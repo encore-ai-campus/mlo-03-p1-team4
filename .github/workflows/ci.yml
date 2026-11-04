@@ -1,40 +1,217 @@
-# PR과 main 푸시마다 검사: 파이썬 Ruff + 프론트 린트·단위 테스트·빌드 (verify.ps1의 CI판)
+# 로컬 verify.ps1과 같은 검사 + DB(실제 MariaDB·MongoDB)·화면 흐름(E2E). 설명: CONTRIBUTING.md 4-1절
+# - PR(develop·main 대상)은 바뀐 폴더에 해당하는 검사만, develop·main 푸시는 전부 돈다.
+# - 건너뛴 job은 '성공'으로 보고되므로, 브랜치 보호에는 마지막 'CI 결과' 하나만 필수로 걸면 된다.
 name: CI
 
 on:
   pull_request:
+    branches: [develop, main]
   push:
-    branches: [main, develop]
+    branches: [develop, main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read # paths-filter가 PR의 바뀐 파일 목록을 읽음
 
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  python:
+  changes:
+    name: 바뀐 곳 찾기
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      frontend: ${{ github.event_name != 'pull_request' || steps.filter.outputs.frontend == 'true' }}
+      data: ${{ github.event_name != 'pull_request' || steps.filter.outputs.data == 'true' }}
+    steps:
+      - uses: actions/checkout@v7
+      - id: filter
+        if: github.event_name == 'pull_request'
+        uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
+        with:
+          filters: |
+            frontend:
+              - 'frontend/**'
+              - '.github/workflows/ci.yml'
+            data:
+              - 'backend/**'
+              - 'db/**'
+              - 'docs/db/**'
+              - 'infra/local/**'
+              - 'environment.yml'
+              - 'pytest.ini'
+              - '.github/workflows/ci.yml'
+
+  ruff:
     name: Ruff
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
-      - run: pip install ruff==0.17.3
-      - run: ruff check .
+      - run: pip install ruff==0.17.3 # environment.yml과 같은 버전
+      - run: ruff check --output-format=github .
       - run: ruff format --check .
 
   frontend:
     name: 프론트 verify
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     defaults:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: "24"
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
-      - run: npm run verify
+      - run: npm run verify # 린트 · 단위 테스트 · 빌드
+
+  e2e:
+    name: 프론트 E2E
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e # CI에서는 빌드 → preview(4173)로 띄워 목업 데이터로 돈다
+      - name: 실패하면 trace 올리기
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-test-results
+          path: frontend/test-results/
+          retention-days: 7
+
+  data:
+    name: DB·백엔드 테스트
+    needs: changes
+    if: needs.changes.outputs.data == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      # CI 안에서만 쓰고 버리는 컨테이너 비밀번호(실제 서비스 비밀번호 아님)
+      MARIADB_ROOT_PASSWORD: ci-only-root-${{ github.run_id }}
+      MARIADB_PASSWORD: ci-only-app-${{ github.run_id }}
+      MARIADB_PORT: "3308"
+      COMPOSE: docker compose -f infra/local/docker-compose.yml
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: 로컬과 같은 compose로 MariaDB 11.4 · MongoDB 7 띄우기 (0001 · seed · mongo_init 자동)
+        run: $COMPOSE up -d --wait mariadb mongodb
+
+      - name: MariaDB 클라이언트 준비 (컨테이너 안의 mariadb를 부르는 래퍼)
+        run: |
+          id=$($COMPOSE ps -q mariadb)
+          printf '#!/bin/sh\nexec docker exec -i -e MYSQL_PWD="$MYSQL_PWD" %s mariadb "$@"\n' "$id" > "$RUNNER_TEMP/mariadb"
+          chmod +x "$RUNNER_TEMP/mariadb"
+          echo "MARIADB_BIN=$RUNNER_TEMP/mariadb" >> "$GITHUB_ENV"
+
+      - name: 서버 설정 · seed 확인 (STRICT · +09:00 · 유형 5 · 시설 20 · 지역 230)
+        env:
+          MYSQL_PWD: ${{ env.MARIADB_ROOT_PASSWORD }}
+        run: |
+          q() { "$MARIADB_BIN" -uroot -N -B spacecube -e "$1"; }
+          expect() { got=$(q "$2"); echo "$1: $got"; [ "$got" = "$3" ] || { echo "::error::$1 기대 $3, 실제 $got"; exit 1; }; }
+          expect "sql_mode" "SELECT @@GLOBAL.sql_mode" "STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION"
+          expect "time_zone" "SELECT @@GLOBAL.time_zone" "+09:00"
+          expect "categories" "SELECT COUNT(*) FROM categories" "5"
+          expect "facilities" "SELECT COUNT(*) FROM facilities" "20"
+          expect "regions" "SELECT COUNT(*) FROM regions" "230"
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: environment.yml
+
+      - name: DDL · 제약 검사 (db/tests/check_ddl.py, 29건 + 동시 결제)
+        env:
+          # 래퍼가 컨테이너 안에서 접속하므로 컨테이너 안 포트 3306
+          CHECK_DB_URL: mysql://root:${{ env.MARIADB_ROOT_PASSWORD }}@127.0.0.1:3306/spacecube_test
+        run: python db/tests/check_ddl.py
+
+      - name: MongoDB 검증기 · 인덱스 · TTL 검사 (db/tests/check_mongo_init.js)
+        run: |
+          $COMPOSE cp db/tests/check_mongo_init.js mongodb:/tmp/check_mongo_init.js
+          $COMPOSE exec -T mongodb mongosh --quiet /tmp/check_mongo_init.js | tee mongo_check.txt
+          grep -qx '실패 0' mongo_check.txt
+
+      - name: pytest 준비 (테스트 파일이 있을 때만 패키지 설치 + spacecube_test에 0001 · seed)
+        id: prep
+        env:
+          MYSQL_PWD: ${{ env.MARIADB_ROOT_PASSWORD }}
+        run: |
+          if [ -z "$(find backend/tests db/tests -name 'test_*.py' -o -name '*_test.py' | head -1)" ]; then
+            echo "테스트 파일 없음, pytest 건너뜀"; echo "run=false" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          grep -E '^ {6}- [A-Za-z]' environment.yml | sed -E 's/^ {6}- ([^ #]+).*/\1/' > "$RUNNER_TEMP/requirements.txt"
+          pip install -r "$RUNNER_TEMP/requirements.txt"
+          "$MARIADB_BIN" -uroot -e "DROP DATABASE IF EXISTS spacecube_test; CREATE DATABASE spacecube_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+          "$MARIADB_BIN" -uroot spacecube_test < db/migrations/0001_init.sql
+          "$MARIADB_BIN" -uroot spacecube_test < db/seed/seed.sql
+          echo "run=true" >> "$GITHUB_OUTPUT"
+
+      - name: pytest (backend/tests · db/tests)
+        if: steps.prep.outputs.run == 'true'
+        env:
+          # 키 이름은 backend/.env.example. A가 설정 키를 바꾸면 여기도 같이 고친다
+          CHECK_DB_URL: mysql+pymysql://root:${{ env.MARIADB_ROOT_PASSWORD }}@127.0.0.1:3308/spacecube_test?charset=utf8mb4
+          DB_WRITE_URL: mysql+pymysql://root:${{ env.MARIADB_ROOT_PASSWORD }}@127.0.0.1:3308/spacecube_test?charset=utf8mb4
+          DB_READ_URL: ""
+          MONGO_URL: mongodb://127.0.0.1:27017
+          MONGO_DB: spacecube_test
+          JWT_SECRET: ci-only-not-a-secret-0123456789abcdef
+          JWT_EXPIRE_MINUTES: "60"
+          INTERNAL_API_KEY: ci-only-internal-key
+          LOG_DIR: ${{ runner.temp }}/logs
+          SERVER_NAME: api-ci
+          CORS_ORIGINS: http://localhost:5173
+          BOOKING_PAST_DAYS: "365"
+          BOOKING_FUTURE_DAYS: "365"
+        run: python -m pytest -q
+
+      - name: 실패하면 DB 로그
+        if: failure()
+        run: $COMPOSE logs --tail=200
+
+  result:
+    name: CI 결과
+    if: always()
+    needs: [changes, ruff, frontend, e2e, data]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: 결과 모으기 (필수 검사는 이 job 하나)
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          {
+            echo "| 검사 | 결과 |"; echo "| --- | --- |"
+            echo "$RESULTS" | jq -r 'to_entries[] | "| \(.key) | \(.value.result) |"'
+          } >> "$GITHUB_STEP_SUMMARY"
+          if echo "$RESULTS" | jq -e 'any(.[]; .result == "failure" or .result == "cancelled")' > /dev/null; then
+            echo "::error::실패한 검사가 있습니다"; exit 1
+          fi

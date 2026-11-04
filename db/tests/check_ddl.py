@@ -24,12 +24,15 @@ STRICT = "STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_
 
 
 def load_url():
-    env = {}
-    for line in ENV_FILE.read_text(encoding="utf-8").splitlines():
-        if "=" in line and not line.startswith("#"):
-            key, value = line.split("=", 1)
-            env[key] = value
-    raw = os.environ.get("CHECK_DB_URL") or env["DB_WRITE_URL"]  # 다른 DB(로컬 compose·RDS)를 볼 때
+    # 다른 DB(로컬 compose·RDS·CI)를 볼 때는 CHECK_DB_URL. 있으면 .env를 읽지 않는다
+    raw = os.environ.get("CHECK_DB_URL")
+    if not raw:
+        env = {}
+        for line in ENV_FILE.read_text(encoding="utf-8").splitlines():
+            if "=" in line and not line.startswith("#"):
+                key, value = line.split("=", 1)
+                env[key] = value
+        raw = env["DB_WRITE_URL"]
     url = urlparse(raw.replace("mysql+pymysql", "mysql"))
     assert url.path.strip("/") == TEST_DB, "DB_WRITE_URL은 spacecube_test를 가리켜야 함"
     return url
