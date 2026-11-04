@@ -1,4 +1,4 @@
-"""F-20 실제 상세 API와 MariaDB, 이미지·NEW·시간 칸 계약을 검증한다."""
+"""F-20·22 실제 상세·시간 칸 API와 MariaDB 계약을 검증한다."""
 
 import inspect
 import os
@@ -13,9 +13,10 @@ from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import NullPool
 
+from app.core.config import Settings
 from app.core.db import get_db_read
 from app.main import app
-from app.routers.venues import get_venue
+from app.routers.venues import get_slots, get_venue
 from app.services import venue_service
 
 
@@ -462,7 +463,11 @@ def test_detail_reads_latest_values_without_writing(venue_client, synthetic_venu
     )
 
 
-def test_detail_router_is_registered_with_public_read_dependency():
+@pytest.mark.parametrize(
+    ("path", "endpoint"),
+    [("/venues/{venue_id}", get_venue), ("/venues/{venue_id}/slots", get_slots)],
+)
+def test_venue_router_is_registered_with_public_read_dependency(path, endpoint):
     def api_routes(routes, prefix=""):
         for route in routes:
             if isinstance(route, APIRoute):
@@ -476,11 +481,218 @@ def test_detail_router_is_registered_with_public_read_dependency():
 
     routes = [
         route
-        for path, route in api_routes(app.routes)
-        if path == "/venues/{venue_id}" and "GET" in route.methods
+        for route_path, route in api_routes(app.routes)
+        if route_path == path and "GET" in route.methods
     ]
     assert len(routes) == 1
-    assert str(app.url_path_for("get_venue", venue_id=7)) == "/venues/7"
-    assert routes[0].endpoint is get_venue
-    assert not inspect.iscoroutinefunction(get_venue)
+    assert str(app.url_path_for(endpoint.__name__, venue_id=7)) == path.replace("{venue_id}", "7")
+    assert routes[0].endpoint is endpoint
+    assert not inspect.iscoroutinefunction(endpoint)
     assert [dependency.call for dependency in routes[0].dependant.dependencies] == [get_db_read]
+
+
+def test_slots_today_matches_detail(venue_client, synthetic_venue):
+    """별도 API와 상세의 오늘 칸은 같은 계약을 유지한다."""
+    _, venue_id, today = synthetic_venue
+    response = venue_client.get(f"/venues/{venue_id}/slots", params={"date": today.isoformat()})
+    assert response.status_code == 200
+    assert response.json() == venue_client.get(f"/venues/{venue_id}").json()["slots"]
+
+
+@pytest.mark.parametrize("offset", [-1, 0, 1])
+def test_slots_isolate_dates_and_keep_completed_occupancy(
+    venue_client, synthetic_venue, add_reservation, offset
+):
+    """완료·확정 칸은 해당 날짜에만 점유하며 최소시간으로 표시 칸을 줄이지 않는다."""
+    connection, venue_id, today = synthetic_venue
+    connection.execute(
+        text(
+            "UPDATE venues SET open_hour = 10, close_hour = 14, min_hours = 2 WHERE venue_id = :id"
+        ),
+        {"id": venue_id},
+    )
+    for day_offset, hour in [(-1, 11), (0, 12), (1, 13)]:
+        day = today + timedelta(days=day_offset)
+        reservation_id, _ = add_reservation(
+            day=day,
+            start_hour=hour,
+            end_hour=hour + 1,
+            status="completed" if day_offset < 0 else "confirmed",
+        )
+        connection.execute(
+            text(
+                "INSERT INTO reservation_slots (venue_id, slot_date, slot_hour, reservation_id) "
+                "VALUES (:id, :day, :hour, :reservation_id)"
+            ),
+            {"id": venue_id, "day": day, "hour": hour, "reservation_id": reservation_id},
+        )
+    response = venue_client.get(
+        f"/venues/{venue_id}/slots", params={"date": (today + timedelta(days=offset)).isoformat()}
+    )
+    assert response.status_code == 200
+    assert response.json() == [
+        {
+            "hour": hour,
+            "taken": hour == 12 + offset,
+            "past": offset < 0 or (offset == 0 and hour <= 12),
+        }
+        for hour in range(10, 14)
+    ]
+
+
+def test_slots_ignore_other_venues(venue_client, synthetic_venue, add_reservation):
+    connection, venue_id, today = synthetic_venue
+    other_id = connection.execute(
+        text(
+            "INSERT INTO venues (region_id, category_id, name, capacity_max, price_per_hour, "
+            "open_hour, close_hour) SELECT region_id, category_id, '다른 가상 공간', 4, 10000, "
+            "9, 23 FROM venues WHERE venue_id = :id"
+        ),
+        {"id": venue_id},
+    ).lastrowid
+    reservation_id, _ = add_reservation(start_hour=13, end_hour=14, status="confirmed")
+    connection.execute(
+        text("UPDATE reservations SET venue_id = :id WHERE reservation_id = :rid"),
+        {"id": other_id, "rid": reservation_id},
+    )
+    connection.execute(
+        text(
+            "INSERT INTO reservation_slots (venue_id, slot_date, slot_hour, reservation_id) "
+            "VALUES (:id, :day, 13, :rid)"
+        ),
+        {"id": other_id, "day": today, "rid": reservation_id},
+    )
+    response = venue_client.get(f"/venues/{venue_id}/slots", params={"date": today.isoformat()})
+    assert response.status_code == 200
+    assert not any(slot["taken"] for slot in response.json())
+
+
+@pytest.mark.parametrize(
+    ("past_days", "future_days", "offset", "allowed"),
+    [
+        (365, 365, -365, True),
+        (365, 365, 365, True),
+        (365, 365, -366, False),
+        (365, 365, 366, False),
+        (2, 3, -2, True),
+        (2, 3, 3, True),
+        (2, 3, -3, False),
+        (2, 3, 4, False),
+        (0, 0, 0, True),
+        (0, 0, -1, False),
+        (0, 0, 1, False),
+    ],
+)
+def test_slots_configured_date_range(
+    venue_client, synthetic_venue, monkeypatch, past_days, future_days, offset, allowed
+):
+    """기본·변경·0일 설정 모두 양끝 날짜를 포함한다."""
+    _, venue_id, today = synthetic_venue
+    settings = Settings(
+        _env_file=None, booking_past_days=past_days, booking_future_days=future_days
+    )
+    monkeypatch.setattr(venue_service, "get_settings", lambda: settings)
+    response = venue_client.get(
+        f"/venues/{venue_id}/slots", params={"date": (today + timedelta(days=offset)).isoformat()}
+    )
+    if allowed:
+        assert response.status_code == 200
+        assert response.json() == [
+            {"hour": hour, "taken": False, "past": offset < 0 or (offset == 0 and hour <= 12)}
+            for hour in range(9, 23)
+        ]
+    else:
+        assert response.status_code == 400
+        assert response.json() == {
+            "code": "OUT_OF_RANGE",
+            "message": "예약할 수 없는 날짜나 시간이에요.",
+            "detail": {
+                "reason": "date",
+                "min_date": (today - timedelta(days=past_days)).isoformat(),
+                "max_date": (today + timedelta(days=future_days)).isoformat(),
+            },
+        }
+
+
+@pytest.mark.parametrize(
+    "requested_date",
+    [
+        None,
+        "",
+        "2026-02-30",
+        "2026-13-01",
+        "20261105",
+        "2026-1-05",
+        "2026-11-05T00:00:00",
+        "not-date",
+        "2026-W45-4",
+        "1762387200",
+    ],
+)
+def test_slots_reject_missing_or_noncanonical_date(venue_client, synthetic_venue, requested_date):
+    _, venue_id, _ = synthetic_venue
+    params = {} if requested_date is None else {"date": requested_date}
+    response = venue_client.get(f"/venues/{venue_id}/slots", params=params)
+    assert response.status_code == 400
+    assert response.json()["code"] == "VALIDATION"
+    assert response.json()["detail"]["fields"][0]["field"] == "date"
+
+
+@pytest.mark.parametrize("venue_id", ["0", "-1", "abc", "1.5", "9223372036854775808"])
+def test_slots_reject_invalid_id(venue_client, synthetic_venue, venue_id):
+    _, _, today = synthetic_venue
+    response = venue_client.get(f"/venues/{venue_id}/slots", params={"date": today.isoformat()})
+    assert response.status_code == 400
+    assert response.json()["code"] == "VALIDATION"
+    assert response.json()["detail"]["fields"][0]["field"] == "venue_id"
+
+
+@pytest.mark.parametrize("inactive", [False, True])
+def test_slots_missing_or_inactive_404(venue_client, synthetic_venue, inactive):
+    connection, venue_id, today = synthetic_venue
+    if inactive:
+        connection.execute(
+            text("UPDATE venues SET is_active = FALSE WHERE venue_id = :id"), {"id": venue_id}
+        )
+    requested_id = venue_id if inactive else 9223372036854775807
+    response = venue_client.get(f"/venues/{requested_id}/slots", params={"date": today.isoformat()})
+    assert response.status_code == 404
+    assert response.json() == {
+        "code": "VENUE_NOT_FOUND",
+        "message": "공간을 찾을 수 없어요.",
+        "detail": None,
+    }
+
+
+def test_slots_reread_occupancy(venue_client, synthetic_venue, add_reservation):
+    """조회 후 추가된 칸을 다음 요청과 F-20에서 즉시 반영한다."""
+    connection, venue_id, today = synthetic_venue
+    path = f"/venues/{venue_id}/slots"
+    before = venue_client.get(path, params={"date": today.isoformat()})
+    assert before.status_code == 200
+    assert not any(slot["taken"] for slot in before.json())
+    reservation_id, _ = add_reservation(start_hour=13, end_hour=14, status="confirmed")
+    connection.execute(
+        text(
+            "INSERT INTO reservation_slots (venue_id, slot_date, slot_hour, reservation_id) "
+            "VALUES (:id, :day, 13, :rid)"
+        ),
+        {"id": venue_id, "day": today, "rid": reservation_id},
+    )
+    after = venue_client.get(path, params={"date": today.isoformat()})
+    assert after.status_code == 200
+    assert [slot["hour"] for slot in after.json() if slot["taken"]] == [13]
+    assert after.json() == venue_client.get(f"/venues/{venue_id}").json()["slots"]
+
+
+@pytest.mark.parametrize("current_hour", [0, 9, 23])
+def test_slots_today_hour_boundaries(venue_client, synthetic_venue, monkeypatch, current_hour):
+    _, venue_id, today = synthetic_venue
+    monkeypatch.setattr(
+        venue_service, "get_now", lambda: datetime.combine(today, time(current_hour))
+    )
+    response = venue_client.get(f"/venues/{venue_id}/slots", params={"date": today.isoformat()})
+    assert response.status_code == 200
+    assert response.json() == [
+        {"hour": hour, "taken": False, "past": hour <= current_hour} for hour in range(9, 23)
+    ]

@@ -133,6 +133,19 @@ infra/nginx/       spacecube.conf         # [B] upstream 2대, /health
 - 실제 이미지가 있으면 정렬된 첫 그림을 대표 이미지로 쓰고 갤러리는 그 순서를 유지합니다.
 - `is_new`는 DB의 한국 시각 `created_at`을 날짜로 바꿔 `0 <= (get_today() - created_at.date()).days < 14`로 계산합니다. 오늘과 13일 전은 포함하고 14일 전·미래 날짜는 제외합니다. 경과 336시간이 아니라 한국 달력 날짜 14개가 기준입니다.
 
+F-22 `GET /venues/{venue_id}/slots?date=YYYY-MM-DD`:
+
+```json
+[{"hour": 9, "taken": false, "past": true}, {"hour": 10, "taken": true, "past": true}]
+```
+
+- 인증 없이 `get_db_read()`로 조회하며 `date`는 필수입니다. `YYYY-MM-DD` 형식의 실제 날짜만 허용합니다. 누락·잘못된 형식·존재하지 않는 날짜·잘못된 공간 ID는 공통 400 `VALIDATION`입니다.
+- 날짜는 한국 `get_today()` 기준 `BOOKING_PAST_DAYS`일 전부터 `BOOKING_FUTURE_DAYS`일 후까지 양끝을 포함합니다(기본 각각 365). 범위 밖은 400 `OUT_OF_RANGE`, 문구는 “예약할 수 없는 날짜나 시간이에요.”, `detail`은 `{"reason":"date","min_date":"YYYY-MM-DD","max_date":"YYYY-MM-DD"}`입니다.
+- 범위를 확인한 뒤 활성 공간을 읽으며 없는 공간·비활성 공간은 같은 404 `VENUE_NOT_FOUND`입니다.
+- 응답은 배열입니다. `open_hour`부터 `close_hour` 직전까지 1시간 칸을 오름차순으로 모두 반환합니다. 최소 예약시간·연속 빈 칸 여부로 표시 칸을 제외하지 않습니다.
+- `taken`은 해당 공간·날짜의 `reservation_slots` 존재 여부입니다. 완료 예약의 칸도 점유로 표시하고 다른 공간·날짜는 섞지 않습니다. `past`는 위의 표시 규칙을 따르며 지난 빈 칸도 유지합니다.
+- 오늘 조회 결과는 F-20의 `slots`와 같습니다. 점유 상태는 캐시하지 않으며 매 요청 다시 읽습니다. replica 복제 지연 가능성과 예약 시 primary 최종 판정 원칙은 동일합니다.
+
 `/available-dates`:
 
 ```json

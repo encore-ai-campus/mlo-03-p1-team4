@@ -1,11 +1,12 @@
-"""F-20 공간 상세 조합과 F-14 공통 NEW 판정."""
+"""F-20·22 공간 상세·날짜별 시간 칸과 F-14 공통 NEW 판정."""
 
 from collections.abc import Sequence
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 from sqlalchemy.orm import Session
 
 from app.core.clock import get_now, get_today
+from app.core.config import get_settings
 from app.core.errors import AppError
 from app.repositories import slot_repo, venue_repo
 from app.schemas.catalog import CategoryRead, FacilityRead
@@ -84,4 +85,35 @@ def get_venue(db: Session, venue_id: int) -> VenueRead:
         description=venue["description"],
         notice=venue["notice"],
         slots=slots,
+    )
+
+
+def get_slots(db: Session, venue_id: int, slot_date: date) -> list[SlotRead]:
+    """지난 날짜도 허용하고 설정된 날짜 범위 안의 공간·일자별 칸을 반환한다."""
+    today = get_today()
+    settings = get_settings()
+    min_date = today - timedelta(days=settings.booking_past_days)
+    max_date = today + timedelta(days=settings.booking_future_days)
+    if not min_date <= slot_date <= max_date:
+        raise AppError(
+            "OUT_OF_RANGE",
+            "예약할 수 없는 날짜나 시간이에요.",
+            400,
+            detail={
+                "reason": "date",
+                "min_date": min_date.isoformat(),
+                "max_date": max_date.isoformat(),
+            },
+        )
+
+    venue = venue_repo.get_slot_context(db, venue_id)
+    if venue is None:
+        raise AppError("VENUE_NOT_FOUND", "공간을 찾을 수 없어요.", 404)
+    return build_slots(
+        venue["open_hour"],
+        venue["close_hour"],
+        slot_date,
+        slot_repo.list_taken_hours(db, venue_id, slot_date),
+        today=today,
+        now=get_now(),
     )

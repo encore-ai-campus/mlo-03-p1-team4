@@ -1,8 +1,22 @@
-"""F-20 공간 상세의 공개 응답 계약."""
+"""F-20·22 공간 상세·시간 칸의 공개 요청·응답 계약."""
 
-from pydantic import BaseModel
+import re
+from datetime import date
+from typing import Annotated
+
+from pydantic import BaseModel, BeforeValidator
 
 from app.schemas.catalog import CategoryRead, FacilityRead
+
+
+def _require_iso_date(value: object) -> str:
+    """날짜 타입의 유연한 변환 전에 API의 YYYY-MM-DD 형식을 엄격히 확인한다."""
+    if not isinstance(value, str) or re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", value) is None:
+        raise ValueError("날짜는 YYYY-MM-DD 형식으로 입력해 주세요.")
+    return value
+
+
+type BookingDate = Annotated[date, BeforeValidator(_require_iso_date)]
 
 
 class VenueRegionRead(BaseModel):
