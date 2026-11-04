@@ -4,7 +4,7 @@ import { useAuthStore } from '@/stores/auth'
 import { setUnauthorizedHandler } from '@/api/client'
 
 const routes = [
-  { path: '/', name: 'main', component: MainPage, meta: { title: '공간큐브' } },
+  { path: '/', name: 'main', component: MainPage, meta: { title: '다락큐브' } },
   { path: '/search', name: 'search', component: () => import('@/pages/SearchPage.vue'), meta: { title: '빈 시간 찾기' } },
   { path: '/rooms/:roomId', redirect: (to) => ({ name: 'venue', params: { venueId: to.params.roomId }, query: to.query }) },
   { path: '/venues/:venueId', name: 'venue', component: () => import('@/pages/RoomPage.vue'), meta: { title: '공간 상세' } },
@@ -37,7 +37,7 @@ router.beforeEach((to) => {
 })
 
 router.afterEach((to) => {
-  document.title = to.meta.title === '공간큐브' ? '공간큐브 · 1시간 단위 공간 예약' : `${to.meta.title} · 공간큐브`
+  document.title = to.meta.title === '다락큐브' ? '다락큐브 · 1시간 단위 공간 예약' : `${to.meta.title} · 다락큐브`
 })
 
 setUnauthorizedHandler(() => {

@@ -16,3 +16,6 @@ README '수행결과'에 넣는 화면입니다. 프론트 목업 데이터로 �
 ```bash
 npx playwright screenshot --channel chrome --viewport-size=1280,860 --wait-for-timeout=2500 http://localhost:5173/ ../docs/figures/screens/main.png
 ```
+
+- 공간 상세(`venue.png`, `venue_mobile.png`)는 칸이 '지남'으로만 보이지 않게 내일 날짜로 찍습니다: `http://localhost:5173/venues/1?date=YYYY-MM-DD`
+- 11-04 다시 찍음: 이름을 다락큐브로 바꾸고 공통 푸터를 시안대로 바꾼 뒤
