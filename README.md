@@ -68,34 +68,9 @@
 
 1차는 AWS 프리 티어(크레딧) 안에서 **EC2 3대 + RDS**로 올립니다. 브라우저는 Nginx만 부르고, FastAPI는 밖에서 직접 부를 수 없습니다. EC2에는 Docker 없이 직접 설치합니다. 기준: [AWS 프리 티어 구성](docs/AWS_프리티어_구성.md), [시스템 아키텍처](docs/산출물_02_시스템아키텍처_흐름도.md)
 
-```mermaid
-flowchart LR
-  U["사용자 브라우저<br/>Vue 3"] -->|"HTTP 80"| N
-  L["Locust<br/>(노트북)"] -->|부하| N
-  subgraph VPC["AWS VPC · 서울 리전"]
-    subgraph PA["public-a"]
-      N["① 정문 EC2<br/>Nginx + MongoDB 7"]
-      A1["② FastAPI #1<br/>+ 배치·크롤러 cron"]
-    end
-    subgraph PC["public-c"]
-      A2["③ FastAPI #2"]
-    end
-    subgraph DB["private-db"]
-      P[("MariaDB primary<br/>RDS")]
-      R[("read replica<br/>측정하는 날만")]
-    end
-  end
-  N -->|"/api 라운드로빈"| A1
-  N -->|"/api 라운드로빈"| A2
-  A1 & A2 -->|"쓰기·인증·내 것"| P
-  A1 & A2 -->|"공개 조회"| R
-  P -. 비동기 복제 .-> R
-  A1 & A2 -->|"이벤트(응답 뒤)"| N
-  A1 & A2 -. "Alloy: 로그·지표" .-> G["Grafana Cloud<br/>Loki · Prometheus"]
-  A1 -->|"크롤링(주 1회, 20건 이하)"| S["스페이스클라우드"]
-```
+![다락큐브 시스템 아키텍처 1차 구성(C안)](docs/figures/architecture.png)
 
-확장안(EC2 5대 + RDS 2대 + 모니터링 EC2)은 [그림](docs/figures/architecture.png)으로 남기고, 측정에서 조건을 넘으면 ALB·Auto Scaling을 더합니다.
+확장안(EC2 5대 + RDS 2대 + 모니터링 EC2)은 [그림](docs/figures/architecture_expanded.png)으로 남기고, 측정에서 조건을 넘으면 ALB·Auto Scaling을 더합니다.
 
 ## 4. WBS
 

@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>다락큐브 시스템 아키텍처 · 확장안</title>
+<style>
+  :root {
+    --ink: #1f2430; --muted: #5b6475; --line: #4b5563; --read: #2563eb; --write: #c2410c;
+    --event: #15803d; --obs: #7c3aed; --pub: #eef6ff; --pubb: #93c5fd; --priv: #fff4ec; --privb: #fdba74;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body { width: 1800px; height: 1040px; background: #fff; font-family: 'Noto Sans KR', 'Malgun Gothic', sans-serif; color: var(--ink); position: relative; }
+  .title { position: absolute; left: 40px; top: 18px; font-size: 26px; font-weight: 700; }
+  .sub { position: absolute; left: 40px; top: 56px; font-size: 14px; color: var(--muted); }
+  .box { position: absolute; border-radius: 14px; }
+  .aws { left: 240px; top: 96px; width: 1270px; height: 860px; border: 2px solid #f59e0b; background: #fffdf7; }
+  .vpc { left: 262px; top: 140px; width: 1226px; height: 796px; border: 2px dashed #8c99ad; background: #fbfcfe; }
+  .box-label { position: absolute; left: 14px; top: 8px; font-size: 14px; font-weight: 700; color: var(--muted); display: flex; gap: 8px; align-items: center; }
+  .box-label img { width: 22px; height: 22px; }
+  .card { position: absolute; width: 180px; min-height: 104px; background: #fff; border: 1.5px solid #cbd2dc; border-radius: 12px; padding: 10px 10px 8px; text-align: center; box-shadow: 0 1px 2px rgba(15,23,42,.06); }
+  .card img { height: 38px; display: block; margin: 0 auto 4px; }
+  .card b { display: block; font-size: 15px; }
+  .card span { display: block; font-size: 12px; color: var(--muted); line-height: 1.35; }
+  .tag { position: absolute; top: -11px; right: 10px; font-size: 11px; font-weight: 700; padding: 1px 8px; border-radius: 999px; border: 1px solid; }
+  .tag.pub { background: var(--pub); border-color: var(--pubb); color: #1d4ed8; }
+  .tag.priv { background: var(--priv); border-color: var(--privb); color: #c2410c; }
+  .card.opt { border-style: dashed; opacity: .8; }
+  .mon { position: absolute; left: 1222px; top: 196px; width: 240px; height: 400px; border: 1.5px solid #c4b5fd; background: #faf7ff; border-radius: 14px; }
+  .mon .row { display: flex; align-items: center; gap: 12px; margin: 14px 16px 0; padding: 10px; background: #fff; border: 1px solid #ddd6fe; border-radius: 10px; }
+  .mon .row img { width: 40px; height: 40px; object-fit: contain; }
+  .mon .row b { font-size: 15px; display: block; }
+  .mon .row span { font-size: 12px; color: var(--muted); }
+  svg.edges { position: absolute; inset: 0; width: 1800px; height: 1040px; pointer-events: none; }
+  .lbl { font-size: 12.5px; fill: var(--ink); font-weight: 600; paint-order: stroke; stroke: #fff; stroke-width: 5px; }
+  .legend { position: absolute; left: 40px; top: 760px; width: 180px; font-size: 12.5px; color: var(--muted); line-height: 1.9; }
+  .legend i { display: inline-block; width: 28px; height: 0; border-top: 3px solid; vertical-align: middle; margin-right: 6px; }
+</style>
+</head>
+<body>
+  <div class="title">다락큐브 시스템 아키텍처 · 확장안</div>
+  <div class="sub">팀원 n번 VPC 10.1n.0.0/16 · 서울 리전 2a / 2c · NAT 게이트웨이 없음 · 2026-11-03</div>
+
+  <div class="box aws"><div class="box-label"><img src="../../architecture/icons/aws.svg" alt="">AWS 서울 리전 (ap-northeast-2)</div></div>
+  <div class="box vpc"><div class="box-label">VPC 10.1n.0.0/16 · 태그 = 서브넷</div></div>
+
+  <!-- 사용자 -->
+  <div class="card" style="left:40px; top:300px"><img src="../../architecture/icons/vuejs.svg" alt=""><b>사용자 브라우저</b><span>Vue 3 화면 7개</span></div>
+  <div class="card" style="left:40px; top:500px"><img src="../../architecture/icons/locust.png" alt=""><b>Locust</b><span>부하·가상 사용자<br>X-Synthetic: 1</span></div>
+
+  <!-- 웹·앱 -->
+  <div class="card" style="left:300px; top:400px"><span class="tag pub">public-a</span><img src="../../architecture/icons/nginx.svg" alt=""><b>Nginx</b><span>탄력적 IP · 정적 파일<br>/api → 라운드로빈</span></div>
+  <div class="card" style="left:580px; top:300px"><span class="tag pub">public-a</span><img src="../../architecture/icons/fastapi.svg" alt=""><b>FastAPI #1</b><span>:8000 · 완료 배치 cron<br>Alloy</span></div>
+  <div class="card" style="left:580px; top:560px"><span class="tag pub">public-c</span><img src="../../architecture/icons/fastapi.svg" alt=""><b>FastAPI #2</b><span>:8000 · 같은 코드<br>Alloy</span></div>
+  <div class="card" style="left:580px; top:166px; min-height:92px; padding-top:8px"><span class="tag pub">#1 안</span><img src="../../architecture/icons/python.svg" alt="" style="height:30px"><b>크롤러 cron</b><span>주 1회 · 상세 ≤ 20건</span></div>
+
+  <!-- 데이터 -->
+  <div class="card" style="left:900px; top:200px"><span class="tag priv">private-db-a</span><img src="../../architecture/icons/mariadb.svg" alt=""><b>MariaDB primary</b><span>RDS · 쓰기·인증·내 것<br>표 12개</span></div>
+  <div class="card" style="left:900px; top:420px"><span class="tag priv">private-db-c</span><img src="../../architecture/icons/mariadb.svg" alt=""><b>MariaDB replica</b><span>RDS read replica<br>공개 조회 (read_only)</span></div>
+  <div class="card opt" style="left:900px; top:630px; min-height:80px"><span class="tag priv">필요하면</span><b style="margin-top:6px">replica 2</b><span>읽기 p95가 목표를 넘을 때</span></div>
+  <div class="card" style="left:900px; top:770px"><span class="tag pub">public-c</span><img src="../../architecture/icons/mongodb.svg" alt=""><b>MongoDB 7</b><span>EC2 · 27017 (sg-app만)<br>user_events · crawl_raw</span></div>
+
+  <!-- 모니터링 -->
+  <div class="mon"><div class="box-label" style="position:static; margin:12px 16px 0">모니터링 EC2 · public-a · Docker</div>
+    <div class="row"><img src="../../architecture/icons/prometheus.svg" alt=""><div><b>Prometheus</b><span>지표 15일 · 복제 지연</span></div></div>
+    <div class="row"><img src="../../architecture/icons/loki.png" alt=""><div><b>Loki</b><span>서버·이벤트 로그 14일</span></div></div>
+    <div class="row"><img src="../../architecture/icons/grafana.svg" alt=""><div><b>Grafana</b><span>:3000 · 대시보드·경보</span></div></div>
+  </div>
+
+  <!-- VPC 밖 -->
+  <div class="card" style="left:1580px; top:150px"><b style="margin-top:10px">스페이스클라우드</b><span>sitemap · /space/&lt;id&gt;<br>robots.txt 준수 · 3초</span></div>
+  <div class="card" style="left:1580px; top:440px"><b style="margin-top:10px">운영자</b><span>Grafana 접속<br>내 IP/32만 허용</span></div>
+
+  <svg class="edges" viewBox="0 0 1800 1040">
+    <defs>
+      <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#4b5563"/></marker>
+      <marker id="aw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#c2410c"/></marker>
+      <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#2563eb"/></marker>
+      <marker id="ae" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#15803d"/></marker>
+      <marker id="ao" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#7c3aed"/></marker>
+    </defs>
+    <g fill="none" stroke-width="2.4">
+      <!-- 사용자 → Nginx -->
+      <path d="M220 352 C260 352 260 440 298 440" stroke="#4b5563" marker-end="url(#a)"/>
+      <path d="M220 552 C260 552 260 470 298 470" stroke="#4b5563" marker-end="url(#a)"/>
+      <!-- Nginx → FastAPI -->
+      <path d="M480 440 C530 440 530 350 578 350" stroke="#4b5563" marker-end="url(#a)"/>
+      <path d="M480 470 C530 470 530 610 578 610" stroke="#4b5563" marker-end="url(#a)"/>
+      <!-- 쓰기(주황) FastAPI → primary -->
+      <path d="M760 330 C830 330 830 240 898 240" stroke="#c2410c" marker-end="url(#aw)"/>
+      <path d="M760 590 C850 590 850 270 898 270" stroke="#c2410c" marker-end="url(#aw)"/>
+      <!-- 읽기(파랑) FastAPI → replica -->
+      <path d="M760 360 C830 360 830 455 898 455" stroke="#2563eb" marker-end="url(#ar)"/>
+      <path d="M760 615 C830 615 830 480 898 480" stroke="#2563eb" marker-end="url(#ar)"/>
+      <!-- 복제 -->
+      <path d="M990 306 L990 418" stroke="#c2410c" stroke-dasharray="7 5" marker-end="url(#aw)"/>
+      <!-- 이벤트(초록) FastAPI → MongoDB -->
+      <path d="M720 666 C720 790 800 815 898 815" stroke="#15803d" marker-end="url(#ae)"/>
+      <!-- 크롤러 -->
+      <path d="M760 200 C1100 120 1400 120 1578 195" stroke="#4b5563" stroke-dasharray="7 5" marker-end="url(#a)"/>
+      <path d="M670 258 L670 298" stroke="#4b5563" marker-end="url(#a)"/>
+      <!-- 관측(보라) -->
+      <path d="M1080 250 L1220 300" stroke="#7c3aed" stroke-dasharray="7 5" marker-end="url(#ao)"/>
+      <path d="M1080 470 L1220 330" stroke="#7c3aed" stroke-dasharray="7 5" marker-end="url(#ao)"/>
+      <path d="M1080 820 C1160 820 1180 560 1220 520" stroke="#7c3aed" stroke-dasharray="7 5" marker-end="url(#ao)"/>
+      <path d="M670 666 L670 752 L1170 752 C1200 752 1205 600 1220 560" stroke="#7c3aed" stroke-dasharray="7 5" marker-end="url(#ao)"/>
+      <path d="M1578 492 L1464 492" stroke="#4b5563" marker-end="url(#a)"/>
+    </g>
+    <text class="lbl" x="232" y="330">HTTP(S) 80/443</text>
+    <text class="lbl" x="492" y="398">라운드로빈</text>
+    <text class="lbl" x="790" y="228" style="fill:#c2410c">쓰기 · 인증 · 내 것</text>
+    <text class="lbl" x="784" y="520" style="fill:#2563eb">공개 조회</text>
+    <text class="lbl" x="1000" y="372" style="fill:#c2410c">비동기 복제</text>
+    <text class="lbl" x="700" y="800" style="fill:#15803d">이벤트 #1·#2 (응답 뒤)</text>
+    <text class="lbl" x="1120" y="128">사이트맵 비교 · 속성만</text>
+    <text class="lbl" x="682" y="284">POST /internal/venues</text>
+    <text class="lbl" x="1096" y="232" style="fill:#7c3aed">exporter</text>
+    <text class="lbl" x="800" y="744" style="fill:#7c3aed">Alloy: 로그 → Loki, 지표 → Prometheus</text>
+    <text class="lbl" x="1474" y="480">:3000</text>
+  </svg>
+
+  <div class="legend">
+    <div><i style="border-color:#4b5563"></i>요청</div>
+    <div><i style="border-color:#c2410c"></i>쓰기 (primary)</div>
+    <div><i style="border-color:#2563eb"></i>읽기 (replica)</div>
+    <div><i style="border-color:#15803d"></i>이벤트 (MongoDB)</div>
+    <div><i style="border-color:#7c3aed; border-top-style:dashed"></i>로그·지표</div>
+  </div>
+</body>
+</html>

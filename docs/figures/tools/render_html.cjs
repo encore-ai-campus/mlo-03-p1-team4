@@ -1,5 +1,5 @@
 // HTML 그림(아키텍처)을 PNG로 만든다. 프론트에 설치된 Playwright(Chromium)를 쓴다.
-// node docs/figures/tools/render_html.cjs docs/figures/src/architecture.html docs/figures/architecture.png 1800 1040
+// node docs/figures/tools/render_html.cjs docs/figures/src/architecture.html docs/figures/architecture.png 1800 1100
 const path = require('path');
 const { chromium } = require(path.join(__dirname, '../../../frontend/node_modules/playwright'));
 const [, , html, png, w, h] = process.argv;
