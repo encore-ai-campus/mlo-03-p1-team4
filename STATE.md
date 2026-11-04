@@ -138,6 +138,7 @@ A1~A4는 11-03에 확정했고, **A5~A8은 추후 확정**으로 미뤘다(11-03
 
 ## 최근 변경 (최신이 위)
 
+- 11-04 · 공동 · CI 확장(`.github/workflows/ci.yml`): 바뀐 폴더별로 프론트 verify·E2E, DB·백엔드 테스트(compose MariaDB·MongoDB로 seed 확인·`check_ddl.py`·`check_mongo_init.js`·pytest) + 결과를 모으는 `CI 결과` job. 루트 `pytest.ini` 추가, `check_ddl.py`는 `CHECK_DB_URL`이 있으면 `.env`를 읽지 않게 함. 설명: CONTRIBUTING 4-1절
 - 11-04 · 공동 · 시스템 아키텍처 그림을 1차 구성(C안: EC2 3대 + RDS, MongoDB는 정문 EC2, Grafana Cloud) 아이콘 그림으로 새로 그림(`docs/figures/architecture.png`). 11-03 그림은 확장안(`architecture_expanded.png`)으로 이름을 바꿔 남김. README 3장의 mermaid를 이 그림으로 바꿈
 - 11-04 · 공동 · `docs/산출물_05_구현_운영_계획.md`(강사님 고려사항 답변) 추가. README를 강사님 목차(주요 프로시저·수행결과·한 줄 회고)로 바꾸고 시연 화면 6장(`docs/figures/screens`) 넣음. 일정 확정: 11-05(목) 통합 → 11-06(금) 피드백·검토 → 11-07(토) 반영 → 11-08(일) 발표 자료 → 11-09(월) 발표
 - 11-04 · FE·공동 · 프론트–명세 대조(가입 필드·이벤트 9종·`X-Session-Id`·오류 코드) 통과. 작은 차이 3건 고침: `오류코드.md` EMAIL_TAKEN에서 '(탈퇴 회원 포함)' 정정(A4), 500 토스트에 `request_id` 표시, 405 토스트 추가(`App.vue`, 단위 테스트 2개 추가 → 54개). `npm run verify` 통과

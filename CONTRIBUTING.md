@@ -55,9 +55,26 @@ powershell -NoProfile -ExecutionPolicy Bypass -File verify.ps1
 ```
 
 - DB를 건드렸으면 `db/tests/check_ddl.py`, 화면 흐름을 바꿨으면 `verify.ps1 -E2E`도 돌립니다.
-- GitHub Actions(CI)가 Ruff와 프론트 `npm run verify`를 다시 돌립니다. **CI가 빨간색이면 머지하지 않습니다.**
+- GitHub Actions(CI)가 아래 4-1절 검사를 다시 돌립니다. **CI가 빨간색이면 머지하지 않습니다.**
 - 작업 PR → `develop` 머지는 **Squash and merge**(PR 하나 = 커밋 하나), `develop` → `main`은 **Merge commit**(그날 묶음이 한 번에 보이게)으로 합니다.
 - `develop` → `main`은 마일스톤이 끝날 때(예: 11-05 통합 점검 통과 뒤, 11-08 발표 버전) 전원이 확인하고 올립니다.
+
+### 4-1. CI (GitHub Actions, `.github/workflows/ci.yml`)
+
+PR(`develop`·`main` 대상)을 올리거나 고칠 때마다, 그리고 `develop`·`main`에 머지될 때마다 돕니다. 워크플로 파일은 브랜치마다 따로 있어서 `develop`에 먼저 들어가고, 마일스톤 끝에 `develop` → `main`으로 같이 올라갑니다.
+
+| 검사 | 언제 | 하는 일 | 로컬에서 같은 것 |
+| --- | --- | --- | --- |
+| Ruff | 항상 | 파이썬 린트·포맷(`ruff.toml`) | `verify.ps1` |
+| 프론트 verify | `frontend/`가 바뀌었을 때 | 린트·단위 테스트·빌드 | `npm run verify` |
+| 프론트 E2E | `frontend/`가 바뀌었을 때 | Playwright(Chromium) 데스크톱·폰, 목업 데이터. 실패하면 trace를 Artifacts에 올림 | `npm run test:e2e` |
+| DB·백엔드 테스트 | `backend/`·`db/`·`docs/db/`·`infra/local/`·`environment.yml`이 바뀌었을 때 | `infra/local` compose로 MariaDB 11.4·MongoDB 7을 띄워 ① STRICT·시간대·seed 수 ② `check_ddl.py`(제약 29건 + 동시 결제) ③ `check_mongo_init.js` ④ 테스트 파일이 있으면 `spacecube_test`에 0001 + seed를 넣고 pytest | `check_ddl.py`, `verify.ps1` |
+| CI 결과 | 항상 | 위 결과를 모아 하나라도 실패하면 실패 | — |
+
+- `develop`·`main`에 머지될 때는 바뀐 곳과 상관없이 전부 돕니다. `workflow_dispatch`로 Actions 탭에서 손으로 돌릴 수도 있습니다.
+- 건너뛴 검사는 '성공'으로 표시됩니다. 브랜치 보호를 켤 수 있게 되면 **'CI 결과' 하나만 필수 검사**로 지정하면 됩니다(관리자 권한 필요).
+- 백엔드 설정 키(`backend/.env.example`)가 바뀌면 `ci.yml`의 pytest 환경 변수도 같이 고칩니다. CI의 DB 비밀번호는 CI 안에서만 쓰고 버리는 값입니다.
+- 빨간색이면 Actions 탭에서 실패한 단계를 열어 보고, 로컬에서 같은 명령으로 재현해 고친 뒤 다시 푸시합니다.
 
 ### 리뷰할 때 보는 것
 

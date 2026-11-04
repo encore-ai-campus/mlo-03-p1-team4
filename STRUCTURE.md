@@ -19,12 +19,13 @@
 Pro_1/
 ├─ AGENTS.md                  [공동] AI 작업 지침 (Codex·Claude Code 공용)
 ├─ CONTRIBUTING.md            [공동] GitHub 규칙: 이슈·브랜치·커밋·PR·리뷰·라벨 (11-04)
-├─ .github/                   [공동] PR·이슈 템플릿, CODEOWNERS(폴더별 리뷰어), CI(Ruff·프론트 verify)
+├─ .github/                   [공동] PR·이슈 템플릿, CODEOWNERS(폴더별 리뷰어), CI(Ruff·프론트 verify·E2E·DB·pytest, CONTRIBUTING 4-1절)
 ├─ README.md                  [공동] 소개, 처음 받았을 때 할 일
 ├─ STATE.md                   [공동] 진행 상태·결정 기록·열린 질문
 ├─ STRUCTURE.md               [공동] 이 파일
 ├─ environment.yml            [공동] conda 환경 pro_1 (Python 3.12)
 ├─ ruff.toml · verify.ps1     [공동] 파이썬 린트 규칙, 커밋 전 전체 검증
+├─ pytest.ini                 [공동] pytest 공통 설정(테스트 폴더, backend import 경로)
 ├─ .gitignore                 [공동] .env·node_modules·글꼴 원본 등 제외
 │
 ├─ docs/                      설계 문서 (docs/README.md)
