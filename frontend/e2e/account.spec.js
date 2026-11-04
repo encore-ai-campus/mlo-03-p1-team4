@@ -1,0 +1,82 @@
+// 회원·후기 확정안: 필수 동의, 나이 검증, 내 후기, 안전한 취소와 탈퇴.
+import { test, expect } from '@playwright/test'
+import { fixClock, loginFirst } from './helpers'
+
+test.beforeEach(async ({ page }) => fixClock(page))
+
+async function openMenu(page, label) {
+  const link = page.getByRole('link', { name: label, exact: true })
+  if (!(await link.isVisible())) await page.getByRole('button', { name: '내 메뉴', exact: true }).click()
+  await page.getByRole('link', { name: label, exact: true }).click()
+}
+
+test('가입 필수 동의와 만 14세 검증 뒤 가입하고 로그인한다', async ({ page }) => {
+  await page.goto('/login?tab=signup')
+  const form = page.locator('form')
+  const submit = form.getByRole('button', { name: '가입하기', exact: true })
+  await expect(submit).toBeDisabled()
+  await form.getByLabel('이름', { exact: true }).fill('테스트회원')
+  await form.getByLabel('이메일', { exact: true }).fill('new-member@example.com')
+  await form.getByLabel('비밀번호', { exact: true }).fill('account1234')
+  await form.getByLabel('비밀번호 확인', { exact: true }).fill('account1234')
+  await form.getByLabel('휴대폰 번호', { exact: true }).fill('010-2222-3333')
+  await form.getByLabel('생년월일 6자리', { exact: true }).fill('200101')
+  await form.getByRole('combobox', { name: '출생연도·성별 구분' }).click()
+  await page.getByRole('option', { name: '2000년대 출생 · 남성' }).click()
+  await form.getByLabel('필수 항목 모두 동의').check()
+  await expect(form.getByLabel('[선택] 새 공간 소식 받기')).not.toBeChecked()
+  await form.getByLabel('[필수] 개인정보 수집·이용', { exact: true }).uncheck()
+  await form.getByLabel('[필수] 이용약관', { exact: true }).check()
+  await expect(submit).toBeDisabled()
+  await form.getByLabel('[필수] 개인정보 수집·이용', { exact: true }).check()
+  await expect(submit).toBeEnabled()
+  await form.getByRole('button', { name: '시연용 이용약관 전문 보기' }).click()
+  await expect(form.getByText(/실제 결제나 공간 이용 계약은 발생하지 않습니다/)).toBeVisible()
+  await submit.click()
+  await expect(form.getByText('만 14세 이상부터 가입할 수 있어요.', { exact: true })).toBeVisible()
+  await form.getByLabel('생년월일 6자리', { exact: true }).fill('000101')
+  await submit.click()
+  await expect(page.getByRole('tab', { name: '로그인', exact: true })).toHaveAttribute('aria-selected', 'true')
+  await page.locator('form').getByLabel('비밀번호', { exact: true }).fill('account1234')
+  await page.locator('form').getByRole('button', { name: '로그인', exact: true }).click()
+  await expect(page).toHaveURL('/')
+})
+
+test('이용 완료 예약에 쓴 후기가 내 후기에 바로 보인다', async ({ page }) => {
+  await loginFirst(page, '/me?tab=completed&review=1003')
+  const dialog = page.getByRole('dialog', { name: '후기 쓰기', exact: true })
+  await expect(dialog).toBeVisible()
+  await dialog.getByRole('radio', { name: '5점', exact: true }).check()
+  await dialog.getByLabel('어땠나요?', { exact: true }).fill('편안한 공간에서 집중해서 공부했어요.')
+  await dialog.getByRole('button', { name: '후기 올리기', exact: true }).click()
+  await expect(dialog).toBeHidden()
+  await expect(page.getByText('후기 작성 완료').first()).toBeVisible()
+  await openMenu(page, '내가 쓴 후기')
+  await expect(page.getByText('편안한 공간에서 집중해서 공부했어요.', { exact: true })).toBeVisible()
+})
+
+test('취소 창은 취소하지 않기에 초점을 두고 취소하면 환불을 표시한다', async ({ page }) => {
+  await loginFirst(page, '/me')
+  await page.getByRole('button', { name: '예약 취소', exact: true }).first().click()
+  const dialog = page.getByRole('dialog', { name: '이 예약을 취소할까요?', exact: true })
+  await expect(dialog.getByRole('button', { name: '취소하지 않기', exact: true })).toBeFocused()
+  await dialog.getByRole('button', { name: '예약 취소', exact: true }).click()
+  await expect(dialog).toBeHidden()
+  await page.getByRole('tab', { name: '취소', exact: true }).click()
+  await expect(page.getByText(/환불 완료/).first()).toBeVisible()
+})
+
+test('탈퇴 전 이용 예정 예약을 알리고 확인한 뒤 개인정보를 지운다', async ({ page }) => {
+  await loginFirst(page, '/me')
+  await openMenu(page, '회원 정보')
+  await page.getByRole('button', { name: '회원 탈퇴', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: '회원 탈퇴', exact: true })
+  await expect(dialog.getByText(/이용 예정 예약이 2건/)).toBeVisible()
+  const submit = dialog.getByRole('button', { name: '탈퇴하기', exact: true })
+  await expect(submit).toBeDisabled()
+  await dialog.getByRole('checkbox', { name: '개인정보 삭제와 예약·후기 유지 내용을 확인했어요.' }).check()
+  await submit.click()
+  await expect(page).toHaveURL('/')
+  await page.goto('/me')
+  await expect(page).toHaveURL(/\/login\?next=/)
+})

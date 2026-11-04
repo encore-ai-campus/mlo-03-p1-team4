@@ -1,0 +1,148 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  scroll-padding-top: calc(var(--header-h) + 16px);
+}
+
+body {
+  margin: 0;
+  background: var(--c-paper);
+  color: var(--c-ink);
+  font-family: var(--font-sans);
+  font-size: var(--fs-16);
+  line-height: 1.6;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+
+h1,
+h2,
+h3 {
+  line-height: 1.3;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+
+a {
+  color: var(--c-brand-ink);
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+/* 터치: 두 번 탭 확대 지연 없애고, 누를 때 회색 번쩍임 대신 각 컴포넌트의 눌림 표시를 쓴다 */
+a,
+button,
+[role='tab'] {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+img,
+svg {
+  display: block;
+}
+
+:focus-visible {
+  outline: 3px solid var(--c-brand-light);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* 시간·가격 숫자는 자릿수를 맞춘다 (Pretendard·SUIT는 기본이 비례 숫자) */
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+.container {
+  width: 100%;
+  max-width: var(--container);
+  margin-inline: auto;
+  padding-inline: var(--sp-16);
+}
+
+@media (min-width: 768px) {
+  .container {
+    padding-inline: var(--sp-24);
+  }
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* 다이얼로그·드로어 뒤 어두운 배경 (reka-ui 포털이라 전역) */
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: rgba(23, 22, 29, 0.45);
+  animation: fade-in var(--t-base) var(--ease-out);
+}
+.overlay[data-state='closed'] {
+  animation: fade-out var(--t-fast) var(--ease-out);
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes fade-out {
+  to {
+    opacity: 0;
+  }
+}
+
+/* 토스트(vue-sonner) 색: 기본 rich-colors는 글자 대비가 4.5:1에 못 미쳐(성공 4.25, 오류 4.34) 우리 토큰으로 덮는다 */
+:root [data-sonner-toaster][data-sonner-theme='light'] {
+  --success-bg: var(--c-success-soft);
+  --success-border: var(--c-success-line);
+  --success-text: var(--c-success);
+  --error-bg: var(--c-danger-soft);
+  --error-border: var(--c-danger-line);
+  --error-text: var(--c-danger);
+  --info-bg: var(--c-brand-soft);
+  --info-border: var(--c-line-strong);
+  --info-text: var(--c-brand-ink);
+  --warning-bg: var(--c-danger-soft);
+  --warning-border: var(--c-danger-line);
+  --warning-text: var(--c-danger);
+}
+
+/* 움직임 줄이기: 없애는 게 아니라 '적고 부드럽게'. 이동·크기 변화는 각 컴포넌트가 흐려짐으로 바꾸고
+   (창·드로어·툴팁·카드 등장·결제 완료), 여기서는 기다림(지연)과 부드러운 스크롤만 전역으로 끈다 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-delay: 0s !important;
+    transition-delay: 0s !important;
+    scroll-behavior: auto !important;
+  }
+}

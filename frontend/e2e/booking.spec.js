@@ -1,0 +1,87 @@
+import { test, expect } from '@playwright/test'
+import { fixClock, login, loginFirst, pickTwoFreeSlots, slot } from './helpers'
+
+test.beforeEach(async ({ page }) => fixClock(page))
+
+test('폰 결제 버튼이 동의·금액을 가리지 않고 이어서 나온다', async ({ page }, info) => {
+  test.skip(info.project.name !== 'mobile', '폰 화면 기준 요구사항')
+  await loginFirst(page, '/venues/2')
+  expect(await pickTwoFreeSlots(page)).not.toBeNull()
+  await page.getByRole('button', { name: '예약 신청하기' }).click()
+  await expect(page).toHaveURL(/\/reserve\?/)
+  const agreement = await page.getByLabel('이용 규칙과 취소 · 환불 규정을 확인했어요').boundingBox()
+  const amount = await page.getByText('결제 금액', { exact: true }).boundingBox()
+  const pay = await page.getByRole('button', { name: /결제하고 확정/ }).boundingBox()
+  expect(agreement && amount && pay).toBeTruthy()
+  expect(amount.y).toBeGreaterThanOrEqual(agreement.y + agreement.height)
+  expect(pay.y).toBeGreaterThanOrEqual(amount.y + amount.height)
+})
+
+test('선택값을 로그인 뒤 결제로 가져가고 결제할 때 한 번 확정한다', async ({ page }) => {
+  await page.goto('/venues/2')
+  await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
+  expect(await pickTwoFreeSlots(page)).not.toBeNull()
+  await page.getByRole('button', { name: '예약 신청하기' }).click()
+  await expect(page).toHaveURL(/\/login\?next=/)
+  await login(page)
+  await expect(page).toHaveURL(/\/reserve\?/)
+  await expect(page.getByText('결제 전에는 시간이 확보되지 않아요.')).toBeVisible()
+  await expect(page.getByRole('timer')).toHaveCount(0)
+  const pay = page.getByRole('button', { name: /결제하고 확정/ })
+  await pay.click()
+  await expect(page.getByRole('alert')).toContainText('동의해야')
+  await page.getByRole('radio', { name: /휴대폰/ }).check()
+  await page.getByLabel('이용 규칙과 취소 · 환불 규정을 확인했어요').check()
+  await pay.click()
+  await expect(page.getByRole('heading', { name: '예약이 확정됐어요' })).toBeVisible()
+  await page.getByRole('link', { name: '내 예약 보기' }).click()
+  await expect(page).toHaveURL(/\/me$/)
+})
+
+test('409 칸은 결제 화면에서 즉시 마감되고 다시 고를 수 있다', async ({ page }) => {
+  await loginFirst(page, '/venues/1')
+  await slot(page, 21).click()
+  await page.getByRole('button', { name: '예약 신청하기' }).click()
+  await expect(page).toHaveURL(/\/reserve\?/)
+  await page.getByLabel('이용 규칙과 취소 · 환불 규정을 확인했어요').check()
+  await page.getByRole('button', { name: /결제하고 확정/ }).click()
+  await expect(page.getByRole('alert').filter({ hasText: '다른 분이 먼저 결제한 시간이 있어요.' })).toBeVisible()
+  await expect(page.getByRole('button', { name: '21:00 마감' })).toBeDisabled()
+  await expect(page.getByRole('button', { name: /결제하고 확정/ })).toBeDisabled()
+  await page.getByRole('button', { name: '20:00부터 1시간' }).click()
+  await page.getByRole('button', { name: /결제하고 확정/ }).click()
+  await expect(page.getByRole('heading', { name: '예약이 확정됐어요' })).toBeVisible()
+})
+
+test('지난 시간 결제는 이용 완료로 저장하고 후기 입구를 보여 준다', async ({ page }) => {
+  await loginFirst(page, '/reserve?venue=2&date=2026-11-01&start=9&hours=2&people=2')
+  await page.getByLabel('이용 규칙과 취소 · 환불 규정을 확인했어요').check()
+  await page.getByRole('button', { name: /결제하고 확정/ }).click()
+  await expect(page.getByRole('heading', { name: '이용 완료로 저장됐어요' })).toBeVisible()
+  await expect(page.getByRole('link', { name: '바로 후기 쓰기' })).toHaveAttribute('href', /\/me\?tab=completed/)
+})
+
+test('최소 이용시간보다 짧은 선택은 결제로 갈 수 없다', async ({ page }) => {
+  await loginFirst(page, '/venues/2')
+  const hours = await pickTwoFreeSlots(page)
+  expect(hours).not.toBeNull()
+  await slot(page, hours[1]).click()
+  await expect(page.getByRole('button', { name: '예약 신청하기' })).toBeDisabled()
+  await expect(page.getByText(/최소 2시간부터 예약할 수 있어요/)).toBeVisible()
+})
+
+
+test('60분 로그인 만료 뒤에도 결제 선택을 유지한다', async ({ page }) => {
+  await loginFirst(page, '/reserve?venue=2&date=2026-11-03&start=13&hours=2&people=3')
+  await page.clock.setFixedTime(new Date('2026-11-02T11:01:00+09:00'))
+  await page.getByLabel('이용 규칙과 취소 · 환불 규정을 확인했어요').check()
+  await page.getByRole('button', { name: /결제하고 확정/ }).click()
+  await expect(page).toHaveURL(/\/login\?next=/)
+  await login(page)
+  await expect(page).toHaveURL(/venue=2&date=2026-11-03&start=13&hours=2&people=3/)
+  await expect(page.getByRole('button', { name: '13:00부터 1시간', exact: true })).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.getByRole('combobox', { name: '인원', exact: true })).toContainText('3명')
+  await page.getByLabel('이용 규칙과 취소 · 환불 규정을 확인했어요').check()
+  await page.getByRole('button', { name: /결제하고 확정/ }).click()
+  await expect(page.getByRole('heading', { name: '예약이 확정됐어요' })).toBeVisible()
+})
