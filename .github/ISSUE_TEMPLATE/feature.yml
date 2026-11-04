@@ -1,0 +1,40 @@
+name: 기능
+description: 만들거나 바꿀 기능
+title: "[파트] F-ID 요약"
+labels: ["feature"]
+body:
+  - type: dropdown
+    id: part
+    attributes:
+      label: 파트
+      options: [FE, A, B, DB, 공동]
+    validations:
+      required: true
+  - type: input
+    id: fid
+    attributes:
+      label: 기능 ID
+      description: docs/산출물_01_요구사항명세서.md의 F-xx (없으면 비움)
+      placeholder: F-30
+  - type: textarea
+    id: what
+    attributes:
+      label: 무엇을
+      description: 무엇을 만들거나 바꾸는지
+    validations:
+      required: true
+  - type: textarea
+    id: done
+    attributes:
+      label: 완료 조건
+      description: 끝났다고 볼 기준(테스트 포함)
+      value: |
+        - [ ] 
+        - [ ] 테스트:
+    validations:
+      required: true
+  - type: input
+    id: docs
+    attributes:
+      label: 기준 문서
+      placeholder: docs/백엔드_B_공간_예약_결제_크롤링.md 6절
