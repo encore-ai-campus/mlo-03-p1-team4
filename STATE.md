@@ -138,6 +138,7 @@ A1~A4는 11-03에 확정했고, **A5~A8은 추후 확정**으로 미뤘다(11-03
 
 ## 최근 변경 (최신이 위)
 
+- 11-04 · FE · 화면 이름을 다락큐브로 통일(헤더·푸터·로그인·약관·페이지 제목·`index.html`), 공통 푸터를 디자인 캔버스 SiteFooter 시안대로 바꿈(서비스 소개·바로가기·프로젝트·안내 + 캠프 표기, 발표 11-09). `npm run verify`·E2E 59개 통과, README 시연 화면 6장 다시 찍음
 - 11-04 · 공동 · GitHub Project 보드 [팀 방조 · 다락큐브 1차](https://github.com/orgs/encore-ai-campus/projects/5) 만듦: 상태 5개(할 일·하는 중·리뷰·막힘·끝), 파트 필드, 보기 4개(전체 표·보드·내 일·목 11-05 통합), 이슈 23개 넣음. 이슈 템플릿이 보드에 자동으로 넣게 함. 사용법: CONTRIBUTING 1절
 - 11-04 · 공동 · CI 확장(`.github/workflows/ci.yml`): 바뀐 폴더별로 프론트 verify·E2E, DB·백엔드 테스트(compose MariaDB·MongoDB로 seed 확인·`check_ddl.py`·`check_mongo_init.js`·pytest) + 결과를 모으는 `CI 결과` job. 루트 `pytest.ini` 추가, `check_ddl.py`는 `CHECK_DB_URL`이 있으면 `.env`를 읽지 않게 함. 설명: CONTRIBUTING 4-1절
 - 11-04 · 공동 · 시스템 아키텍처 그림을 1차 구성(C안: EC2 3대 + RDS, MongoDB는 정문 EC2, Grafana Cloud) 아이콘 그림으로 새로 그림(`docs/figures/architecture.png`). 11-03 그림은 확장안(`architecture_expanded.png`)으로 이름을 바꿔 남김. README 3장의 mermaid를 이 그림으로 바꿈
