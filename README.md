@@ -10,11 +10,11 @@
 
 ## 1. 팀 소개
 
-**팀명: 방조**. 프론트엔드, 백엔드 A·B, 데이터베이스로 역할을 나누어 개발합니다.
+**팀명: 방조**. 프론트엔드, 백엔드 A·B, 데이터베이스로 역할을 나누어 개발하고, 프로젝트 관리(PM)는 노진산이 함께 맡습니다.
 
 | 이름 | 담당 | 주요 작업 | GitHub |
 | --- | --- | --- | --- |
-| 노진산 | 프론트엔드 | Vue 웹 화면, 사용자 흐름, API 연동 | [@jinsan02](https://github.com/jinsan02) |
+| 노진산 | 프론트엔드 · PM | Vue 웹 화면, 사용자 흐름, API 연동 / 일정·이슈·마일스톤 관리, 산출물 정리, 통합 점검 | [@jinsan02](https://github.com/jinsan02) |
 | 이자연 | 백엔드 A | 공통 기능, 회원·인증, 후기, 이벤트·관측 | [@naturedevworks](https://github.com/naturedevworks) |
 | 이세훈 | 백엔드 B | 공간 조회, 예약·모의 결제, 취소, 크롤링 등록 API | [@hun117](https://github.com/hun117) |
 | 전희정 | 데이터베이스 | MariaDB·MongoDB 스키마, 기초 데이터, 크롤링·데이터 생성 | [@gmlwjd0055](https://github.com/gmlwjd0055) |
