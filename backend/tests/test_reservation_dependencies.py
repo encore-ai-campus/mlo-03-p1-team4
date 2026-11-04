@@ -18,10 +18,11 @@ from app.core.db import get_db_write
 from app.core.deps import CurrentUser, get_current_user
 from app.main import app
 from app.models.reservation import Payment, Reservation, ReservationSlot
+from app.models.venue import Venue, VenueFacility, VenueImage
 from app.repositories import reservation_repo
 from app.services import review_service
 
-MODELS = (Reservation, ReservationSlot, Payment)
+MODELS = (Reservation, ReservationSlot, Payment, Venue, VenueFacility, VenueImage)
 TODAY = date(2026, 11, 4)
 NOW = datetime.fromisoformat("2026-11-04T12:00:00")
 
@@ -38,7 +39,7 @@ def test_model_matches_migration(model):
     ddl = re.sub(r"--[^\n]*", "", ddl)
     table = model.__table__
     columns = re.findall(
-        r"^\s+(\w+)\s+(BIGINT|SMALLINT|TINYINT|INT|DATE(?:TIME)?|BOOLEAN|ENUM\([^)]*\))\s+(NOT NULL|NULL)([^\n]*)",
+        r"^\s+(\w+)\s+(BIGINT|SMALLINT|TINYINT|INT|DATE(?:TIME)?|BOOLEAN|TEXT|VARCHAR\(\d+\)|ENUM\([^)]*\))\s+(NOT NULL|NULL)([^\n]*)",
         ddl,
         re.M,
     )

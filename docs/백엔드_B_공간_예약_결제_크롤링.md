@@ -125,7 +125,13 @@ infra/nginx/       spacecube.conf         # [B] upstream 2대, /health
 - `past`: 그 칸이 이미 지났는지(날짜가 오늘 이전, 또는 오늘이고 시 ≤ 지금 시). **표시용이고 막지 않습니다**(11-03 날짜 결정). 지난 칸도 비어 있으면 예약할 수 있습니다.
 - replica에서 읽으므로 방금 찬 칸이 잠깐 비어 보일 수 있습니다. 예약은 primary가 판정하니 중복은 생기지 않습니다(6절).
 
-상세는 검색 항목에 `description`, `notice`, `images`(정렬 순), `facilities`(id·이름)를 더합니다. `is_active = false`면 404입니다. `/venues/new`는 `registered_on`, `new_days_left`를 더합니다.
+상세는 검색 항목에 `min_hours`, `description`, `notice`, `images`(정렬 순), `facilities`(id·이름)를 더합니다. `slots`는 오늘의 영업시간 칸이고 날짜별 조회는 F-22의 별도 API입니다. `is_active = false`면 404입니다. 평점은 `v_venue_rating`을 읽고 후기가 없는 공간은 `rating_avg = 0`, `review_count = 0`으로 반환합니다. DB에서 NULL인 설명·안내는 JSON에서도 null입니다. `/venues/new`는 `registered_on`, `new_days_left`를 더합니다.
+
+11-05 확정한 응답 기준:
+
+- 이미지가 없거나 빈 값뿐이면 대표 `image`는 `"art:group-0"`, 상세 `images`는 `["art:group-0"]`를 반환합니다. 기존 `RoomArt`의 `kind="group"`, `tone=0` 기본 동작과 같으며 갤러리를 빈 상태로 두지 않습니다. 별도의 `lounge-0` 대체값은 추가하지 않습니다.
+- 실제 이미지가 있으면 정렬된 첫 그림을 대표 이미지로 쓰고 갤러리는 그 순서를 유지합니다.
+- `is_new`는 DB의 한국 시각 `created_at`을 날짜로 바꿔 `0 <= (get_today() - created_at.date()).days < 14`로 계산합니다. 오늘과 13일 전은 포함하고 14일 전·미래 날짜는 제외합니다. 경과 336시간이 아니라 한국 달력 날짜 14개가 기준입니다.
 
 `/available-dates`:
 
@@ -257,7 +263,7 @@ UPDATE reservations SET status = 'completed'
 | 파일 | 확인할 것 |
 | --- | --- |
 | test_catalog.py | 유형 5개, 시·도 → 시·군·구, 시설 목록 |
-| test_venues.py | 필터 조합, 정렬 4종, 칸 상태(taken·past), NEW 14일 경계, 비활성 404, 날짜 더보기(offset) |
+| test_venues.py | 필터 조합, 정렬 4종, 칸 상태(taken·past), 이미지 누락 시 대표·갤러리 group-0, 실제 이미지 순서, NEW 오늘·13일 전 포함 및 14일 전·미래 제외, 비활성 404, 날짜 더보기(offset) |
 | test_reservations.py | 성공 201(3개 표 모두 생김), **같은 요청 다시 보내면 200 + 같은 reservation_id(표에 새 행 없음)**, 내 예약과 일부 겹치면 409 + `mine`, 범위 밖 400(±365일 밖·영업시간 밖·5칸·`min_hours` 미만), 지난 시간 예약은 201 + 바로 completed, 인원 초과, 결제수단 오류, 남의 예약 404, 취소 후 칸 반납·환불, 지난 예약 취소 409, **예약 직후 `/reservations/me`에 보임** |
 | test_concurrency.py | **같은 칸 동시 50건 → 201 정확히 1건, 409 49건.** 겹치는 범위(13~15 vs 14~16)도 1건만. 409의 `detail.slots`가 정확함 |
 | test_jobs.py | 끝나는 시각이 지난 confirmed만 completed(오늘 끝난 것 포함), 두 번 돌려도 같음 |

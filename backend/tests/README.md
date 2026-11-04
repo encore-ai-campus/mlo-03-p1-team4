@@ -17,6 +17,73 @@
 - 테스트 DB는 로컬 MariaDB(`infra/local`)의 `spacecube_test`. SQLite는 제약 동작이 달라 쓰지 않습니다.
 - 동시성 테스트는 스레드 50개로 요청을 한꺼번에 보냅니다.
 
+## F-20 상세 API·F-14 공통 정책
+
+`test_venues.py`는 실제 A 앱의 `GET /venues/{venue_id}`를 로컬 MariaDB와 연결해 호출합니다.
+`CHECK_DB_URL`에 기존 DDL·seed가 적용된 로컬 `spacecube_test` 접속 정보를 지정해야 합니다.
+이미지·NEW 정책 단위 10건, 가상 공간 DB 연결 1건, 상세 HTTP 응답·라우터 등록 17건을 검증합니다.
+
+- 인증 없이 상세 계약 전체를 반환하며, 내부 출처·등록 시각을 노출하지 않습니다.
+- 이미지 누락 시 대표·갤러리 모두 `art:group-0`; 실제 이미지는 정렬 순서와 대표 그림을 유지합니다.
+- 시설 ID·이름, 최소 이용시간·설명·안내, 평점 뷰의 평균·건수를 실제 DB 값으로 확인합니다.
+- 후기 없는 공간은 평점·후기 수 0이며 삭제된 후기는 뷰 집계에서 빠집니다.
+- NEW는 한국 날짜 기준 오늘·13일 전을 포함하고 14일 전·미래 날짜를 제외합니다.
+- 오늘 시간 칸은 영업시간 안에서 점유·지난 시간 표시를 반환합니다. 다른 날짜의 점유 칸은 제외합니다.
+- 없는 공간·비활성 공간은 동일한 404 `VENUE_NOT_FOUND`, 잘못된 ID는 400 `VALIDATION`입니다.
+- 동기 라우터와 `get_db_read()` 의존성을 검사하고 재조회 시 DB 변경이 반영되는지 확인합니다.
+
+가상 공간·회원·예약은 테스트 트랜잭션 안에서만 만들고 출처 synthetic 또는 `is_synthetic`으로 표시합니다.
+TestClient는 lifespan을 시작하지 않으며 공개 DB 의존성을 테스트 연결로 교체합니다. 종료 시 전체 변경을
+롤백하고 가상 공간이 남지 않는지 확인합니다. DDL·운영 DB·실제 replica 장애 전환은 검사하지 않습니다.
+
+```bash
+python -m pytest backend/tests/test_venues.py -q
+```
+
+11-05 이 파일은 **28건 통과**했습니다. F-20 구현 직후 `verify.ps1`도 통과했습니다(pytest 64건,
+프론트 54건·린트·포맷·빌드). 이후 읽기 경로 시험을 추가한 전체 pytest는 **67건 통과**했으며,
+별도 Chrome 검사 1건과 기존 목업 화면 E2E 59건도 통과했습니다. 검증 범위는 아래와 같습니다.
+
+현재 A 앱은 로컬 전달본이므로 `main.py`의 Git 제외는 유지했습니다. A 통합 PR에는 다음 import·등록이 필요합니다.
+
+```python
+from app.routers import venues
+
+app.include_router(venues.router, prefix="/venues", tags=["venues"])
+```
+
+공간별 후기 목록은 A API로 별도 연결하며, F-21·F-22 별도 엔드포인트와 브라우저 전체 흐름은 이후 검증합니다.
+
+## F-20 추가 검증: 브라우저·읽기 연결 대체
+
+`test_read_routing.py`는 A의 `get_db_read()`를 대체하지 않고 실제 MariaDB 연결을 사용합니다.
+시험용 설정·연결 풀은 테스트 프로세스에서만 분리하고, 읽기 주소 미설정·동일 DB의 정상 읽기 연결·수신하지
+않는 loopback 포트의 연결 실패를 확인합니다. 세 경우 모두 실제 유형 조회가 200으로 성공하며, 연결 실패
+때만 `db_read_fallback_total`이 1 증가해야 합니다. DB 서버를 중지하거나 설정·데이터를 변경하지 않습니다.
+실제 복제 DB의 장애·복제 지연을 시험한 것은 아닙니다.
+
+```bash
+python -m pytest backend/tests/test_read_routing.py -q
+```
+
+`check_venue_browser.py`·`.mjs`는 별도 실행하는 B 검증기입니다. 기본 pytest 수집에는 들어가지 않으며,
+가상 공간이 있는 트랜잭션에 실제 앱을 연결해 임시 Uvicorn을 띄우고 Chrome으로 상세 200·JSON 계약·본문과
+없는 공간 404를 확인합니다. 테스트가 끝나면 Chrome·임시 API 서버를 종료하고 공간을 롤백합니다.
+Node와 frontend의 기존 Playwright 패키지가 필요합니다. DB 접속 정보는 Node·Chrome에 전달하지 않습니다.
+
+```powershell
+$env:PLAYWRIGHT_CHANNEL = 'chrome'
+python -m pytest backend/tests/check_venue_browser.py -q -s
+```
+
+별도로 기존 프론트 E2E도 같은 Chrome에서 실행했습니다. 프론트 소스·설정은 바꾸지 않았으며 이 시험은
+목업 데이터 기반의 화면·접근성·가입·예약 흐름 검증입니다. 실제 F-20과 상세 페이지 전체를 연결한 시험과
+구분합니다. F-21·F-22·A 후기 목록까지 실제로 연결한 화면 흐름은 여전히 별도 통합 항목입니다.
+
+11-05 결과: 읽기 경로 **3건 통과**, 별도 Chrome **1건 통과**, 기존 프론트 E2E **59건 통과·7건 건너뜀**
+(데스크톱/폰 전용 조건), 실패 0건. 마지막 전체 pytest **67건**과 Ruff 린트·포맷도 통과했습니다.
+별도 Chrome 실행에는 Starlette 경고와 pytest 캐시 기록 권한 경고가 있었으며 검사는 통과했습니다.
+
 ## F-10·11: 유형·지역·시설 조회
 
 `test_catalog.py`는 실제 A 앱과 로컬 MariaDB에서 공개 목록 응답과 읽기 의존성을 검사합니다.
@@ -41,7 +108,7 @@ python -m pytest backend/tests/test_catalog.py -q
 ## F-50 지원: 예약 소유권·A 후기 작성 연결
 
 `test_reservation_dependencies.py`는 이전 프로젝트에서 가져온 B 코드의 검증 테스트입니다.
-예약·칸·결제 모델의 컬럼·타입·기본값·키·인덱스·CHECK·외래키를 현재
+예약·칸·결제 및 공간·시설 연결·이미지 모델의 컬럼·타입·기본값·키·인덱스·CHECK·외래키를 현재
 `db/migrations/0001_init.sql`과 대조하고, A 모델과 함께 매퍼가 구성되는지 확인합니다.
 실제 MariaDB에서는 예약 상태 3개의 본인·타인·없는 예약 조회와 A 후기 작성 API의
 성공·타인 예약·미완료·기한 초과·중복·7일 경계·과거 이용일의 최근 예약을 검증합니다.
@@ -58,6 +125,6 @@ python -m pytest backend/tests/test_catalog.py -q
 python -m pytest backend/tests/test_reservation_dependencies.py -q
 ```
 
-11-05 현재 프로젝트의 `localhost:3306/spacecube_test`에서 **14건 통과**했습니다.
-F-11 추가 후 `test_catalog.py`까지 포함한 전체 pytest는 **33건 통과**, Starlette TestClient 사용 중단 예정
+11-05 현재 프로젝트의 `localhost:3306/spacecube_test`에서 **17건 통과**했습니다(기존 예약 의존성 14건 + 공간 모델 3건).
+읽기 경로 시험까지 추가한 전체 pytest는 **67건 통과**, Starlette TestClient 사용 중단 예정
 경고 1건입니다. 비밀번호는 테스트 프로세스에만 전달했고 파일이나 영구 환경변수에 저장하지 않았습니다.
