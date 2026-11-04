@@ -17,6 +17,27 @@
 - 테스트 DB는 로컬 MariaDB(`infra/local`)의 `spacecube_test`. SQLite는 제약 동작이 달라 쓰지 않습니다.
 - 동시성 테스트는 스레드 50개로 요청을 한꺼번에 보냅니다.
 
+## F-10·11: 유형·지역·시설 조회
+
+`test_catalog.py`는 실제 A 앱과 로컬 MariaDB에서 공개 목록 응답과 읽기 의존성을 검사합니다.
+`CHECK_DB_URL`에 기존 DDL·seed가 적용된 로컬 `spacecube_test` 접속 정보를 지정하고 실행합니다.
+
+```bash
+python -m pytest backend/tests/test_catalog.py -q
+```
+
+- 유형은 기존 5개 목록과 실제 DB 이름, 5분 캐시 만료·DB 오류 처리를 확인합니다.
+- 지역은 활성 공간이 있는 곳만 반환하며 시·도 중복, 타 시·도 혼입, 비활성·공간 없는 지역을 제외합니다.
+- 시·도 목록과 시·군·구 조회가 활성 지역 스냅샷 하나를 공유하고 만료 후 DB 변경을 반영하는지 검사합니다.
+- 시설은 공간 연결 여부와 관계없이 전체 목록을 실제 ID 순서로 반환하고 5분 뒤 이름 변경을 반영합니다.
+- 빈 목록도 캐시하며 DB 오류는 캐시하지 않습니다. 시·도는 DB 컬럼 길이인 20자 이내인지 검증합니다.
+- 임시 지역·공간 추가와 이름·상태 변경은 외부 트랜잭션에서 롤백합니다. DDL·기존 데이터 삭제는 없습니다.
+
+캐시는 프로세스마다 독립적입니다. 새 공간 등록·비활성화 후 공개 지역 목록에는 최대 5분의 캐시 지연과
+별도의 replica 복제 지연이 있을 수 있습니다. 실제 replica 장애 대체·서버 간 동작은 이 테스트 범위 밖입니다.
+
+11-05 로컬 MariaDB에서 **19건 통과**했습니다.
+
 ## F-50 지원: 예약 소유권·A 후기 작성 연결
 
 `test_reservation_dependencies.py`는 이전 프로젝트에서 가져온 B 코드의 검증 테스트입니다.
@@ -38,5 +59,5 @@ python -m pytest backend/tests/test_reservation_dependencies.py -q
 ```
 
 11-05 현재 프로젝트의 `localhost:3306/spacecube_test`에서 **14건 통과**했습니다.
-`test_catalog.py`까지 포함한 전체 pytest는 **19건 통과**, Starlette TestClient 사용 중단 예정
+F-11 추가 후 `test_catalog.py`까지 포함한 전체 pytest는 **33건 통과**, Starlette TestClient 사용 중단 예정
 경고 1건입니다. 비밀번호는 테스트 프로세스에만 전달했고 파일이나 영구 환경변수에 저장하지 않았습니다.

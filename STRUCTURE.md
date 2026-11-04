@@ -62,15 +62,15 @@ Pro_1/
 │  ├─ public/fonts/           웹용 글꼴 (Noto Sans KR 서브셋)
 │  └─ scripts/check-colors.mjs  tokens.css 밖 색 코드 검사
 │
-├─ backend/                   [A·B] FastAPI 한 앱 (B F-10·get_owned 검증, A 코드는 로컬 전달본 사용)
+├─ backend/                   [A·B] FastAPI 한 앱 (B F-10·11·시설·get_owned 검증, A 코드는 로컬 전달본 사용)
 │  ├─ AGENTS.md · README.md · .env.example
 │  ├─ app/
 │  │  ├─ main.py              [A] (예정)
 │  │  ├─ core/                [A] config, db, mongo, security, deps, errors, pagination, events, metrics, logging, clock, synthetic (예정)
 │  │  ├─ models/              [A] base, user, review / [B] catalog·reservation 구현, venue 예정 — DDL 대응 모델
-│  │  ├─ routers/             [A] auth, users, reviews, events, health / [B] catalog, venues, reservations, internal (예정)
-│  │  ├─ schemas/             라우터와 같은 이름 (예정)
-│  │  ├─ services/            [A] auth_service, user_service, review_service / [B] venue_service, reservation_service, internal_service (예정)
+│  │  ├─ routers/             [A] auth, users, reviews, events, health / [B] catalog 구현, venues·reservations·internal 예정
+│  │  ├─ schemas/             라우터와 같은 이름 ([B] catalog 구현)
+│  │  ├─ services/            [A] auth_service, user_service, review_service / [B] catalog_service 구현, venue_service·reservation_service·internal_service 예정
 │  │  ├─ repositories/        [A] user_repo, review_repo / [B] catalog_repo·reservation_repo(get_owned) 구현, venue_repo·slot_repo·payment_repo 예정
 │  │  └─ jobs/                [B] complete_reservations (예정)
 │  ├─ scripts/                [A] replay_events (예정)
