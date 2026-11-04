@@ -2,6 +2,7 @@ name: 기능
 description: 만들거나 바꿀 기능
 title: "[파트] F-ID 요약"
 labels: ["feature"]
+projects: ["encore-ai-campus/5"]  # 만들면 Project 보드에 자동으로 들어감
 body:
   - type: dropdown
     id: part

@@ -74,7 +74,7 @@
 
 ## 4. WBS
 
-발표는 **2026-11-09(월)**입니다. 날짜별 묶음은 GitHub [마일스톤](https://github.com/encore-ai-campus/mlo-03-p1-team4/milestones), 할 일은 [이슈](https://github.com/encore-ai-campus/mlo-03-p1-team4/issues)로 관리하고, 상세 상태는 [STATE.md](STATE.md)에 있습니다.
+발표는 **2026-11-09(월)**입니다. 날짜별 묶음은 GitHub [마일스톤](https://github.com/encore-ai-campus/mlo-03-p1-team4/milestones), 할 일은 [이슈](https://github.com/encore-ai-campus/mlo-03-p1-team4/issues)로 관리하며 진행 상태는 [Project 보드](https://github.com/orgs/encore-ai-campus/projects/5)에서 한눈에 봅니다. 상세 상태는 [STATE.md](STATE.md)에 있습니다.
 
 | 날짜 | 단계 | 작업 | 담당 | 산출물 | 상태 |
 | --- | --- | --- | --- | --- | --- |
