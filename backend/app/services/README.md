@@ -1,0 +1,29 @@
+# services — 업무 규칙과 트랜잭션
+
+| 파일 (예정) | 담당 | 핵심 규칙 |
+| --- | --- | --- |
+| `auth_service.py` | A | 이메일 중복(탈퇴 회원 포함), bcrypt, 토큰 발급. birth 6자리 실제 날짜, gender_digit 1~4 |
+| `user_service.py` | A | 탈퇴 = `deleted_at` 기록(예약·후기는 보존) |
+| `review_service.py` | A | 자격 4단계: 내 예약(`get_owned`) → `completed` → 기한 안(`max(이용일, 예약한 날)`부터 7일) → 아직 안 씀 |
+| `venue_service.py` | B | 검색 조건 → 공간 + 그날 칸(`slots`는 한 번에 읽어 붙임), 예약 가능 날짜(이어진 빈 칸 ≥ `min_hours`) |
+| `reservation_service.py` | B | 예약+결제·취소 트랜잭션 (아래) |
+| `internal_service.py` | B | 크롤러 결과 upsert `(source_site, source_id)`, 모르는 시설은 버리고 알림, 모르는 지역·유형은 400 |
+
+## 예약 + 모의 결제 트랜잭션 (B, primary)
+
+```
+1. 검증: 오늘−BOOKING_PAST_DAYS ≤ date ≤ 오늘+BOOKING_FUTURE_DAYS(지난 시간도 허용), min_hours ≤ hours ≤ 4, 영업시간 안,
+         1 ≤ headcount ≤ capacity_max, is_active, method ∈ {transfer, card, phone}
+2. BEGIN
+3. reservations INSERT (끝나는 시각이 지났으면 status = completed, 아니면 confirmed / total_price = price_per_hour × hours)
+4. reservation_slots INSERT × hours   ← 중복 키(1062)면 IntegrityError
+5. payments INSERT (status = paid, paid_at = NOW())
+6. COMMIT → 201, log_event(reserve_ok), reservation_total{result="ok"} +1
+   IntegrityError → ROLLBACK → primary에서 겹친 칸 읽기 → AppError("SLOT_TAKEN", 409, detail={"slots": [...]})
+                   → log_event(reserve_conflict), reservation_total{result="conflict"} +1
+```
+
+- 결제 화면에 들어올 때는 아무것도 잡지 않습니다. 먼저 커밋한 요청이 이깁니다.
+- 3 전에 '빈 칸인지 SELECT'로 막지 않습니다(두 서버가 동시에 '비었음'을 볼 수 있음).
+- 취소: `SELECT … FOR UPDATE` → 시작 전인지 → status = cancelled, 칸 DELETE, payments = refunded(전액) → COMMIT.
+- 자세한 순서: [백엔드_B 6절](../../../docs/백엔드_B_공간_예약_결제_크롤링.md)

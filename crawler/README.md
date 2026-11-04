@@ -1,0 +1,51 @@
+# 스페이스클라우드 신규 스터디룸 크롤러 (MVP)
+
+담당: DB. **11-03 확정 흐름**은 `사이트맵 diff → 상세 조회 → MongoDB crawl_raw → 전처리 → FastAPI B POST /internal/venues`이다(`AGENTS.md`). DB에 바로 넣는 길은 없앴다. 아직 API·MongoDB 연결 전이라 지금 코드는 `data/new_rooms.jsonl`에만 쓴다.
+
+> **코드가 문서보다 뒤처져 있다.** 서비스는 5개 유형·전국이고(유형 대응표 `db/seed/README.md`), 예약 단위는 `venues`(룸 없음)다. 그런데 `spacecloud_crawler.py`의 필터는 아직 스터디룸 + 최대 10명 + 서울만 고르고, 아래 '신규 룸 만들기 규칙'(룸 번호 101·102…, 가격 4단계)도 스터디룸 시절 방식이다. 고칠 때는 `docs/백엔드_B_공간_예약_결제_크롤링.md` 7절 JSON(`name`은 생성 이름, `images`는 `art:<종류>-<색>`)에 맞춘다.
+
+주 1회 사이트맵을 비교해 새로 생긴 공간 id를 찾고, 조건에 맞는 공간 1개를 가상 신규 룸(NEW)으로 등록한다. 범위와 수치는 [../docs/MVP_시뮬레이션_크롤링_수치.md](../docs/MVP_시뮬레이션_크롤링_수치.md)를 따른다.
+
+## 실행
+
+conda 환경 `pro_1`(httpx, beautifulsoup4 포함)에서 실행한다.
+
+```bash
+conda run -n pro_1 --no-capture-output python spacecloud_crawler.py baseline
+```
+
+```bash
+conda run -n pro_1 --no-capture-output python spacecloud_crawler.py diff
+```
+
+```bash
+conda run -n pro_1 --no-capture-output python spacecloud_crawler.py fetch 53074
+```
+
+- `baseline`: 사이트맵의 공간 id 목록을 `data/sitemap_ids.json`에 저장 (최초 1회)
+- `diff`: 새 id를 최신순으로 최대 20건 조회 → 스터디룸 + 최대 10명 이하 + 서울이면 1건 등록 → `data/new_rooms.jsonl`
+- `fetch`: 공간 하나를 파싱해 출력 (파서 점검용)
+
+## 지키는 것
+
+- robots.txt를 읽어 막힌 경로(`/search*`, `/reserve/` 등)는 요청하지 않는다.
+- 요청 간격 3초, 실행당 상세 조회 20건 이하.
+- 저장 항목: 공간유형, 수용인원, 최소 예약시간, 면적, 시설, 가격, 영업시간, 시·구, 평점·후기 수.
+- 사진, 후기 본문, 전화번호, 상세 주소는 저장하지 않는다.
+
+## 신규 룸 만들기 규칙
+
+| 최대 인원 | 룸 유형 | 시간당 가격 | 이미지 풀 (순환) |
+| --- | --- | --- | --- |
+| 1~2명 | 1인실 | 3,000원 | booth 기본 → booth 색 변형 |
+| 3~4명 | 소형 | 6,000원 | duo → lounge → 색 변형 2종 |
+| 5~8명 | 중형 | 10,000원 | group → seminar → 색 변형 2종 |
+| 9~10명 | 대형 | 20,000원 | meeting 기본 → 색 변형 |
+
+룸 번호는 101·102·201·202·301·302 다음부터 층마다 4개까지 이어 붙인다(303, 304, 401 …). 가상 룸은 10개가 되면 더 등록하지 않는다. 상태는 `data/virtual_rooms_state.json`에 남는다.
+
+## 2026-10-30 시험 실행 결과
+
+- 사이트맵 공간 14,137개, 최대 id 82391.
+- 기준선에서 최근 id 8개를 지우고 `diff`를 돌린 결과, 새 id 11개 중 8개를 조회했고 조건에 맞는 공간은 0개였다. 대부분 연습실·촬영스튜디오이거나 최대 인원이 10명을 넘었다.
+- 신규 스터디룸이 매주 나온다는 보장이 없으므로, 등록 0건인 주를 허용할지 아니면 조건(최대 인원, 지역)을 넓힐지 회의에서 정한다. → 11-01 검토 문서는 '실제 주 1회 후보 풀에 쌓고 가상 주마다 꺼내 등록, 없으면 가상 생성'을 제안(회의 대기).
