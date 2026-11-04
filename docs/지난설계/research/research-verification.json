@@ -1,0 +1,16 @@
+[
+  {
+    "file": "C:\\MLops03\\Pro_1\\크롤링_로그_프레임워크_사전조사.html",
+    "bytes": 90145,
+    "sections": 8,
+    "diagrams": 2,
+    "relative_dependencies": 0
+  },
+  {
+    "file": "C:\\MLops03\\Pro_1\\맛집_MVP_설계_리뷰_브리핑.html",
+    "bytes": 652189,
+    "sections": 12,
+    "diagrams": 6,
+    "relative_dependencies": 0
+  }
+]

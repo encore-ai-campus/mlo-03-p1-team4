@@ -1,0 +1,115 @@
+erDiagram
+    regions ||--o{ venues : "위치"
+    categories ||--o{ venues : "유형"
+    venues ||--o{ venue_facilities : "갖춤"
+    facilities ||--o{ venue_facilities : "포함"
+    venues ||--o{ venue_images : "그림"
+    users ||--o{ reservations : "예약함"
+    venues ||--o{ reservations : "예약됨"
+    reservations ||--|{ reservation_slots : "칸 차지"
+    reservations ||--|| payments : "결제"
+    reservations ||--o| reviews : "후기"
+    users ||--o{ reviews : "작성"
+
+    regions {
+        INT region_id PK
+        VARCHAR sido UK
+        VARCHAR sigungu UK
+    }
+    categories {
+        SMALLINT category_id PK
+        VARCHAR code UK
+        VARCHAR name
+    }
+    facilities {
+        SMALLINT facility_id PK
+        VARCHAR name UK
+    }
+    users {
+        BIGINT user_id PK
+        VARCHAR email UK
+        VARCHAR password_hash
+        VARCHAR name
+        VARCHAR phone
+        CHAR birth
+        CHAR gender_digit
+        BOOLEAN marketing_agreed
+        DATETIME terms_agreed_at
+        DATETIME privacy_agreed_at
+        BOOLEAN is_synthetic
+        DATETIME created_at
+        DATETIME deleted_at
+    }
+    venues {
+        BIGINT venue_id PK
+        INT region_id FK
+        SMALLINT category_id FK
+        VARCHAR name
+        TEXT description
+        TEXT notice
+        SMALLINT capacity_max
+        INT price_per_hour
+        TINYINT min_hours
+        TINYINT open_hour
+        TINYINT close_hour
+        VARCHAR source_site UK
+        VARCHAR source_id UK
+        BOOLEAN is_active
+        DATETIME created_at
+    }
+    venue_facilities {
+        BIGINT venue_id PK "FK venues"
+        SMALLINT facility_id PK "FK facilities"
+    }
+    venue_images {
+        BIGINT image_id PK
+        BIGINT venue_id FK
+        VARCHAR url
+        TINYINT sort_order
+    }
+    reservations {
+        BIGINT reservation_id PK
+        BIGINT user_id FK
+        BIGINT venue_id FK
+        DATE reserve_date
+        TINYINT start_hour
+        TINYINT end_hour
+        SMALLINT headcount
+        INT total_price
+        ENUM status
+        BOOLEAN is_synthetic
+        DATETIME created_at
+    }
+    reservation_slots {
+        BIGINT venue_id PK "FK venues"
+        DATE slot_date PK "FK 복합"
+        TINYINT slot_hour PK "같은 칸 금지"
+        BIGINT reservation_id FK "복합 FK"
+    }
+    payments {
+        BIGINT payment_id PK
+        BIGINT reservation_id FK "UNIQUE"
+        ENUM method
+        ENUM status
+        DATETIME paid_at
+        DATETIME refunded_at
+    }
+    reviews {
+        BIGINT review_id PK
+        BIGINT reservation_id FK "UNIQUE"
+        BIGINT user_id FK
+        TINYINT rating
+        TEXT content
+        DATETIME created_at
+        DATETIME deleted_at
+    }
+    crawl_jobs {
+        BIGINT job_id PK
+        VARCHAR source_site
+        DATETIME started_at
+        DATETIME finished_at
+        INT new_ids
+        INT fetched
+        INT registered
+        ENUM status
+    }

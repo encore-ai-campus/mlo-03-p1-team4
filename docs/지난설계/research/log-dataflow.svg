@@ -1,0 +1,112 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1022.1723333333333 499.4" width="1022.1723333333333" height="499.4" style="--bg:#ffffff;--fg:#172e28;--line:#71867a;--accent:#174c3c;--muted:#52655c;--surface:#eaf0e8;--border:#a9bcae;background:var(--bg)">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Malgun%20Gothic:wght@400;500;600;700&amp;display=swap');
+  text { font-family: 'Malgun Gothic', system-ui, sans-serif; }
+  svg {
+    /* Derived from --bg and --fg (overridable via --line, --accent, etc.) */
+    --_text:          var(--fg);
+    --_text-sec:      var(--muted, color-mix(in srgb, var(--fg) 60%, var(--bg)));
+    --_text-muted:    var(--muted, color-mix(in srgb, var(--fg) 40%, var(--bg)));
+    --_text-faint:    color-mix(in srgb, var(--fg) 25%, var(--bg));
+    --_line:          var(--line, color-mix(in srgb, var(--fg) 50%, var(--bg)));
+    --_arrow:         var(--accent, color-mix(in srgb, var(--fg) 85%, var(--bg)));
+    --_node-fill:     var(--surface, color-mix(in srgb, var(--fg) 3%, var(--bg)));
+    --_node-stroke:   var(--border, color-mix(in srgb, var(--fg) 20%, var(--bg)));
+    --_group-fill:    var(--bg);
+    --_group-hdr:     color-mix(in srgb, var(--fg) 5%, var(--bg));
+    --_inner-stroke:  color-mix(in srgb, var(--fg) 12%, var(--bg));
+    --_key-badge:     color-mix(in srgb, var(--fg) 10%, var(--bg));
+  }
+</style>
+<defs>
+  <marker id="arrowhead" markerWidth="8" markerHeight="5" refX="7" refY="2.5" orient="auto">
+    <polygon points="0 0, 8 2.5, 0 5" fill="var(--_arrow)" stroke="var(--_arrow)" stroke-width="0.75" stroke-linejoin="round" />
+  </marker>
+  <marker id="arrowhead-start" markerWidth="8" markerHeight="5" refX="1" refY="2.5" orient="auto-start-reverse">
+    <polygon points="8 0, 0 2.5, 8 5" fill="var(--_arrow)" stroke="var(--_arrow)" stroke-width="0.75" stroke-linejoin="round" />
+  </marker>
+</defs>
+<polyline class="edge" data-from="U" data-to="E" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="132.605,76.9 132.60499999999996,108.9" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="A" data-to="T" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="580.0474999999999,76.9 580.0474999999999,92.9 363.79799999999994,92.9 363.79799999999994,108.9" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="E" data-to="P" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="132.60499999999996,145.8 132.60499999999996,165.8 136.9275,165.8 136.9275,185.8" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="T" data-to="P" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="363.79799999999994,145.8 363.79799999999994,165.8 136.9275,165.8 136.9275,185.8" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="T" data-to="Q" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="363.79799999999994,145.8 363.79799999999994,165.8 404.87566666666663,165.8 404.87566666666663,185.8" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="W" data-to="C" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="870.9666666666666,145.8 870.9666666666666,165.8 890.4318333333333,165.8 890.4318333333333,185.8" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="A" data-to="L" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="580.0474999999999,76.9 580.0474999999999,92.9 612.7271666666666,92.9 612.7271666666666,185.8" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="E" data-to="L" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="132.60499999999996,145.8 132.60499999999996,165.8 612.7271666666666,165.8 612.7271666666666,185.8" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="W" data-to="L" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="870.9666666666666,145.8 870.9666666666666,165.8 612.7271666666666,165.8 612.7271666666666,185.8" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="L" data-to="AL" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="612.7271666666666,222.70000000000002 612.7271666666666,268.70000000000005" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="AL" data-to="LO" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="612.7271666666666,305.6 612.7271666666666,345.6" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="LO" data-to="G" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="612.7271666666666,382.5 612.7271666666666,422.5" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="P" data-to="S" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="136.9275,236.70000000000002 136.9275,252.70000000000005 846.1431666666666,252.70000000000005 846.1431666666666,268.70000000000005" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="C" data-to="S" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="890.4318333333333,236.70000000000002 890.4318333333333,252.70000000000005 846.1431666666666,252.70000000000005 846.1431666666666,268.70000000000005" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="S" data-to="K" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="846.1431666666666,305.6 846.1431666666666,345.6" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<g class="node" data-id="U" data-label="브라우저 클릭" data-shape="rectangle">
+  <rect x="66.05849999999998" y="40" width="133.09300000000002" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="132.605" y="58.45" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">브라우저 클릭</text>
+</g>
+<g class="node" data-id="E" data-label="FastAPI 이벤트 수신" data-shape="rectangle">
+  <rect x="48.64499999999998" y="108.9" width="167.92" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="132.60499999999996" y="127.35000000000001" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">FastAPI 이벤트 수신</text>
+</g>
+<g class="node" data-id="A" data-label="리뷰·즐겨찾기 변경 API" data-shape="rectangle">
+  <rect x="483.49049999999994" y="40" width="193.11399999999998" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="580.0474999999999" y="58.45" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">리뷰·즐겨찾기 변경 API</text>
+</g>
+<g class="node" data-id="T" data-label="콘텐츠 변경과 같은 DB 트랜잭션" data-shape="rectangle">
+  <rect x="240.56499999999994" y="108.9" width="246.46599999999998" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="363.79799999999994" y="127.35000000000001" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">콘텐츠 변경과 같은 DB 트랜잭션</text>
+</g>
+<g class="node" data-id="P" data-label="PostgreSQL user_events" data-shape="cylinder">
+  <rect x="40" y="192.8" width="193.855" height="36.900000000000006" fill="var(--_node-fill)" stroke="none" />
+  <line x1="40" y1="192.8" x2="40" y2="229.70000000000002" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <line x1="233.855" y1="192.8" x2="233.855" y2="229.70000000000002" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <ellipse cx="136.9275" cy="229.70000000000002" rx="96.9275" ry="7" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <ellipse cx="136.9275" cy="192.8" rx="96.9275" ry="7" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="136.9275" y="211.25" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">PostgreSQL user_events</text>
+</g>
+<g class="node" data-id="Q" data-label="PostgreSQL audit_logs" data-shape="cylinder">
+  <rect x="315.35816666666665" y="192.8" width="179.03499999999997" height="36.900000000000006" fill="var(--_node-fill)" stroke="none" />
+  <line x1="315.35816666666665" y1="192.8" x2="315.35816666666665" y2="229.70000000000002" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <line x1="494.3931666666666" y1="192.8" x2="494.3931666666666" y2="229.70000000000002" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <ellipse cx="404.87566666666663" cy="229.70000000000002" rx="89.51749999999998" ry="7" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <ellipse cx="404.87566666666663" cy="192.8" rx="89.51749999999998" ry="7" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="404.87566666666663" y="211.25" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">PostgreSQL audit_logs</text>
+</g>
+<g class="node" data-id="W" data-label="수집 worker" data-shape="rectangle">
+  <rect x="812.5711666666666" y="108.9" width="116.791" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="870.9666666666666" y="127.35000000000001" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">수집 worker</text>
+</g>
+<g class="node" data-id="C" data-label="PostgreSQL crawl_jobs" data-shape="cylinder">
+  <rect x="798.6913333333333" y="192.8" width="183.48099999999997" height="36.900000000000006" fill="var(--_node-fill)" stroke="none" />
+  <line x1="798.6913333333333" y1="192.8" x2="798.6913333333333" y2="229.70000000000002" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <line x1="982.1723333333333" y1="192.8" x2="982.1723333333333" y2="229.70000000000002" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <ellipse cx="890.4318333333333" cy="229.70000000000002" rx="91.74049999999998" ry="7" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <ellipse cx="890.4318333333333" cy="192.8" rx="91.74049999999998" ry="7" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="890.4318333333333" y="211.25" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">PostgreSQL crawl_jobs</text>
+</g>
+<g class="node" data-id="L" data-label="JSON 운영 로그 · stdout" data-shape="rectangle">
+  <rect x="518.3931666666666" y="185.8" width="188.66799999999995" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="612.7271666666666" y="204.25" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">JSON 운영 로그 · stdout</text>
+</g>
+<g class="node" data-id="AL" data-label="Grafana Alloy 수집" data-shape="rectangle">
+  <rect x="536.1771666666666" y="268.70000000000005" width="153.10000000000002" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="612.7271666666666" y="287.15000000000003" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Grafana Alloy 수집</text>
+</g>
+<g class="node" data-id="LO" data-label="Loki 보관 · LogQL" data-shape="rectangle">
+  <rect x="535.8066666666666" y="345.6" width="153.84099999999998" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="612.7271666666666" y="364.05" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Loki 보관 · LogQL</text>
+</g>
+<g class="node" data-id="G" data-label="Grafana 운영 대시보드" data-shape="rectangle">
+  <rect x="521.3571666666666" y="422.5" width="182.73999999999998" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="612.7271666666666" y="440.95" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Grafana 운영 대시보드</text>
+</g>
+<g class="node" data-id="S" data-label="관리자 통계 API 또는 읽기 전용 SQL" data-shape="rectangle">
+  <rect x="713.2771666666666" y="268.70000000000005" width="265.73199999999997" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="846.1431666666666" y="287.15000000000003" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">관리자 통계 API 또는 읽기 전용 SQL</text>
+</g>
+<g class="node" data-id="K" data-label="React 관리자 · Grafana 통계" data-shape="rectangle">
+  <rect x="739.2121666666666" y="345.6" width="213.862" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="846.1431666666666" y="364.05" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">React 관리자 · Grafana 통계</text>
+</g>
+</svg>

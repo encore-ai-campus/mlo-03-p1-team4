@@ -1,0 +1,28 @@
+sequenceDiagram
+    autonumber
+    actor U as 사용자
+    participant FE as 프론트
+    participant B as FastAPI B
+    participant R as MariaDB replica
+    participant P as MariaDB primary
+    participant M as MongoDB
+    U->>FE: 유형·지역·날짜·시간·인원
+    FE->>B: GET /venues
+    B->>R: 공간 + 그날 칸 + 평점
+    B-->>FE: items + slots
+    U->>FE: 공간 · 날짜 · 칸 13·14시 · 카드
+    FE->>B: GET /venues/{id}/slots
+    B->>R: 칸 상태
+    FE->>B: POST /reservations (결제 버튼)
+    B->>B: 검증 (기간 · 영업시간 · 1~4칸 · 최소 시간 · 인원)
+    B->>P: BEGIN · reservations · slots · payments
+    alt 성공
+        P-->>B: COMMIT
+        B-->>FE: 201 confirmed
+        B-)M: reserve_ok
+    else 같은 칸 먼저 결제됨
+        P-->>B: 1062 중복 키 → ROLLBACK
+        B->>P: 겹친 칸 다시 읽기
+        B-->>FE: 409 SLOT_TAKEN slots
+        B-)M: reserve_conflict
+    end

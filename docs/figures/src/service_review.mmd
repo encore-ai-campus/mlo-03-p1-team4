@@ -1,0 +1,22 @@
+sequenceDiagram
+    autonumber
+    actor U as 사용자
+    participant FE as 프론트
+    participant A as FastAPI A
+    participant B as get_owned (B)
+    participant P as MariaDB primary
+    Note over P: 완료 배치: 이용일 < 오늘 인 confirmed → completed
+    U->>FE: 이용 완료 예약 → 후기 쓰기
+    FE->>A: POST /reservations/{id}/review
+    A->>B: get_owned(db, user_id, id)
+    B->>P: SELECT reservations
+    B-->>A: 예약 또는 없음
+    A->>A: completed? 7일 안?
+    A->>P: INSERT reviews (reservation_id UNIQUE)
+    alt 성공
+        A-->>FE: 201
+    else 이미 씀
+        A-->>FE: 409 REVIEW_EXISTS
+    else 이용 전
+        A-->>FE: 403 NOT_COMPLETED
+    end

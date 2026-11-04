@@ -1,0 +1,10 @@
+flowchart LR
+    A["cron 주 1회"] --> B["사이트맵 비교<br/>새 공간 id"]
+    B --> C["상세 ≤ 20건<br/>3초 · robots.txt"]
+    C --> D[("crawl_raw<br/>MongoDB")]
+    D --> E{"전처리"}
+    E -- "유형 없음 · 이상값" --> X["excluded"]
+    E -- "통과" --> F["후보 풀<br/>유형별"]
+    F --> G["유형별 1개씩<br/>POST /internal/venues"]
+    G --> H[("venues<br/>MariaDB")]
+    H --> I["NEW 14일<br/>메인 노출"]

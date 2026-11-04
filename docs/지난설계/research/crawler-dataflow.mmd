@@ -1,0 +1,9 @@
+flowchart LR
+    P[공공 API · JSON] --> H[HTTPX]
+    W[허락된 HTML 페이지] --> H
+    H --> B[JSON 파싱 · Beautiful Soup]
+    J[JavaScript 렌더링 필요 시] -. 선택 .-> R[Playwright]
+    R --> B
+    B --> V[검증 · 정규화 · 출처 ID upsert]
+    V --> D[(PostgreSQL 음식점·출처)]
+    V --> C[(crawl_jobs 실행 결과)]

@@ -1,0 +1,16 @@
+flowchart TB
+    U[브라우저 클릭] --> E[FastAPI 이벤트 수신]
+    A[리뷰·즐겨찾기 변경 API] --> T[콘텐츠 변경과 같은 DB 트랜잭션]
+    E --> P[(PostgreSQL user_events)]
+    T --> P
+    T --> Q[(PostgreSQL audit_logs)]
+    W[수집 worker] --> C[(PostgreSQL crawl_jobs)]
+    A --> L[JSON 운영 로그 · stdout]
+    E --> L
+    W --> L
+    L --> AL[Grafana Alloy 수집]
+    AL --> LO[Loki 보관 · LogQL]
+    LO --> G[Grafana 운영 대시보드]
+    P --> S[관리자 통계 API 또는 읽기 전용 SQL]
+    C --> S
+    S --> K[React 관리자 · Grafana 통계]

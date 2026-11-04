@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1234.822 231.55" width="1234.822" height="231.55" style="--bg:#ffffff;--fg:#172e28;--line:#71867a;--accent:#174c3c;--muted:#52655c;--surface:#eaf0e8;--border:#a9bcae;background:var(--bg)">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Malgun%20Gothic:wght@400;500;600;700&amp;display=swap');
+  text { font-family: 'Malgun Gothic', system-ui, sans-serif; }
+  svg {
+    /* Derived from --bg and --fg (overridable via --line, --accent, etc.) */
+    --_text:          var(--fg);
+    --_text-sec:      var(--muted, color-mix(in srgb, var(--fg) 60%, var(--bg)));
+    --_text-muted:    var(--muted, color-mix(in srgb, var(--fg) 40%, var(--bg)));
+    --_text-faint:    color-mix(in srgb, var(--fg) 25%, var(--bg));
+    --_line:          var(--line, color-mix(in srgb, var(--fg) 50%, var(--bg)));
+    --_arrow:         var(--accent, color-mix(in srgb, var(--fg) 85%, var(--bg)));
+    --_node-fill:     var(--surface, color-mix(in srgb, var(--fg) 3%, var(--bg)));
+    --_node-stroke:   var(--border, color-mix(in srgb, var(--fg) 20%, var(--bg)));
+    --_group-fill:    var(--bg);
+    --_group-hdr:     color-mix(in srgb, var(--fg) 5%, var(--bg));
+    --_inner-stroke:  color-mix(in srgb, var(--fg) 12%, var(--bg));
+    --_key-badge:     color-mix(in srgb, var(--fg) 10%, var(--bg));
+  }
+</style>
+<defs>
+  <marker id="arrowhead" markerWidth="8" markerHeight="5" refX="7" refY="2.5" orient="auto">
+    <polygon points="0 0, 8 2.5, 0 5" fill="var(--_arrow)" stroke="var(--_arrow)" stroke-width="0.75" stroke-linejoin="round" />
+  </marker>
+  <marker id="arrowhead-start" markerWidth="8" markerHeight="5" refX="1" refY="2.5" orient="auto-start-reverse">
+    <polygon points="8 0, 0 2.5, 8 5" fill="var(--_arrow)" stroke="var(--_arrow)" stroke-width="0.75" stroke-linejoin="round" />
+  </marker>
+</defs>
+<polyline class="edge" data-from="P" data-to="H" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="319.423,112.2 338.977,112.2 338.977,142.65 358.531,142.65" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="W" data-to="H" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="319.423,173.10000000000002 338.977,173.10000000000002 338.977,142.65 358.531,142.65" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="H" data-to="B" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="444.94100000000003,142.65 474.279,142.65 474.279,112.2 485.833,112.2" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="J" data-to="R" data-style="dotted" data-arrow-start="false" data-arrow-end="true" data-label="선택" points="244.229,58.45 358.531,58.45" fill="none" stroke="var(--_line)" stroke-width="1" stroke-dasharray="4 4" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="R" data-to="B" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="462.725,58.45 474.279,58.45 474.279,112.2 485.833,112.2" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="B" data-to="V" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="690.803,112.2 730.803,112.2" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="V" data-to="D" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="955.039,112.2 975.039,112.2 975.039,74.75 995.039,74.75" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="V" data-to="C" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="955.039,112.2 975.039,112.2 975.039,149.65 995.039,149.65" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<g class="edge-label" data-from="J" data-to="R" data-label="선택">
+  <rect x="280.22900000000004" y="42.45" width="41.41" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="300.934" y="57.6" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">선택</text>
+</g>
+<g class="node" data-id="P" data-label="공공 API · JSON" data-shape="rectangle">
+  <rect x="177.43800000000005" y="93.75" width="141.98499999999996" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="248.43050000000002" y="112.2" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">공공 API · JSON</text>
+</g>
+<g class="node" data-id="H" data-label="HTTPX" data-shape="rectangle">
+  <rect x="358.531" y="124.2" width="86.41" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="401.736" y="142.65" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">HTTPX</text>
+</g>
+<g class="node" data-id="W" data-label="허락된 HTML 페이지" data-shape="rectangle">
+  <rect x="146.31600000000003" y="154.65" width="173.10699999999997" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="232.86950000000002" y="173.10000000000002" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">허락된 HTML 페이지</text>
+</g>
+<g class="node" data-id="B" data-label="JSON 파싱 · Beautiful Soup" data-shape="rectangle">
+  <rect x="485.833" y="93.75" width="204.96999999999997" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="588.318" y="112.2" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">JSON 파싱 · Beautiful Soup</text>
+</g>
+<g class="node" data-id="J" data-label="JavaScript 렌더링 필요 시" data-shape="rectangle">
+  <rect x="40" y="40" width="204.229" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="142.11450000000002" y="58.45" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">JavaScript 렌더링 필요 시</text>
+</g>
+<g class="node" data-id="R" data-label="Playwright" data-shape="rectangle">
+  <rect x="358.531" y="40" width="104.194" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="410.628" y="58.45" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Playwright</text>
+</g>
+<g class="node" data-id="V" data-label="검증 · 정규화 · 출처 ID upsert" data-shape="rectangle">
+  <rect x="730.803" y="93.75" width="224.236" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="842.921" y="112.2" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">검증 · 정규화 · 출처 ID upsert</text>
+</g>
+<g class="node" data-id="D" data-label="PostgreSQL 음식점·출처" data-shape="cylinder">
+  <rect x="995.039" y="56.3" width="199.78299999999996" height="36.900000000000006" fill="var(--_node-fill)" stroke="none" />
+  <line x1="995.039" y1="56.3" x2="995.039" y2="93.2" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <line x1="1194.822" y1="56.3" x2="1194.822" y2="93.2" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <ellipse cx="1094.9305" cy="93.2" rx="99.89149999999998" ry="7" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <ellipse cx="1094.9305" cy="56.3" rx="99.89149999999998" ry="7" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="1094.9305" y="74.75" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">PostgreSQL 음식점·출처</text>
+</g>
+<g class="node" data-id="C" data-label="crawl_jobs 실행 결과" data-shape="cylinder">
+  <rect x="995.039" y="131.2" width="170.884" height="36.900000000000006" fill="var(--_node-fill)" stroke="none" />
+  <line x1="995.039" y1="131.2" x2="995.039" y2="168.1" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <line x1="1165.923" y1="131.2" x2="1165.923" y2="168.1" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <ellipse cx="1080.481" cy="168.10000000000002" rx="85.442" ry="7" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <ellipse cx="1080.481" cy="131.2" rx="85.442" ry="7" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="1080.481" y="149.65" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">crawl_jobs 실행 결과</text>
+</g>
+</svg>

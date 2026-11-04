@@ -1,0 +1,4 @@
+-- 이 파일은 2026-11-04에 db/migrations/0001_init.sql로 옮겼다.
+-- 로컬 MariaDB 11.8에서 실행 검증(표 12·뷰 1·CHECK 12, 제약 시험 29건 통과) 뒤 내용을 그대로 옮기고 CREATE DATABASE·USE 줄만 뺐다.
+-- MariaDB 표 정의는 이제 마이그레이션이 기준이다. 표를 바꿀 때는 db/migrations/0002_….sql을 새로 만든다.
+-- 검증 기록: docs/기록/검증_2026-11-04_DDL실행.md
