@@ -1,0 +1,55 @@
+# 로컬 개발용 MariaDB 11.4 + MongoDB 7 (담당: DB). 안내: infra/local/README.md
+# 실행(Pro_1에서): docker compose -f infra/local/docker-compose.yml up -d
+# 첫 실행 때만 0001_init → seed → mongo_init이 자동으로 들어간다. 처음부터 다시 하려면 down -v.
+name: spacecube
+
+services:
+  mariadb:
+    image: mariadb:11.4
+    environment:
+      MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD:?infra/local/.env에 MARIADB_ROOT_PASSWORD를 넣으세요}
+      MARIADB_DATABASE: spacecube
+      MARIADB_USER: app
+      MARIADB_PASSWORD: ${MARIADB_PASSWORD:?infra/local/.env에 MARIADB_PASSWORD를 넣으세요}
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-time-zone=+09:00
+      - --sql-mode=STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION
+    ports:
+      - "127.0.0.1:${MARIADB_PORT:-3308}:3306"   # 이 PC 안에서만. 3306(설치형 MariaDB)·3307(Windows 서비스)과 겹치지 않게 3308
+    volumes:
+      - mariadb_data:/var/lib/mysql
+      - ./initdb/00_test_db.sql:/docker-entrypoint-initdb.d/00_test_db.sql:ro
+      - ../../db/migrations/0001_init.sql:/docker-entrypoint-initdb.d/10_init.sql:ro
+      - ../../db/seed/seed.sql:/docker-entrypoint-initdb.d/20_seed.sql:ro
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  mongodb:
+    image: mongo:7
+    ports:
+      - "127.0.0.1:27017:27017"   # 로컬 전용이라 인증 없음. 서버(EC2)에서는 인증을 켠다
+    volumes:
+      - mongo_data:/data/db
+      - ../../docs/db/mongo_init.js:/docker-entrypoint-initdb.d/10_init.js:ro
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  adminer:   # 선택: docker compose -f infra/local/docker-compose.yml --profile tools up -d
+    image: adminer:4
+    profiles: ["tools"]
+    ports:
+      - "127.0.0.1:8080:8080"
+    depends_on:
+      - mariadb
+
+volumes:
+  mariadb_data:
+  mongo_data:
