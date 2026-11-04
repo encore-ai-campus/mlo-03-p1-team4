@@ -1,4 +1,4 @@
-"""F-20·22 브라우저 별도 실행기. 기본 pytest 수집에는 포함하지 않는다."""
+"""F-20~22 브라우저 별도 실행기. 기본 pytest 수집에는 포함하지 않는다."""
 
 import os
 import shutil
@@ -19,7 +19,7 @@ from app.main import app
 from app.services import venue_service
 
 
-def test_venue_detail_and_slots_in_real_browser(synthetic_venue, monkeypatch):
+def test_venue_availability_in_real_browser(synthetic_venue, monkeypatch):
     """임시 Uvicorn에 실제 앱을 띄우고 Chrome으로 확인한 뒤 서버·DB를 정리한다."""
     connection, venue_id, today = synthetic_venue
     monkeypatch.setattr(venue_service, "get_today", lambda: today)

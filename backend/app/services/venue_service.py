@@ -1,4 +1,4 @@
-"""F-20·22 공간 상세·날짜별 시간 칸과 F-14 공통 NEW 판정."""
+"""F-20~22 공간 상세·예약 가능 날짜·시간 칸과 F-14 공통 NEW 판정."""
 
 from collections.abc import Sequence
 from datetime import date, datetime, timedelta
@@ -10,7 +10,13 @@ from app.core.config import get_settings
 from app.core.errors import AppError
 from app.repositories import slot_repo, venue_repo
 from app.schemas.catalog import CategoryRead, FacilityRead
-from app.schemas.venues import SlotRead, VenueRead, VenueRegionRead
+from app.schemas.venues import (
+    AvailableDateRead,
+    AvailableDatesRead,
+    SlotRead,
+    VenueRead,
+    VenueRegionRead,
+)
 
 _DEFAULT_IMAGE = "art:group-0"
 
@@ -88,13 +94,12 @@ def get_venue(db: Session, venue_id: int) -> VenueRead:
     )
 
 
-def get_slots(db: Session, venue_id: int, slot_date: date) -> list[SlotRead]:
-    """지난 날짜도 허용하고 설정된 날짜 범위 안의 공간·일자별 칸을 반환한다."""
-    today = get_today()
+def _booking_date_range(today: date, offset: int) -> tuple[date, date]:
+    """F-21·22가 같은 날짜 범위·오류를 쓰고 큰 offset도 날짜 변환 전에 거절한다."""
     settings = get_settings()
     min_date = today - timedelta(days=settings.booking_past_days)
     max_date = today + timedelta(days=settings.booking_future_days)
-    if not min_date <= slot_date <= max_date:
+    if not -settings.booking_past_days <= offset <= settings.booking_future_days:
         raise AppError(
             "OUT_OF_RANGE",
             "예약할 수 없는 날짜나 시간이에요.",
@@ -105,6 +110,13 @@ def get_slots(db: Session, venue_id: int, slot_date: date) -> list[SlotRead]:
                 "max_date": max_date.isoformat(),
             },
         )
+    return min_date, max_date
+
+
+def get_slots(db: Session, venue_id: int, slot_date: date) -> list[SlotRead]:
+    """지난 날짜도 허용하고 설정된 날짜 범위 안의 공간·일자별 칸을 반환한다."""
+    today = get_today()
+    _booking_date_range(today, (slot_date - today).days)
 
     venue = venue_repo.get_slot_context(db, venue_id)
     if venue is None:
@@ -116,4 +128,41 @@ def get_slots(db: Session, venue_id: int, slot_date: date) -> list[SlotRead]:
         slot_repo.list_taken_hours(db, venue_id, slot_date),
         today=today,
         now=get_now(),
+    )
+
+
+def get_available_dates(db: Session, venue_id: int, offset: int, days: int) -> AvailableDatesRead:
+    """영업시간의 빈 칸 총수와 연속 빈 칸을 날짜마다 집계한다. 지난 칸도 포함한다."""
+    today = get_today()
+    min_date, max_date = _booking_date_range(today, offset)
+    start_date = today + timedelta(days=offset)
+    day_count = min(days, (max_date - start_date).days + 1)
+    end_date = start_date + timedelta(days=day_count - 1)
+    venue = venue_repo.get_slot_context(db, venue_id)
+    if venue is None:
+        raise AppError("VENUE_NOT_FOUND", "공간을 찾을 수 없어요.", 404)
+
+    taken_by_date = slot_repo.list_taken_hours_by_date(db, venue_id, start_date, end_date)
+    dates = []
+    for day_offset in range(day_count):
+        slot_date = start_date + timedelta(days=day_offset)
+        taken = taken_by_date.get(slot_date, set())
+        free = run = longest_run = 0
+        for hour in range(venue["open_hour"], venue["close_hour"]):
+            if hour in taken:
+                run = 0
+            else:
+                free += 1
+                run += 1
+                longest_run = max(longest_run, run)
+        dates.append(
+            AvailableDateRead(date=slot_date, free=free, bookable=longest_run >= venue["min_hours"])
+        )
+    return AvailableDatesRead(
+        venue_id=venue_id,
+        offset=offset,
+        days=days,
+        min_date=min_date,
+        max_date=max_date,
+        dates=dates,
     )

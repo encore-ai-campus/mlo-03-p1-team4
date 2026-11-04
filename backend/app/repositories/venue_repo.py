@@ -1,4 +1,4 @@
-"""F-20·22 공간 상세·영업시간 SQL. 공개 읽기 세션은 호출자가 전달한다."""
+"""F-20~22 공간 상세·영업시간 SQL. 공개 읽기 세션은 호출자가 전달한다."""
 
 from sqlalchemy import column, func, select, table
 from sqlalchemy.engine import RowMapping
@@ -44,8 +44,8 @@ def get_detail(db: Session, venue_id: int) -> RowMapping | None:
 
 
 def get_slot_context(db: Session, venue_id: int) -> RowMapping | None:
-    """시간 칸 조회에 필요한 활성 공간의 ID·영업시간만 읽는다."""
-    query = select(Venue.venue_id, Venue.open_hour, Venue.close_hour).where(
+    """날짜·시간 칸 조회에 필요한 활성 공간의 영업시간·최소 이용시간만 읽는다."""
+    query = select(Venue.venue_id, Venue.open_hour, Venue.close_hour, Venue.min_hours).where(
         Venue.venue_id == venue_id, Venue.is_active.is_(True)
     )
     return db.execute(query).mappings().one_or_none()

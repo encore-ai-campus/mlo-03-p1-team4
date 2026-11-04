@@ -1,4 +1,4 @@
-// F-20·22 실제 API를 Chrome의 네트워크 경로로 호출한다. 목업 화면 E2E와는 별도 시험이다.
+// F-20~22 실제 API를 Chrome의 네트워크 경로로 호출한다. 목업 화면 E2E와는 별도 시험이다.
 import assert from 'node:assert/strict';
 import { chromium } from '../../frontend/node_modules/@playwright/test/index.mjs';
 
@@ -66,7 +66,56 @@ try {
   assert.deepEqual(await missingSlots.json(), {
     code: 'VENUE_NOT_FOUND', message: '공간을 찾을 수 없어요.', detail: null,
   });
-  process.stdout.write('F-20·22 Chrome: 실제 상세·날짜별 칸 200, 일치·미래 날짜, 검증·범위 400, 공간 404 통과\n');
+  const datesUrl = `${baseUrl}/venues/${venueId}/available-dates`;
+  const available = await page.goto(datesUrl);
+  assert.equal(available.status(), 200);
+  const calendar = await available.json();
+  assert.deepEqual(Object.keys(calendar).sort(), ['venue_id', 'offset', 'days', 'min_date', 'max_date', 'dates'].sort());
+  assert.equal(calendar.venue_id, Number(venueId));
+  assert.equal(calendar.offset, 0);
+  assert.equal(calendar.days, 14);
+  assert.equal(calendar.dates.length, 14);
+  assert.deepEqual(calendar.dates[0], {
+    date: today, free: detail.slots.filter(slot => !slot.taken).length, bookable: true,
+  });
+  function addDays(day, offset) {
+    const result = new Date(`${day}T00:00:00Z`);
+    result.setUTCDate(result.getUTCDate() + offset);
+    return result.toISOString().slice(0, 10);
+  }
+  assert.deepEqual(calendar.dates, Array.from({ length: 14 }, (_, i) => ({
+    date: addDays(today, i), free: 14, bookable: true,
+  })));
+  const previous = await page.goto(`${datesUrl}?offset=-14&days=2`);
+  assert.equal(previous.status(), 200);
+  assert.deepEqual((await previous.json()).dates, [-14, -13].map(offset => ({
+    date: addDays(today, offset), free: 14, bookable: true,
+  })));
+  const maxOffset = Math.round((Date.parse(calendar.max_date) - Date.parse(today)) / 86400000);
+  const lastPage = await page.goto(`${datesUrl}?offset=${maxOffset}`);
+  assert.equal(lastPage.status(), 200);
+  const lastCalendar = await lastPage.json();
+  assert.equal(lastCalendar.days, 14);
+  assert.deepEqual(lastCalendar.dates, [{ date: calendar.max_date, free: 14, bookable: true }]);
+  for (const [query, field] of [['days=0', 'days'], ['days=32', 'days'], ['offset=1.5', 'offset']]) {
+    const invalid = await page.goto(`${datesUrl}?${query}`);
+    assert.equal(invalid.status(), 400);
+    const error = await invalid.json();
+    assert.equal(error.code, 'VALIDATION');
+    assert.equal(error.detail.fields[0].field, field);
+  }
+  const outsideDates = await page.goto(`${datesUrl}?offset=${maxOffset + 1}`);
+  assert.equal(outsideDates.status(), 400);
+  assert.deepEqual(await outsideDates.json(), {
+    code: 'OUT_OF_RANGE', message: '예약할 수 없는 날짜나 시간이에요.',
+    detail: { reason: 'date', min_date: calendar.min_date, max_date: calendar.max_date },
+  });
+  const missingDates = await page.goto(`${baseUrl}/venues/9223372036854775807/available-dates`);
+  assert.equal(missingDates.status(), 404);
+  assert.deepEqual(await missingDates.json(), {
+    code: 'VENUE_NOT_FOUND', message: '공간을 찾을 수 없어요.', detail: null,
+  });
+  process.stdout.write('F-20~22 Chrome: 실제 상세·시간 칸·날짜 200, 과거·마지막 페이지, 검증·범위 400, 공간 404 통과\n');
 } finally {
   await browser.close();
 }

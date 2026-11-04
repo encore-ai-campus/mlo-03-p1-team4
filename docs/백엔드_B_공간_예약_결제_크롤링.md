@@ -155,6 +155,15 @@ F-22 `GET /venues/{venue_id}/slots?date=YYYY-MM-DD`:
 
 `bookable`은 **이어진 빈 칸이 그 공간의 `min_hours` 이상**인 날입니다(지난 칸도 포함). `offset`은 오늘 기준 일 수로 음수도 됩니다(`-14`면 2주 전부터). 범위는 설정값 `BOOKING_PAST_DAYS`·`BOOKING_FUTURE_DAYS`(기본 각 365)이고 응답의 `min_date`·`max_date`로 알려 줍니다.
 
+F-21 구현 기준(기존 프론트 목업과 동일):
+
+- 인증 없이 `get_db_read()`로 조회합니다. `offset`은 정수 기본 0, `days`는 1~31 정수 기본 14입니다. 잘못된 값·공간 ID는 400 `VALIDATION`입니다.
+- 시작 날짜는 한국 `get_today() + offset`입니다. 시작 날짜가 설정 범위 밖이면 F-22와 같은 400 `OUT_OF_RANGE` 및 `reason="date"`·`min_date`·`max_date` detail을 반환합니다. 큰 정수 offset도 날짜 연산 전에 범위를 확인합니다.
+- 시작 날짜가 허용되면 `days`일을 조회하되 최대 날짜를 넘는 뒷부분은 자릅니다. 응답 `days`는 요청값을 유지하고 `dates` 길이는 더 짧을 수 있습니다. `min_date`·`max_date`는 조회 페이지가 아닌 전체 예약 가능 범위입니다.
+- `dates`는 조회 구간의 모든 날짜를 오름차순으로 포함합니다. 예약 불가능한 날도 `bookable=false`로 남깁니다. `free`는 `[open_hour, close_hour)` 안의 빈 칸 총수이며 연속 길이와 다릅니다. 예를 들어 최소 2시간에 빈 칸 2개가 떨어져 있으면 `free=2`, `bookable=false`입니다.
+- 지난 칸은 제외하지 않고 완료 예약의 칸도 점유로 셉니다. 다른 공간·날짜 및 영업시간 밖 점유는 섞지 않습니다. 없는 공간·비활성 공간은 404 `VENUE_NOT_FOUND`입니다.
+- 공간의 영업시간·최소 이용시간과 요청 기간의 점유 칸을 각각 한 번씩 조회합니다. 날짜별 SQL 반복·이미지·평점 조회·점유 캐시는 없습니다. replica 복제 지연 가능성과 예약 시 primary 최종 판정 원칙은 F-22와 같습니다.
+
 ### 5-3. 예약·결제 (W)
 
 | 메서드 | 경로 | 인증 | 기능 | 성공 | 주요 오류 |

@@ -1,4 +1,4 @@
-"""F-20·22 공간 상세·시간 칸의 공개 요청·응답 계약."""
+"""F-20~22 공간 상세·예약 가능 날짜·시간 칸의 공개 계약."""
 
 import re
 from datetime import date
@@ -32,6 +32,25 @@ class SlotRead(BaseModel):
     hour: int
     taken: bool
     past: bool
+
+
+class AvailableDateRead(BaseModel):
+    """빈 칸 총수와 최소 이용시간을 연속으로 예약할 수 있는지를 구분한다."""
+
+    date: date
+    free: int
+    bookable: bool
+
+
+class AvailableDatesRead(BaseModel):
+    """days는 요청한 일수이며 날짜 상한에 걸리면 dates 길이는 더 짧을 수 있다."""
+
+    venue_id: int
+    offset: int
+    days: int
+    min_date: date
+    max_date: date
+    dates: list[AvailableDateRead]
 
 
 class VenueRead(BaseModel):

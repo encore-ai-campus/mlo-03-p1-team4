@@ -17,11 +17,11 @@
 - 테스트 DB는 로컬 MariaDB(`infra/local`)의 `spacecube_test`. SQLite는 제약 동작이 달라 쓰지 않습니다.
 - 동시성 테스트는 스레드 50개로 요청을 한꺼번에 보냅니다.
 
-## F-20 상세·F-22 시간 칸 API·F-14 공통 정책
+## F-20 상세·F-21 예약 가능 날짜·F-22 시간 칸 API·F-14 공통 정책
 
-`test_venues.py`는 실제 A 앱의 `GET /venues/{venue_id}`와 `GET /venues/{venue_id}/slots?date=YYYY-MM-DD`를 로컬 MariaDB와 연결해 호출합니다.
+`test_venues.py`는 실제 A 앱의 `GET /venues/{venue_id}`, `GET /venues/{venue_id}/available-dates`, `GET /venues/{venue_id}/slots?date=YYYY-MM-DD`를 로컬 MariaDB와 연결해 호출합니다.
 `CHECK_DB_URL`에 기존 DDL·seed가 적용된 로컬 `spacecube_test` 접속 정보를 지정해야 합니다.
-이미지·NEW 정책 단위 10건, 가상 공간 DB 연결 1건, 상세 HTTP 응답·라우터 등록 17건과 F-22 관련 38건을 검증합니다.
+이미지·NEW 정책 단위 10건, 가상 공간 DB 연결 1건, 상세 HTTP 응답·라우터 등록 17건과 F-22 관련 38건, F-21 관련 48건을 검증합니다.
 
 - 인증 없이 상세 계약 전체를 반환하며, 내부 출처·등록 시각을 노출하지 않습니다.
 - 이미지 누락 시 대표·갤러리 모두 `art:group-0`; 실제 이미지는 정렬 순서와 대표 그림을 유지합니다.
@@ -35,6 +35,10 @@
 - 날짜별·공간별 점유 분리, 완료 예약 점유 유지, 재조회 시 새 점유 반영, 한국 시각 자정·영업 시작·종료 후 `past` 경계를 검사합니다.
 - 날짜 필수·엄격한 `YYYY-MM-DD` 형식·실제 달력 날짜·ID 오류는 공통 400, 없는 공간·비활성은 동일한 404를 확인합니다.
 - 기본 ±365일과 변경된 과거·미래 범위, 0일 설정의 양끝 포함·범위 밖 400 `OUT_OF_RANGE` 및 정확한 `detail`을 검사합니다.
+- F-21은 기본 14일·최대 31일, 음수 offset·지난 빈 칸, 설정 범위 양끝·0일 설정·마지막 페이지 잘림을 확인합니다. 응답 `days`는 요청값을 유지합니다.
+- 빈 칸 총수와 연속 길이를 구분해 최소 1~4시간 판정, 분산된 빈 칸·완전 점유·끝까지 이어진 빈 칸·영업시간 밖 점유 제외를 검사합니다. 예약 불가능한 날도 반환합니다.
+- 공간·날짜별 점유 분리, 완료 예약의 점유 유지, F-22 빈 칸 수와 일치, 점유 추가·삭제·최소시간 변경 후 재조회 반영을 확인합니다.
+- 매우 큰 offset도 500 대신 400이며, 31일 조회도 공간·점유 SELECT가 총 2회이고 이미지·평점 조회가 없음을 실제 SQL로 확인합니다.
 
 가상 공간·회원·예약은 테스트 트랜잭션 안에서만 만들고 출처 synthetic 또는 `is_synthetic`으로 표시합니다.
 TestClient는 lifespan을 시작하지 않으며 공개 DB 의존성을 테스트 연결로 교체합니다. 종료 시 전체 변경을
@@ -44,8 +48,8 @@ TestClient는 lifespan을 시작하지 않으며 공개 DB 의존성을 테스�
 python -m pytest backend/tests/test_venues.py -q
 ```
 
-11-05 F-22 추가 후 이 파일은 **66건 통과**했습니다. F-20의 기존 28건에 F-22 검증 38건을 추가했습니다.
-`verify.ps1` 전체도 통과했습니다: pytest **105건**, 프론트 단위 **54건**, Ruff 린트·포맷,
+11-05 F-21 추가 후 이 파일은 **114건 통과**했습니다. 기존 F-20·22 66건에 F-21 검증 48건을 추가했습니다.
+`verify.ps1` 전체도 통과했습니다: pytest **153건**, 프론트 단위 **54건**, Ruff 린트·포맷,
 프론트 린트·색 검사·빌드. Starlette TestClient 사용 중단 예정 경고 1건이며 실패는 없습니다.
 
 현재 A 앱은 로컬 전달본이므로 `main.py`의 Git 제외는 유지했습니다. A 통합 PR에는 다음 import·등록이 필요합니다.
@@ -56,9 +60,9 @@ from app.routers import venues
 app.include_router(venues.router, prefix="/venues", tags=["venues"])
 ```
 
-F-22는 기존 venues 라우터에 포함되어 추가 main.py 변경이 없습니다. 공간별 후기 목록은 A API로 별도 연결하며, F-21과 실제 프론트 화면 전체 흐름은 이후 검증합니다.
+F-21·22는 기존 venues 라우터에 포함되어 추가 main.py 변경이 없습니다. 공간별 후기 목록은 A API로 별도 연결하며, 실제 프론트 화면 전체 흐름은 이후 검증합니다.
 
-## F-20·22 추가 검증: 브라우저·읽기 연결 대체
+## F-20~22 추가 검증: 브라우저·읽기 연결 대체
 
 `test_read_routing.py`는 A의 `get_db_read()`를 대체하지 않고 실제 MariaDB 연결을 사용합니다.
 시험용 설정·연결 풀은 테스트 프로세스에서만 분리하고, 읽기 주소 미설정·동일 DB의 정상 읽기 연결·수신하지
@@ -73,7 +77,8 @@ python -m pytest backend/tests/test_read_routing.py -q
 `check_venue_browser.py`·`.mjs`는 별도 실행하는 B 검증기입니다. 기본 pytest 수집에는 들어가지 않으며,
 가상 공간이 있는 트랜잭션에 실제 앱을 연결해 임시 Uvicorn을 띄우고 Chrome으로 상세 200·JSON 계약·본문과
 없는 공간 404를 확인합니다. F-22는 오늘 칸과 상세 응답 일치·미래 날짜 200, 날짜 누락·형식·달력 오류와
-범위 밖 400, 없는 공간 404를 확인합니다. 테스트가 끝나면 Chrome·임시 API 서버를 종료하고 공간을 롤백합니다.
+범위 밖 400, 없는 공간 404를 확인합니다. F-21은 기본 날짜 목록·F-22 빈 칸 수 일치·지난 날짜·마지막 페이지
+잘림 200, 입력·범위 400, 없는 공간 404를 확인합니다. 테스트가 끝나면 Chrome·임시 API 서버를 종료하고 공간을 롤백합니다.
 Node와 frontend의 기존 Playwright 패키지가 필요합니다. DB 접속 정보는 Node·Chrome에 전달하지 않습니다.
 
 ```powershell
@@ -85,9 +90,9 @@ python -m pytest backend/tests/check_venue_browser.py -q -s -p no:cacheprovider
 목업 데이터 기반의 화면·접근성·가입·예약 흐름 검증입니다. 실제 F-20과 상세 페이지 전체를 연결한 시험과
 구분합니다. F-20·21·22·A 후기 목록까지 실제로 연결한 화면 흐름은 여전히 별도 통합 항목입니다.
 
-11-05 F-22 추가 후 별도 Chrome **1건 통과**, Starlette 사용 중단 예정 경고 1건입니다.
+11-05 F-21 추가 후 별도 Chrome **1건 통과**, Starlette 사용 중단 예정 경고 1건입니다.
 기존 F-20 단계의 읽기 경로 **3건 통과**, 목업 화면 E2E **59건 통과·7건 기기 조건 건너뜀** 기록은 유지합니다.
-이번 F-22 작업에서 목업 화면 E2E는 재실행하지 않았습니다(프론트 변경 없음).
+이번 F-21 작업에서 목업 화면 E2E는 재실행하지 않았습니다(프론트 변경 없음).
 
 ## F-10·11: 유형·지역·시설 조회
 
@@ -131,5 +136,5 @@ python -m pytest backend/tests/test_reservation_dependencies.py -q
 ```
 
 11-05 현재 프로젝트의 `localhost:3306/spacecube_test`에서 **17건 통과**했습니다(기존 예약 의존성 14건 + 공간 모델 3건).
-F-22까지 추가한 전체 pytest는 **105건 통과**, Starlette TestClient 사용 중단 예정
+F-21까지 추가한 전체 pytest는 **153건 통과**, Starlette TestClient 사용 중단 예정
 경고 1건입니다. 비밀번호는 테스트 프로세스에만 전달했고 파일이나 영구 환경변수에 저장하지 않았습니다.

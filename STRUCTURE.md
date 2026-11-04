@@ -62,20 +62,20 @@ Pro_1/
 │  ├─ public/fonts/           웹용 글꼴 (Noto Sans KR 서브셋)
 │  └─ scripts/check-colors.mjs  tokens.css 밖 색 코드 검사
 │
-├─ backend/                   [A·B] FastAPI 한 앱 (B F-10·11·20·22·시설·get_owned 검증, A 코드는 로컬 전달본 사용)
+├─ backend/                   [A·B] FastAPI 한 앱 (B F-10·11·20~22·시설·get_owned 검증, A 코드는 로컬 전달본 사용)
 │  ├─ AGENTS.md · README.md · .env.example
 │  ├─ app/
 │  │  ├─ main.py              [A] (예정)
 │  │  ├─ core/                [A] config, db, mongo, security, deps, errors, pagination, events, metrics, logging, clock, synthetic (예정)
 │  │  ├─ models/              [A] base, user, review / [B] catalog·reservation·venue 구현 — DDL 대응 모델
-│  │  ├─ routers/             [A] auth, users, reviews, events, health / [B] catalog·venues(상세·날짜별 시간 칸) 구현, reservations·internal 예정
-│  │  ├─ schemas/             라우터와 같은 이름 ([B] catalog·venues 상세·시간 칸 응답·날짜 검증 구현)
-│  │  ├─ services/            [A] auth_service, user_service, review_service / [B] catalog_service·venue_service(상세·날짜별 시간 칸) 구현, reservation_service·internal_service 예정
-│  │  ├─ repositories/        [A] user_repo, review_repo / [B] catalog_repo·reservation_repo(get_owned)·venue_repo·slot_repo(점유 시간 조회) 구현, payment_repo 예정
+│  │  ├─ routers/             [A] auth, users, reviews, events, health / [B] catalog·venues(상세·예약 가능 날짜·시간 칸) 구현, reservations·internal 예정
+│  │  ├─ schemas/             라우터와 같은 이름 ([B] catalog·venues 상세·날짜 목록·시간 칸 응답·날짜 검증 구현)
+│  │  ├─ services/            [A] auth_service, user_service, review_service / [B] catalog_service·venue_service(상세·예약 가능 날짜·시간 칸) 구현, reservation_service·internal_service 예정
+│  │  ├─ repositories/        [A] user_repo, review_repo / [B] catalog_repo·reservation_repo(get_owned)·venue_repo·slot_repo(일자·기간 점유 조회) 구현, payment_repo 예정
 │  │  └─ jobs/                [B] complete_reservations (예정)
 │  ├─ scripts/                [A] replay_events (예정)
-│  └─ tests/                  [B] test_catalog·test_reservation_dependencies·test_venues·test_read_routing 구현 / F-21 별도 API 등은 예정
-│     └─ check_venue_browser.py·mjs  [B] 별도 실행: 임시 실제 API + Chrome 상세·시간 칸 200·400·404 검증
+│  └─ tests/                  [B] test_catalog·test_reservation_dependencies·test_venues·test_read_routing 구현 / 검색·예약 API 등은 예정
+│     └─ check_venue_browser.py·mjs  [B] 별도 실행: 임시 실제 API + Chrome 상세·날짜 목록·시간 칸 200·400·404 검증
 │
 ├─ db/                        [DB] (스키마는 docs/db, 검증 후 여기로)
 │  ├─ migrations/             0001_init.sql (11-04 검증, 표 12 + 뷰)
