@@ -2,6 +2,7 @@ name: 버그
 description: 기대와 다르게 동작하는 것
 title: "[파트] 버그 요약"
 labels: ["bug"]
+projects: ["encore-ai-campus/5"]  # 만들면 Project 보드에 자동으로 들어감
 body:
   - type: dropdown
     id: part
