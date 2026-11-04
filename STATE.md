@@ -11,7 +11,7 @@
 
 | 파트 | 담당자 | 지금 | 다음 할 일 | 막힌 것 |
 | --- | --- | --- | --- | --- |
-| 프론트 | [이름] | FE-1~9 확정안 반영, Claude 시안 대조·FE 오류/모바일 결제/가입 UX 재검토 및 목업·화면 검증 | A·B 구현 후 실제 API 연결·오류·예약 동시성 통합 검증 | 실제 API 미구현 |
+| 프론트 | 노진산(FE·PM) | FE-1~9 확정안 반영, Claude 시안 대조·FE 오류/모바일 결제/가입 UX 재검토 및 목업·화면 검증 | A·B 구현 후 실제 API 연결·오류·예약 동시성 통합 검증 | 실제 API 미구현 |
 | FastAPI A | [이름] | 문서 확정(`docs/백엔드_A`), 폴더·README | 1일차 오전 `core/`(두 DB 세션·오류·`get_current_user`·`log_event`·`get_today`)·`models/base.py` → 회원 → 후기 → 이벤트 | 없음 |
 | FastAPI B | [이름] | 문서 확정(`docs/백엔드_B`), 폴더·README | 공개 조회(catalog·venues·slots) → 예약+결제 트랜잭션·동시성 테스트 → `/internal/venues` | A의 core (DDL은 11-04 로컬 검증 끝) |
 | DB | [이름] | `0001_init.sql`·`mongo_init.js` 검증(설치형 11.8·compose 11.4 둘 다 29건 통과), seed(유형 5·시설 20·지역 230 → `seed.sql`), `infra/local` compose, 크롤러 시제품(옛 필터) | 크롤러 새 필터(유형 5·별칭) → `/internal/venues` 등록(B와) → 가상 데이터 생성기 | 없음(A2 결정을 팀원에게 공유) |
