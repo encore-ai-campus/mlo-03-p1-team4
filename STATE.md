@@ -1,0 +1,193 @@
+# STATE.md — 지금 어디까지 왔나
+
+사람과 에이전트(Codex, Claude Code)가 함께 고치는 진행 기록입니다. 작업을 끝낼 때마다 해당 줄을 고치고 '최근 변경' 맨 위에 한 줄 더합니다. 설계 내용 자체는 `docs/`에, 여기는 상태와 결정만 둡니다.
+
+- 마지막 갱신: 2026-11-03
+- 단계: **11-03 설계 확정안** · 폴더·지침 정리(`STRUCTURE.md`) · 프론트 화면 7개 동작(11-03 확정안 반영, 목업 검증) · 백엔드·DB 코드 시작 전
+- 디자인 캔버스(화면 설계 · 시스템 아키텍처 · 글꼴 시안): https://claude.ai/artifact/5dQciCDEaMm8uNjw6sqZpm
+- 실행 환경: Python은 conda `pro_1`(`environment.yml`), 프론트는 `frontend/`의 npm
+
+## 파트별 상태
+
+| 파트 | 담당자 | 지금 | 다음 할 일 | 막힌 것 |
+| --- | --- | --- | --- | --- |
+| 프론트 | [이름] | FE-1~9 확정안 반영, Claude 시안 대조·FE 오류/모바일 결제/가입 UX 재검토 및 목업·화면 검증 | A·B 구현 후 실제 API 연결·오류·예약 동시성 통합 검증 | 실제 API 미구현 |
+| FastAPI A | [이름] | 문서 확정(`docs/백엔드_A`), 폴더·README | 1일차 오전 `core/`(두 DB 세션·오류·`get_current_user`·`log_event`·`get_today`)·`models/base.py` → 회원 → 후기 → 이벤트 | 없음 |
+| FastAPI B | [이름] | 문서 확정(`docs/백엔드_B`), 폴더·README | 공개 조회(catalog·venues·slots) → 예약+결제 트랜잭션·동시성 테스트 → `/internal/venues` | A의 core (DDL은 11-04 로컬 검증 끝) |
+| DB | [이름] | `0001_init.sql`·`mongo_init.js` 검증(설치형 11.8·compose 11.4 둘 다 29건 통과), seed(유형 5·시설 20·지역 230 → `seed.sql`), `infra/local` compose, 크롤러 시제품(옛 필터) | 크롤러 새 필터(유형 5·별칭) → `/internal/venues` 등록(B와) → 가상 데이터 생성기 | 없음(A2 결정을 팀원에게 공유) |
+
+## 기능 진행표
+
+상태: 설계 → 진행 → 완료 → 검증(테스트 통과). F-ID는 `docs/산출물_01_요구사항명세서.md`.
+
+| F-ID | 기능 | 담당 | 상태 |
+| --- | --- | --- | --- |
+| F-01~04 | 회원가입·로그인·내 정보·탈퇴 | A | 서버 설계 확정 / FE 가입·로그인·내 정보 조회·탈퇴 목업 검증 |
+| F-10~14 | 유형·지역 조회, 검색, 정렬, NEW | B | 서버 설계 확정 / FE `/venues` 계약 목업 검증 |
+| F-20~22 | 상세, 예약 가능 날짜, 시간 칸 | B | 서버 설계 확정 / FE `/venues` 계약 목업 검증 |
+| F-30~32 | 예약+모의 결제 한 번, 중복 차단 | B | 서버 설계 확정 / FE 한 번 결제·409·지난 예약 목업 검증 |
+| F-34~35 | 취소, 이용 완료 배치 | B | 설계 확정 |
+| F-40~41 | 내 예약, 내 후기 | B / A | 서버 설계 확정 / FE 내 예약 3상태·내 후기 목업 검증 |
+| F-50~51 | 후기 작성·조회(후기 모아보기) | A | 서버 설계 확정 / FE 후기 작성·모아보기 목업 검증 |
+| F-60, F-62~65 | 이벤트(로그 파일 + MongoDB), 가상 데이터, `get_today`, 서버 로그, 지표 | A | 설계 확정 |
+| F-61 | 크롤링 신규 등록 | DB / B | 진행 (크롤러 동작, 필터가 옛 스터디룸 기준, `crawl_raw`·`/internal/venues` 연결 전) |
+| F-70 | 헬스체크 3단계 | A | 설계 확정 |
+| — | 같은 칸 동시 50건 중 1건만 성공 | B / DB | 설계 확정 (MVP 통과 조건) |
+| — | F-33 결제 대기 만료, F-52 자유게시판·댓글, F-53 공지 | — | 11-03 삭제 |
+
+## 결정 기록
+
+| 날짜 | 결정 | 근거 |
+| --- | --- | --- |
+| 10-30 | 스터디룸 → 공간대여로 확장, 유형 5개(스터디룸·스튜디오·카페·영화관·파티룸, 11-03에 영화관 → 강의실), 전국 | 회의 · `docs/공간대여_01` |
+| 10-30 | 결제는 '확정 = 결제 완료'인 모의 결제 | 회의 |
+| 10-30 | 예약은 1시간 칸, 중복은 `reservation_slots` 기본키로 DB가 차단 | `docs/공간대여_02` |
+| 10-30 | Nginx → FastAPI 2대 → RDS MariaDB, NAT 게이트웨이 없음, 팀원별 VPC 10.1n.0.0/16 | `docs/AWS_네트워크_설계.md` |
+| 10-30 | FastAPI 분담: A 회원·후기·게시판·로그 / B 공간·검색·예약·결제 | `docs/공간대여_03` |
+| 10-30 | 공간 사진은 크롤링하지 않고 일러스트 10종 × 색 2가지를 순환 | 회의 |
+| 10-30 | 가상 데이터는 규칙 기반·`is_synthetic`으로 분리, 구조 검증용 | 회의 |
+| 10-30 | 문서는 노션이 아니라 이 저장소의 md로 관리 | 팀 |
+| 10-30 | 에이전트 지침은 `AGENTS.md` 하나로 Codex·Claude Code 공용, `CLAUDE.md`는 두지 않음 | 이 파일 '에이전트 사용' |
+| 10-31 | 프론트는 Vue 3 + Vite, JavaScript + 일반 CSS(scoped), reka-ui·vue-sonner·@vueuse/core·@lucide/vue | `frontend/README.md` |
+| 11-01 | UI 패턴: 패럴랙스만 안 씀, 캐러셀·리빌·스태거·툴팁은 정해진 곳에만, 움직임 줄이기 준수 | `docs/공간대여_04` |
+| 11-01 | Python 실행 환경은 conda `pro_1`(3.12) 하나로, 기존 `MLops03` 환경과 분리 | `environment.yml` |
+| 11-01 | 글꼴 후보 5종(Noto Sans KR·Pretendard·Freesentation·SUIT·Spoqa) 수집, 결정 전 기본값 Pretendard | `design/fonts/README.md` |
+| 11-01 | 글꼴은 Noto Sans KR (`--font-sans`) | 시안 비교 · `docs/공간대여_04` |
+| 11-01 | 프론트 검증: Oxlint + ESLint(flat) · Vitest + Vue Test Utils · Playwright + axe. 커밋 전 `npm run verify` | `frontend/README.md` 검증 |
+| 11-02 | 파이썬 린트·포맷은 Ruff 하나(`ruff.toml`). 커밋 전 루트 `verify.ps1`로 파이썬+프론트를 한 번에 | `AGENTS.md` 검증 |
+| 11-03 | RDB는 MariaDB 11.4(RDS), 비정형은 MongoDB 7(EC2). MariaDB는 master–slave(primary + read replica), 클러스터(Galera)는 안 함 | `docs/산출물_04_DB명세서.md` 1절 |
+| 11-03 | 예약 홀딩 없음, 결제 순서대로 확정. 상태는 confirmed·completed·cancelled | 11-03 회의 |
+| 11-03 | 회원 글은 후기만(자유게시판·댓글 삭제). 관리자 없음 | 11-03 회의 |
+| 11-03 | 사용자 이벤트는 로그 파일(→ Loki) + MongoDB, 지표는 Prometheus, 화면은 Grafana | `docs/산출물_02` |
+| 11-03 | 크롤링 유지(스페이스클라우드 → MongoDB crawl_raw → `/internal/venues`), 날짜는 실제 날짜 + 과거 데이터 생성 | 사용자 결정 |
+| 11-03 | 구현 기준 문서는 `docs/산출물_01~04`·`docs/백엔드_A·B`·`docs/프론트_변경목록_11-03.md`. 10-30 설계는 `docs/지난설계/`, 회의·검토는 `docs/기록/`로 옮김. 폴더 지도는 `STRUCTURE.md` | 폴더 정리 |
+| 11-03 | DB 접근은 SQLAlchemy 2.1 동기 + PyMySQL, MongoDB는 pymongo, 엔드포인트는 `def`. 표 변경은 SQL 파일 마이그레이션(Alembic 안 씀), 모델은 DDL에 맞춤. 백엔드 패키지 버전을 `environment.yml`에 고정 | 사용자 결정 · `backend/AGENTS.md` |
+| 11-04 | HTTPS는 먼저 HTTP로 배포·시연 흐름이 다 되면 그때 검토(도메인 + Let's Encrypt 또는 ALB + ACM). 그 전에는 HTTP라 로그인 비밀번호·토큰이 평문으로 감을 알고 시연 계정만 씀 | 사용자 결정 · 2차 검토 #3 |
+| 11-04 | 지역 seed는 기초자치단체 단위 230행(시·도 16, 일반구 제외), 2026-11-04 기준(전남광주통합특별시·인천 2군 9구 반영). 둘로 나뉜 옛 구(인천 중구·서구) 주소는 제외 | `db/seed/README.md` |
+| 11-04 | 로컬 DB는 `infra/local` compose(MariaDB 11.4 포트 3308 + MongoDB 7), 첫 실행 때 0001·seed·mongo_init 자동 | `infra/local/README.md` |
+| 11-04 | DB 연결과 RDS 파라미터 그룹 모두 `sql_mode`에 `STRICT_TRANS_TABLES` 필수(없으면 잘못된 ENUM·빠진 날짜가 조용히 저장됨). DDL·mongo_init은 로컬 실행 검증 통과, RDS 11.4에서 한 번 더 | `docs/기록/검증_2026-11-04_DDL실행.md` |
+| 11-04 | AWS는 프리 티어 안에서, **크레딧 방식 계정**(웬만하면 무료, 크레딧 조금). 평소는 노트북(로컬 compose), AWS는 **C안: EC2 3대(① 정문 Nginx + MongoDB, ② FastAPI #1 + cron, ③ FastAPI #2 다른 AZ), Docker 없이 직접 설치(systemd)** + RDS 1대, 측정·시연 때만 켬. replica는 측정하는 날만, 모니터링은 Grafana Cloud 무료. 작업 시간만 켜면 월 약 $17. EC2 5대 + RDS 2대는 확장안 | 사용자 결정 · `docs/AWS_프리티어_구성.md` |
+| 11-03 | A4 API 세부 확정: 이중 결제는 같은 요청이면 200(처음 예약), 일부만 내 예약과 겹치면 409 `mine`; 탈퇴 시 이름·휴대폰·생년월일·이메일 즉시 지움(예약·후기는 `user_id`로 남김), 같은 이메일 재가입 허용, 후기 작성자 '탈퇴한 회원' | 사용자 결정 · `docs/백엔드_A·B`, `docs/오류코드.md` |
+| 11-03 | A3 기초 데이터 확정: 유형 스터디룸·스튜디오·카페·강의실·파티룸(영화관 → 강의실, 코드 `lectureroom`, 그림 `seminar`), 크롤링 3곳(스페이스클라우드 주·쉐어잇·루북, robots.txt 11-03 확인, 2·3순위는 약관·표본 20건 승인 뒤), 지역은 행정구역 전체 + 공간 있는 지역만 표시 + 시·도 짧은 이름 맞춤, 연습실 계열 제외 | 사용자 결정 · `db/seed/README.md`, `docs/공간대여_06` |
+| 11-03 | A2 DB 스키마 확정: `min_hours` 복원(팀원안과 다름), 결제수단 영문 코드(팀원안 한글과 다름), 시간 범위 CHECK 9~23(영업·예약·칸), 필수 동의 시각 2칸, 만 14세 미만 가입 불가 | 사용자 결정 · `docs/산출물_04` 2·7절, `docs/db/spacecube_mariadb.sql` |
+| 11-03 | A1 파트 약속 확정: `get_current_user()`→`CurrentUser(user_id)`, `log_event(…, venue_id, category, payload, is_synthetic)`(MongoDB는 내부 스레드 풀 2개·대기열 1,000건), `get_session_id()`, `get_today()`·`get_now()`(시간대 없는 한국 시각), `v_venue_rating`, `get_owned()`(+`created_at`) | 사용자 결정 · `docs/백엔드_A·B` 3절 |
+| 11-03 | 날짜는 실제 날짜, 가상 날짜 없음(팀원 제안 검토). 예약은 과거·미래 각 365일 열고 지난 시간 예약은 만들 때 바로 completed, 후기 기한 `max(이용일, 예약한 날)`+7일, 인기순은 실제 결제 시각 기준 | 사용자 결정 · `docs/기록/검토_2026-11-03_가상날짜_제안.md` |
+| 11-03 | 오류 코드는 `docs/오류코드.md` 한 곳(공통 8·A 8·B 10·프론트 2)에만, 다른 문서는 링크 | 사용자 요청 |
+| 11-03 | UX 법칙 5개(힉·피츠·제이콥·근접성·폰 레스토프)를 화면 규칙으로: 보이는 영역마다 채운 버튼 하나, 선택지 7개 안팎, 누르는 것 44px·간격 8px | `docs/공간대여_04` |
+| 11-03 | 서버·프론트 이벤트를 같은 세션으로 묶으려고 모든 요청에 `X-Session-Id` | `docs/기록/검토_2026-11-03_문서_2차검토.md` 1번 |
+| 11-03 | 디자인 스킬: 점검은 impeccable·design-motion-principles, 보안 점검은 ecc-security-review. hallmark·design-taste-frontend는 기존 화면에 안 씀 | `frontend/AGENTS.md` |
+| 11-03 | 토큰은 액세스 토큰만(JWT HS256 60분, Bearer 헤더, `sub` 문자열), 리프레시·쿠키·로그아웃 API 없음. 프론트는 401이면 로그인으로 보내고 선택 유지 | 사용자 결정 · `docs/백엔드_A` 5-1 |
+| 11-03 | 이벤트 `unselect_slot`·`abandon`은 만들지 않고 이탈은 세션 분석으로 계산. `POST /events`는 모르는 이벤트를 그 건만 버리고 202 + `ignored`. 공간은 이벤트 맨 위 `venue_id` | 사용자 결정 · `docs/백엔드_A` 5-3 |
+| 11-03 | 공간 등록은 `/internal/venues` 한 길(DB 직접 로더 없음), 백엔드 운영 스크립트는 `backend/scripts/` | 폴더 정리 |
+
+## 열린 질문 — 한 번에 검토할 목록
+
+방향(11-03): **먼저 지금 설계로 띄우고 재 본 뒤, 조건을 넘는 것만 더한다.** 그래서 A(지금 정할 것)만 검토하고, B(나중에 추가)는 조건과 함께 적어 둔다. A는 막는 순서대로 정렬했다. 정해지면 `[x]` 목록으로 옮기고 결정 기록에 한 줄 쓴다.
+
+### A. 지금 정할 것 (1차 필수, 검토 순서)
+
+| # | 묶음 | 정할 것 | 권장 | 막는 것 | 근거 |
+| --- | --- | --- | --- | --- | --- |
+| ~~A1~~ | 파트 약속 | **확정(11-03)** — 아래 '이미 정한 것' | — | — | `백엔드_A·B` 3절 |
+| ~~A2~~ | DB 스키마 | **확정(11-03)** — 아래 '이미 정한 것' | — | — | `산출물_04` 2·7절 |
+| ~~A3~~ | 기초 데이터 | **확정(11-03)** — 아래 '이미 정한 것' | — | — | `db/seed/README.md` |
+| ~~A4~~ | API 세부 | **확정(11-03)** — 아래 '이미 정한 것' | — | — | `백엔드_A` 5-1·5-2, `백엔드_B` 6절 |
+| A5 (추후 확정) | 협업 | git 원격 저장소·브랜치·PR 리뷰, 비밀값(`.env` 값) 나누는 곳 | GitHub + `main` 보호 + 파트 브랜치 + PR 1명, 비밀값은 팀 채널 비밀 메시지 하나로 | 파트 합치기 | 2차 검토 4절 |
+| A6 (추후 확정) | 1차 배포 구성 | 정문은 지금 설계(Nginx) + 설정 보강, RDS 기본 안전 설정, `X-Synthetic`은 내부 키와 함께 (배치·모니터링 위치는 11-04 프리 티어, **HTTPS는 11-04에 'HTTP로 다 되면 검토'로 정함**) | Nginx 보강, 백업·삭제 보호·파라미터 그룹 켬, 예 | 2일차 배포 | `인프라_트래픽_안정성_검토.md` 1-1절 |
+| A7 (추후 확정) | 측정 기준 | 띄운 뒤 잴 것과 합격선, B의 추가 조건 | 조회 p95 300ms·예약 p95 500ms·오류 1% 미만(409 제외), 1-1절 조건표 승인 | 3일차 부하 시험 | 같은 문서 1-1절, `산출물_01` NFR-05 |
+| A8 (추후 확정) | 발표 전 | 시연 시나리오·시연 계정, 크롤링 약관 최종 확인, 서비스명 겹침 | `docs/시연_시나리오.md` 만들기, 발표 전 확인 | 3일차 발표 | 2차 검토 4절 |
+
+A1~A4는 11-03에 확정했고, **A5~A8은 추후 확정**으로 미뤘다(11-03). 그 전까지는 각 줄의 '권장'을 임시 기준으로 쓰고, 코드에 박아 넣지 않는다(예: 정문·모니터링 위치·합격선은 설정값·문서로만).
+
+### B. 나중에 추가 (띄워서 잰 뒤 조건을 넘을 때만)
+
+| # | 추가할 것 | 넣는 조건 |
+| --- | --- | --- |
+| B1 | 정문 교체: ALB(권장) 또는 HAProxy | 서버 1대 끄기 시험에서 실패 1% 이상, 도메인 HTTPS를 붙일 때, 정문 EC2 장애 |
+| B2 | Auto Scaling 그룹 + 시작 템플릿 (cron은 모니터링 EC2로) | 목표 인원에서 CPU 70% 이상 10분 넘게, p95 초과 원인이 CPU |
+| B3 | EC2 크기 올리기 | `CPUCreditBalance`가 시험 내내 줄어듦 |
+| B4 | RDS 크기 올리기 / replica 추가 | 연결 수 80%·CPU 70% 이상 / replica CPU 70% 이상 또는 조회 p95만 초과 |
+| B5 | RDS Multi-AZ | 운영 단계(실사용자) |
+| B6 | CloudWatch 경보 세트 → SNS, 런북 상세 | 하루 넘게 켜 둘 때 |
+| B7 | SSM Session Manager·Parameter Store | 서버가 3대를 넘거나 B2를 넣을 때 |
+| B8 | 요청 제한(`limit_req`/WAF) | 시연 밖에서도 열어 둘 때, 로그인 실패가 몰릴 때 |
+| B9 | MongoDB 스냅샷 자동화 | 이벤트를 시연 뒤에도 남길 때 |
+| B10 | Locust EC2 | 1,000명 시험 때만 |
+
+그 전까지 Codex는 실행한 폴더의 `AGENTS.md` 하나만 읽으므로 `Pro_1`에서 실행한다.
+
+이미 정한 것:
+
+- [x] A4 API 세부 → 같은 결제 요청을 10분 안에 다시 보내면 200 + 처음 예약, 내 다른 예약과 겹치면 409 + `mine`; 탈퇴 회원 후기는 '탈퇴한 회원'으로 남김; 탈퇴하면 개인정보 바로 지우고 같은 이메일 재가입 허용(11-03)
+- [x] A3 기초 데이터 → 유형 스터디룸·스튜디오·카페·강의실·파티룸(영화관 → 강의실), 크롤링 3곳(스페이스클라우드·쉐어잇·루북, 2·3순위는 약관·표본 승인 후), 지역은 행정구역 전체 seed + 화면엔 공간 있는 지역만, 연습실 계열 제외(11-03)
+- [x] A2 DB 스키마 → `min_hours` 복원, 결제수단 영문 코드, 예약 시간 DB CHECK 9~23, `users.terms_agreed_at`·`privacy_agreed_at` + 만 14세 미만 가입 불가(11-03). DB 담당 팀원에게 알릴 것
+- [x] A1 파트 약속 → 문서대로 확정 + `get_owned()`에 `created_at`, `log_event()`에 `category`, MongoDB 쓰기는 내부 스레드 풀, `get_now()`는 시간대 없는 한국 시각(11-03)
+- [x] 날짜 → 실제 날짜, 가상 날짜 없음, 예약은 과거·미래 365일(지난 시간은 바로 completed), 후기 기한 `max(이용일, 예약한 날)`+7일(11-03)
+- [x] 오류 코드 → `docs/오류코드.md` 한 곳에 전체(11-03)
+- [x] 토큰 → 액세스 토큰만, JWT 60분, Bearer, 리프레시 없음(11-03)
+- [x] 이벤트 `unselect_slot`·`abandon` → 만들지 않음, 이탈은 분석으로 계산. 모르는 이벤트는 그 건만 버림(11-03)
+- [x] ORM·드라이버 → SQLAlchemy 2.1 동기 + PyMySQL, pymongo, 마이그레이션은 SQL 파일(11-03)
+- [x] 결제 대기·만료 → 없음(11-03), venues·rooms 통합 → venues 하나(11-02), 가상 날짜 → 실제 날짜(11-03), 일러스트 값 → `art:<종류>-<색>`, 글꼴 → Noto Sans KR(11-01)
+
+## 에이전트 사용
+
+- 지침은 루트와 파트 폴더의 `AGENTS.md`. Codex는 저장소 루트부터 지금 폴더까지 모두 합쳐 읽고, Claude Code는 `CLAUDE.md`가 없을 때 `AGENTS.md`를 읽는다(v2.1.277 이상).
+- `CLAUDE.md`나 `CLAUDE.local.md`를 만들면 Claude Code가 `AGENTS.md`를 읽지 않으니 만들지 않는다. 개인 설정은 각자 `~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md`에 둔다.
+- 개인 기억(Claude 자동 메모리 등)은 팀에 공유되지 않는다. 팀이 알아야 할 것은 이 파일과 `docs/`에 쓴다.
+
+## 최근 변경 (최신이 위)
+
+- 11-04 · FE·공동 · 프론트–명세 대조(가입 필드·이벤트 9종·`X-Session-Id`·오류 코드) 통과. 작은 차이 3건 고침: `오류코드.md` EMAIL_TAKEN에서 '(탈퇴 회원 포함)' 정정(A4), 500 토스트에 `request_id` 표시, 405 토스트 추가(`App.vue`, 단위 테스트 2개 추가 → 54개). `npm run verify` 통과
+- 11-04 · 공동 · AWS 1차 배치를 C안으로: EC2 3대(정문 Nginx+MongoDB, FastAPI #1·#2), Docker 없이 직접 설치, 보안 그룹 4개, 월 약 $17(작업 시간). `AWS_프리티어_구성.md`·`infra/aws` 체크리스트·산출물_02·인프라 검토·캔버스 메모 반영
+- 11-04 · DB(공동 대신 실행) · seed: `db/seed/*.csv`(유형 5·시설 20·지역 230·시도/시군구 별칭·유형 대응표)와 `db/loaders/load_seed.py`(→ `seed.sql`, 표본 주소 197/200 풀림). 로컬 compose `infra/local/docker-compose.yml`(MariaDB 11.4:3308, MongoDB 7) — 첫 실행 자동 초기화 확인, 11.4에서 `check_ddl.py` 29건 통과. HTTPS는 HTTP로 다 되면 검토로 결정
+- 11-04 · DB(공동 대신 실행) · 검증한 DDL을 `db/migrations/0001_init.sql`로 옮김(`CREATE DATABASE`·`USE` 줄 뺌). `check_ddl.py`가 0001을 쓰도록 바꿔 다시 실행 → 29건 통과. 기준 문서·폴더 지침의 DDL 경로를 마이그레이션으로 바꾸고 `docs/db/spacecube_mariadb.sql`은 옮겼다는 안내만 남김
+- 11-04 · DB(공동 대신 실행) · DDL 실행 검증: 로컬 MariaDB 11.8에서 표 12·뷰 1·CHECK 12 생성, 제약 시험 29건(동시 결제 포함) 통과, MongoDB 7 초기화 시험 13건 통과. 시험 스크립트 `db/tests/check_ddl.py`·`check_mongo_init.js` 추가. STRICT `sql_mode` 필수를 `backend/AGENTS.md`·`infra/aws`·산출물_04에 반영. 로컬 `backend/.env` 만듦(git 제외). Docker 시작 오류(남은 소켓 파일) 해결
+- 11-04 · 공동 · AWS 프리 티어안 `docs/AWS_프리티어_구성.md` 추가(계정 종류별 무료 방식·비용, EC2 1대 + RDS 1대, replica는 측정하는 날만, Grafana Cloud 무료), 산출물_02 6절·인프라 검토·`infra/aws` 체크리스트에 연결. 폴더 정리(캐시·빌드 결과 삭제, 프론트 작업 메모 3개를 `docs/기록/`로), 디자인 캔버스 공통 푸터(캠프·프로젝트 표기)와 로그인 화면 다시 설계(헤더는 화면별 그대로 둠)
+- 11-03 · FE · Claude 아티팩트 8개 화면 대조 후 상세 404/조회 장애·후기 독립 로딩, 홈 NEW 빈 상태, 검색 오래된 오류, 모바일 결제 버튼 겹침, 가입 필수/선택 동의를 수정. 아티팩트 댓글·`docs/기록/인계_2026-11-03_Codex_FE검토.md`로 공유. `npm run verify`(단위 52·린트·빌드), Chrome E2E 59 통과·기기별 7 제외. 실제 API 연결 전.
+- 11-03 · FE · FE-1~9 확정안 반영: `/venues`, 한 번 결제·409 재선택·지난 예약, 가입 동의·14세 검증, 내 후기·탈퇴, 401 선택 복원, 세션·이벤트·공통 오류 처리. `npm run verify`(단위 52·린트·빌드) 통과, Chrome E2E 58 통과·기기별 6 제외. 실제 API 연결 전. 스킬·ZIP 점검은 `docs/기록/작업_2026-11-03_프론트_FE반영.md`·`점검_2026-11-03_FE스킬.md`. 다른 파트 코드 변경 없음.
+
+- 11-03 · 공동 · A5~A8(협업·1차 배포 구성·측정 기준·발표 준비)을 추후 확정으로 미룸. 프론트 작업을 Codex로 하기 위한 작업 단위(FE-1~FE-9)를 `docs/프론트_변경목록_11-03.md` 7절에 정리
+- 11-03 · 공동 · A4 API 세부 확정: 예약 트랜잭션 1062 뒤 분기(같은 요청 200 / 내 예약 겹침 409 `mine` / 남 409), 탈퇴 즉시 개인정보 지움·재가입 허용·후기 '탈퇴한 회원'. 백엔드 A·B(본문·테스트), 요구사항 F-04·F-30, DB 명세, 오류 코드, 프론트 변경 목록 반영
+- 11-03 · 공동 · A3 기초 데이터 확정: 유형 영화관 → 강의실(`lectureroom`), 크롤링 3곳과 robots.txt 다시 확인, 사이트별 유형 대응표·지역 표기 맞춤(`sido_alias.csv`)·연습실 제외를 `db/seed/README.md`에, 크롤러 대상·규칙을 `crawler/AGENTS.md`에. 요구사항·DB 명세·DDL 주석·백엔드 B·아키텍처·서비스 흐름·생성기·프론트 변경 목록 반영. 프론트 코드는 그대로
+- 11-03 · 공동 · A2 DB 스키마 확정: DDL에 시간 범위 CHECK 9~23(venues·reservations·reservation_slots), `users.terms_agreed_at`·`privacy_agreed_at` 추가. DB 명세·백엔드 A(가입 필수 동의·만 14세 미만 `under_14`)·B(`/internal/venues` 영업시간 검증)·오류 코드·프론트 변경 목록·생성기·DB 테스트 반영. DDL은 여전히 실행 검증 전
+- 11-03 · 공동 · A1 파트 약속 확정: `get_owned()`에 `created_at`(후기 기한 계산), `log_event()`에 `category`, MongoDB 쓰기는 `BackgroundTasks` 대신 내부 스레드 풀, `get_now()`는 시간대 없는 한국 시각. 백엔드 A·B 문서, AGENTS(루트·backend), core·repositories README 반영
+- 11-03 · 공동 · 방향 정리: '먼저 띄우고 재 본 뒤 조건을 넘는 것만 더한다'. 인프라 검토에 1-1절(1차 필수 / 잴 것과 합격선 / 나중에 추가할 것과 조건) 추가, 열린 질문을 A(지금 정할 것 8묶음)·B(나중에 추가 10개, 조건 포함)로 다시 나눔. 1차 정문은 지금 설계(Nginx) + 설정 보강
+- 11-03 · 공동 · 인프라·트래픽·안정성 타당성 검토(`docs/인프라_트래픽_안정성_검토.md`): HAProxy는 필수 아님, 권장은 ALB + 앱 서버별 Nginx + Auto Scaling(대안 HAProxy), Playwright는 화면 흐름·Locust는 트래픽, 먼저 막힐 곳은 RDS 연결 수(약 35~40)와 t4g CPU 크레딧, AWS 서비스별 안정성 표, 배포 관여 15개 팀별 검토. `산출물_02` Nginx 헬스체크 문구 정정, 연결 풀·워커·시간 제한 값을 `backend/AGENTS.md`에, 안정성 체크리스트를 `infra/aws`에. 열린 질문을 '한 번에 검토할 목록' 19개로 합침
+- 11-03 · 공동 · 날짜 결정(실제 날짜, 과거·미래 365일, 지난 시간 예약은 바로 완료)을 산출물 01·03·04, 백엔드 A·B, `.env.example`, 사용자 여정 그림에 반영, 팀원 제안 검토 기록. `docs/오류코드.md`(전체 오류 코드) 추가. UX 법칙 5개 적용 규칙과 화면별 바꿀 것 9줄(`docs/공간대여_04`). 문서 2차 검토(`docs/기록/`): 세션 id 끊김·인기순·TTL·`get_now`·로그 개인정보 규칙 고침, 결정 필요 9건을 열린 질문으로. 개인 스킬 저장소에 hallmark·impeccable·design-taste-frontend·design-motion-principles·ecc-security-review 설치(커밋, push 전)
+- 11-03 · 공동 · 토큰 결정 반영: 액세스 토큰만(Bearer, 60분, 리프레시 없음). 백엔드_A 5-1에 토큰 표(클레임, 확인 순서, 로그아웃, 비밀번호 변경 뒤 한계), 프론트 변경 목록에 401 처리, 산출물_01 결정표·AGENTS·backend README 갱신
+- 11-03 · 공동 · 이벤트 결정 반영: `unselect_slot`·`abandon` 제외(이탈은 `select_slot` 있고 `reserve_ok` 없는 세션으로 계산, `산출물_04` 8절), 모르는 이벤트는 그 건만 버림(백엔드_A 5-3·테스트). 프론트는 `room_id`를 payload에 넣고 있어 맨 위 `venue_id`로 옮기도록 변경 목록에 추가. 앞서 '프론트가 두 이벤트를 보내 400'이라고 한 것은 틀림(README 표에만 예정으로 있었음)
+- 11-03 · 공동 · ORM 결정 반영: SQLAlchemy 2.1 동기 + PyMySQL + pymongo, SQL 파일 마이그레이션. `environment.yml`에 백엔드 패키지 11개 버전 고정(설치는 안 함), `backend/AGENTS.md` 'DB 접근 규칙'(def 엔드포인트, 세션 시간대 +09:00, commit/rollback, 1062만 409), `backend/app/models/` 폴더와 `test_models_match_db.py` 추가, 산출물 01·02·04와 백엔드 A·B 문서 갱신. bcrypt 5의 72바이트 제한을 가입 검증에 넣음
+- 11-03 · 공동 · 폴더·지침 정리: `STRUCTURE.md`(폴더 지도·담당·기준 문서·큰 버그 방지 규칙) 추가. 루트·backend·db·crawler·frontend `AGENTS.md`와 backend·db·infra·simulator README를 11-03 확정안으로 고침(pending·`/rooms`·게시판·`v_room_rating`·옛 `log_event` 제거, primary/replica 세션 표, 오류 코드 표). 옛 설계 01~03은 `docs/지난설계/`, 회의·검토는 `docs/기록/`로 옮기고 링크 고침. `docs/프론트_변경목록_11-03.md`, `backend/.env.example`, `backend/scripts/README.md`, 루트 `.gitignore` 추가. Nginx 초안의 `/internal/` 차단 위치를 `/api/internal/`로 고침(원래는 막히지 않았음). 코드는 그대로
+
+- 11-03 · 공동 · DB 설계 확정안: `docs/산출물_04_DB명세서.md`(MariaDB + MongoDB, master–slave vs 클러스터 비교, 팀원 변경 반영표, 3단계 스키마·정규화 다시, 표 12개·컬렉션 3개 명세, Loki·Prometheus 데이터, 데이터량), DDL 수정안 `docs/db/`(실행 검증 전). 그림 7장 `docs/figures/`(ERD, 아이콘 아키텍처, 서비스 흐름 5장)과 다시 만드는 스크립트. 산출물 01·02·03, 백엔드 A·B 문서를 이 명세에 맞춤. 팀원안과 다른 점: `min_hours` 복원, 결제수단 영문 코드, posts·comments 삭제. 아이콘 nginx·fastapi.svg의 중복 fill 속성 수정
+
+- 11-03 · 공동 · 11-03 회의(MongoDB 필수·이벤트 저장, 홀딩 없음·결제순 확정, 자유게시판·댓글 삭제)와 팀원 의견(MySQL master–slave)을 반영해 산출물 5개 개정. 비판적 검토 기록 `docs/기록/검토_2026-11-03_산출물_비판적검토.md`(치명 3·중요 8·사소 4: 복제 지연 때문에 '내 것'·인증은 primary, MongoDB는 NAT가 없어 퍼블릭 서브넷 EC2 + 보안 그룹, 헬스체크 3단계 등). 제안(가상 공간 생성, 날짜 방식)은 권장안(표본 분포 + 생성, 실제 날짜 + 백필)으로 쓰고 회의 확정 전 표시. 백엔드 문서 이름을 `백엔드_A_회원_후기_이벤트.md`로 바꿈
+- 11-02 · 공동 · 변경 ERD(14개 표, MySQL 8.0, rooms·user_events 삭제, 결제 대기 삭제) 기준 산출물 3개(`docs/산출물_01~03`: 요구사항명세서·시스템 아키텍처 흐름도·서비스 흐름도)와 백엔드 파트별 문서 2개(`docs/백엔드_A_…`, `docs/백엔드_B_…`) 작성. 기존 01~03 문서는 변경 전 기준으로 둠. 확인 필요 9개(status 값, min_hours, NEW 기준, 가상 날짜 위치, is_synthetic, DBMS, `/venues` 경로, 결제수단 코드, 생년월일 수집)는 회의 안건
+- 11-02 · FE · 애니메이션 점검(emilkowalski/skills `review-animations`) 반영: 아코디언 닫힘 ease-in 제거, 호버 들림은 마우스에서만, 눌림 0.95~0.97, 툴팁은 버튼 쪽에서 125ms, 곡선·등장 300ms 토큰, 찜 하트 keyframe→transition, 창·드로어 닫힘 150ms(드로어는 닫힘 키프레임 이름을 따로 둬야 함), 스켈레톤을 transform으로, 움직임 줄이기는 '흐려짐만'으로 바꾸고 JS 스크롤도 따르게. `e2e/motion.spec.js` 추가. 전체 통과: 단위 28, E2E 56·6 의도적 skip
+- 11-02 · 공동 · Ruff 도입(`ruff.toml`, `environment.yml`에 ruff 0.17.3)과 전체 검증 `verify.ps1`. 기존 파이썬 5개 파일 정리: 크롤러·글꼴 스크립트 포맷, `with open`, `contextlib.suppress`, 룸 유형 고르기를 `next()`로(결과 같음 확인). `docs/지난설계/research`는 일회성 보고서 생성기라 검사에서 뺌. E2E 접근성 검사를 창·카드 움직임이 끝난 뒤에 재도록 고침(움직이는 도중 반투명이라 대비를 낮게 재던 간헐 실패). 전체 통과: ruff, 단위 28, E2E 47·3 의도적 skip
+- 11-01 · FE · 리뷰·QA 제안 1~6 반영(15건 완료, 1건 정정, 1건 보류). E2E 시계 고정·접근성 검사 6상태 추가(토스트 대비 문제 수정), 오늘·예약 가능한 날 계산(min_hours), 로그인 후 선택 유지, 예약 카드 바로 가기, 조회 더 보기·늦은 응답 무시, `beforeunload`, `.env.example`, 안 쓰는 글꼴 4종을 `design/fonts/web`으로(dist 2.8→0.9MB). verify(단위 28) 통과, E2E 47 통과·3 의도적 skip. **B 확인 필요**: API 03의 available-dates 규칙, 검색 page·size
+
+- 11-01 · FE · 프론트 리뷰·탐색 QA(`docs/기록/리뷰_2026-11-01_프론트_QA.md`): 발견 17건. 높음 2건 = 밤 9시 이후 예약 E2E가 건너뛰어져도 통과로 나옴, 성공 토스트 대비 3.43:1. 코드 수정 없음(피드백 대기)
+
+- 11-01 · FE · 토큰 밖 색 코드 61곳 정리(토큰 28개 추가), `lint:colors` 검사 추가. `npm run verify`·E2E 17개 통과
+
+- 11-01 · FE · 팀 공유용 `docs/공간대여_05_프론트_현황.md` 작성. 프론트 문서 최신화(UI 패턴 문서 화면별 표를 구현 기준으로, 루트 README 현황·폴더 트리, `src/README.md`). 알게 된 것: 화면에 있지만 DB에 없는 값 6개(시설 설명·후기 태그·인기도 등), 토큰 밖 색 코드 61곳
+
+- 11-01 · FE · 검증 도구 도입(create-vue 공식 구성): Oxlint + ESLint 10(eslint-plugin-vue, 접근성), Vitest + Vue Test Utils 단위 테스트 20개, Playwright E2E 9개 × 데스크톱·폰 + axe 접근성 검사. `npm run verify` 통과, E2E 17개 통과·1개 의도적 건너뜀. 린트 지적 3건 수정(GET 요청에도 body 키를 넣던 것, 쓰지 않는 props 변수, 삼항식을 문장처럼 쓴 것)
+
+- 11-01 · 공동 · 이미 정한 내용과 어긋난 문서 정리: 일러스트 10종(01), MVP 수치 문서에 공간대여 전환 안내·이미지 풀 20장·5개 유형 결정, 10-30 회의 문서의 카테고리 범위·NEW 14일, Nginx `/api` 접두사, 크롤러 README(코드가 스터디룸 필터로 뒤처짐), backend 실행 환경 conda `pro_1`
+
+- 11-01 · 공동 · 팀원 피드백(DB 구조·가상 날짜·크롤링) 검토 문서 추가, 회의에서 정할 제안 8개
+
+- 11-01 · 공동 · API 문서 03을 프론트에 맞춤: `GET /rooms`에 people·facilities·now 파라미터와 항목별 `slots`, `GET /reviews`에 sort(recent·high·low). B·A는 이 이름으로 구현
+
+- 11-01 · FE · 조회·상세·예약(모의 결제)·로그인·회원가입·내 예약(취소·후기)·후기 게시판 화면 완성(목업). 메인 히어로 제목 축소, 1280×650에서 유형 벤토까지 첫 화면에 들어오게 조정. 새 활동 로그 이벤트 8개(`frontend/src/composables/README.md`) → A가 허용 목록에 추가 필요. `npm run build` 통과, 1280·375px 확인
+
+- 11-01 · FE · Vue 셋업, 공통 레이아웃·컴포넌트 12종, 메인 화면(히어로·오늘 남은 칸·유형 벤토·NEW 캐러셀·카드 그리드·시간대 차트·후기) 목업으로 완성. `npm run build` 통과, 375·800px 폭 확인
+- 11-01 · 공동 · UI 패턴 결정 문서(`docs/공간대여_04`), 캔버스 화면별 패턴 메모와 '글꼴 시안' 페이지
+- 11-01 · 공동 · conda `pro_1` 환경, 글꼴 5종 원본·Windows(내 계정) 설치·웹용 서브셋
+
+- 10-30 · 공동 · `AGENTS.md`(루트·backend·frontend·db·crawler)와 `STATE.md` 추가
+- 10-30 · 공동 · 4개 파트 스켈레톤 폴더와 폴더별 README 작성
+- 10-30 · 공동 · 기능 정의·DB 정규화·FastAPI 분담 문서 작성, 디자인 화면을 공간대여 버전으로 수정
+- 10-30 · DB · 스페이스클라우드 크롤러 시제품, 공간 200개 표본으로 유형별 개수 추정

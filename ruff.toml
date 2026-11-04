@@ -1,0 +1,44 @@
+# Python 린트·포맷 (Ruff) — backend · crawler · db · simulator · design 스크립트 공통
+# 실행: conda run -n pro_1 ruff check .   /   conda run -n pro_1 ruff format .
+# 폴더별로 바꿀 게 있으면 그 폴더에 ruff.toml을 두고 첫 줄에 extend = "../ruff.toml"
+target-version = "py312"
+line-length = 100
+extend-exclude = [
+  "frontend", "**/node_modules", "design/fonts/*/original",
+  "docs/지난설계/research",  # 조사 보고서를 한 번 만들고 끝난 스크립트
+]
+
+[lint]
+select = [
+  "E", "W",   # pycodestyle: 기본 문법·공백
+  "F",        # Pyflakes: 안 쓰는 import·변수, 정의 안 된 이름
+  "I",        # isort: import 순서
+  "UP",       # pyupgrade: 3.12 문법으로
+  "B",        # bugbear: 버그가 나기 쉬운 코드(가변 기본값 등)
+  "SIM",      # 더 짧게 쓸 수 있는 if/with
+  "C4",       # 리스트·딕셔너리 컴프리헨션
+  "DTZ",      # 시간대 없는 datetime (이 프로젝트는 Asia/Seoul 고정)
+  "ASYNC",    # async 함수 안의 블로킹 호출
+  "FAST",     # FastAPI: Annotated 의존성, response_model 중복 등
+  "S",        # bandit: 하드코딩된 비밀값, SQL 문자열 조합 등
+  "RUF",
+]
+ignore = [
+  "E501",     # 줄 길이는 ruff format이 맞춘다 (긴 한글 문자열·주석은 그대로 둠)
+  "RUF001", "RUF002", "RUF003",  # 한글 문서의 ·, ‧ 같은 전각 기호를 헷갈리는 글자로 보지 않음
+]
+
+[lint.per-file-ignores]
+"**/tests/**" = ["S101"]           # 테스트에서는 assert 허용
+"crawler/**" = ["S113"]            # httpx 클라이언트에 timeout을 한 곳에서 준다
+
+[lint.flake8-bugbear]
+# FastAPI는 기본값 자리에 Depends()/Query()를 쓴다
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Query", "fastapi.Path", "fastapi.Header", "fastapi.Body"]
+
+[lint.isort]
+known-first-party = ["app"]
+
+[format]
+quote-style = "double"
+exclude = ["*.md"]  # README 안의 코드 예시는 손으로 맞춘 정렬을 둔다

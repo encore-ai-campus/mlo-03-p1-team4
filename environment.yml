@@ -1,0 +1,24 @@
+name: pro_1
+channels:
+  - defaults
+dependencies:
+  - python=3.12
+  - pip
+  - pip:
+      - fonttools==4.68.0   # 글꼴 서브셋·woff2 변환 (design/fonts)
+      - brotli              # woff2 압축
+      - httpx               # crawler, FastAPI TestClient
+      - beautifulsoup4      # crawler
+      - ruff==0.17.3        # 파이썬 린트·포맷 (ruff.toml)
+      # 백엔드 (11-03 결정: SQLAlchemy 2 동기 + PyMySQL, MongoDB는 pymongo). 버전은 팀이 같게 고정
+      - fastapi==0.162.0
+      - uvicorn==0.54.0
+      - pydantic==2.14.2
+      - pydantic-settings==2.16.2                   # core/config.py (.env 읽기)
+      - sqlalchemy==2.1.6
+      - pymysql==1.2.3                              # MariaDB 드라이버 (mysql+pymysql://)
+      - pymongo==4.19.0
+      - pyjwt==2.15.1
+      - bcrypt==5.0.0                               # 72바이트 넘는 비밀번호는 ValueError → 가입 검증에서 막음
+      - prometheus-fastapi-instrumentator==8.1.0
+      - pytest==9.2.0
