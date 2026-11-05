@@ -15,3 +15,4 @@ routers와 같은 이름으로 파일을 나눕니다(`auth.py`, `venues.py` …
 - 필드 이름은 [백엔드_A·B 5절](../../../docs/백엔드_B_공간_예약_결제_크롤링.md)의 JSON 예시를 그대로 씁니다. 프론트가 이 이름을 씁니다.
 - 날짜는 `date`, 칸은 `int`(9~22), 금액은 원 단위 `int`, 결제수단 응답은 `Literal["transfer", "card", "phone"]`. 예약 요청은 `INVALID_METHOD` 오류를 보존하도록 수단을 먼저 문자열로 받아 서비스에서 검증합니다.
 - 응답에 `password_hash`, 다른 사람의 이메일·휴대폰은 절대 넣지 않습니다. 후기 작성자는 `김**`처럼 가린 이름만 넣습니다.
+- `internal.py`는 F-61의 `InternalVenueUpsert`(출처 3종·DDL 범위·일러스트 코드 검증)와 `InternalVenueRead`(최상위 `venue_id`·`ignored_facilities`)를 정의합니다.

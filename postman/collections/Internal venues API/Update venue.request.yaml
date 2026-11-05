@@ -1,0 +1,34 @@
+$kind: http-request
+name: Update venue
+order: 5000
+url: '{{base_url}}/internal/venues'
+method: POST
+headers:
+  - key: Accept
+    value: application/json
+  - key: Content-Type
+    value: application/json
+  - key: X-Internal-Key
+    value: '{{internal_api_key}}'
+body:
+  type: json
+  content: '{{updated_venue_json}}'
+scripts:
+  - type: beforeRequest
+    language: text/javascript
+    code: |-
+      const required = ['internal_api_key', 'venue_json', 'updated_venue_json', 'invalid_venue_json'];
+      if (pm.environment.get('allow_internal_write') !== '1' || required.some(k => !pm.environment.get(k))) {
+        console.warn('로컬 테스트 환경을 설정하지 않아 내부 쓰기 요청을 건너뜁니다.');
+        pm.execution.skipRequest();
+      }
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('Source update returns 200', () => pm.response.to.have.status(200));
+      pm.test('Update retains ID and returns an empty warning list', () => {
+        const body = pm.response.json();
+        pm.expect(body).to.have.all.keys('venue_id', 'ignored_facilities');
+        pm.expect(String(body.venue_id)).to.equal(pm.environment.get('internal_venue_id'));
+        pm.expect(body.ignored_facilities).to.deep.equal([]);
+      });

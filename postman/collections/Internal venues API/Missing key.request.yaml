@@ -1,0 +1,19 @@
+$kind: http-request
+name: Missing key
+order: 2000
+url: '{{base_url}}/internal/venues'
+method: POST
+headers:
+  - key: Accept
+    value: application/json
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: '{}'
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('Missing internal key returns 401', () => pm.response.to.have.status(401));
+      pm.test('Missing key uses UNAUTHORIZED', () => pm.expect(pm.response.json().code).to.equal('UNAUTHORIZED'));

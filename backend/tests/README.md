@@ -211,3 +211,31 @@ confirmed/completed + paid인 기존 예약의 재시도 200은 유지합니다.
 수정 전 회귀 사례 4건의 실패를 확인한 뒤, 수정 후 전체 pytest **241건 통과**
 (예약 API 21건·기존 동시성 3건 포함), 기존 Starlette TestClient 경고 1건입니다.
 Ruff 린트·포맷 확인과 실제 HTTP Postman **4요청·8검증**도 통과했습니다.
+
+## F-61: 내부 공간 등록·갱신
+
+`test_internal.py`는 공식 앱의 `POST /internal/venues`를 실제 MariaDB로 검증합니다.
+키 없음·오류·미설정은 DB 접근 전에 401로 거절하며, 공개 읽기 세션으로 쓰지 않는지 확인합니다.
+출처 3종의 신규 201·동일 재전송/갱신 200, 같은 ID와 최상위 응답, 시설 무시·중복 제거,
+시설/그림 교체·비우기와 순서, 원래 등록 시각 보존, 입력 범위·미등록 지역/유형을 확인합니다.
+신규·갱신 저장 실패 뒤에는 전체가 롤백되고, 별도 연결 8개의 같은 출처 요청에서는
+201 1건·200 7건·공간 1개와 마지막 요청의 온전한 시설·그림 목록을 검증합니다.
+일반 테스트는 외부 트랜잭션으로 롤백하고 경쟁 테스트는 생성한 고유 synthetic 출처만 지웁니다.
+
+기존 DDL·seed가 있는 로컬 MariaDB `spacecube_test`를 `CHECK_DB_URL`로 지정한 뒤 pro_1에서 실행합니다.
+
+```powershell
+python -m pytest backend/tests/test_internal.py -q
+python backend/tests/check_internal_http.py
+```
+
+`check_internal_http.py`는 임시 공식 Uvicorn 서버와 내부 키를 준비하고
+`postman/collections/Internal venues API`의 6개 요청을 실행합니다.
+OpenAPI 200·키 없음 401·신규 201·재전송 200·갱신 200·잘못된 출처 400과 DB 공간 1개·목록 교체를
+확인한 뒤 임시 서버·키·환경·공간을 정리합니다. 내부 키가 비어 있는 공유 환경은 쓰기를 건너뜁니다.
+CLI 컬렉션·환경 lint와 실제 응답 검증은 별도이며, api1 배포·방화벽·실제 크롤러 호출은 후속 확인입니다.
+
+11-05 MariaDB 11.4.13 임시 loopback 인스턴스에서 F-61 **35건**을 포함한 전체 pytest **276건 통과**,
+실제 HTTP Postman **6요청·12검증 통과**했습니다. 새 컬렉션 6파일·공유 환경 lint 오류/경고는 0건이고,
+Ruff 린트·포맷 및 프론트 verify(단위 55건·린트·빌드)도 통과했습니다.
+기존 Starlette TestClient 경고와 프론트 조건문 린트 경고가 각 1건 있습니다.

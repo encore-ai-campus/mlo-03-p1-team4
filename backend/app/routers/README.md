@@ -14,7 +14,7 @@
 | `venues.py` | B | `GET /venues`(검색), `GET /venues/new`, `GET /venues/{id}`, `GET /venues/{id}/available-dates`, `GET /venues/{id}/slots` | R |
 | `reservations.py` | B | `POST /reservations`(F-30~32 예약+결제 구현), `POST /reservations/{id}/cancel`(F-34 예정) | W |
 | `reservations.py` | B | `GET /reservations/me`, `GET /reservations/{id}` | W |
-| `internal.py` | B | `POST /internal/venues` (크롤러 전용, `X-Internal-Key`) | W |
+| `internal.py` | B | F-61 `POST /internal/venues` 구현(크롤러·생성기, `X-Internal-Key`, 신규 201·갱신 200) | W |
 
 - 경로가 겹치는 곳 주의: `/reservations/{id}/review`와 `/venues/{id}/reviews`는 A(`reviews.py`)입니다. 나머지 `/reservations/*`, `/venues/*`는 B입니다.
 - 회원 전용 엔드포인트는 `Depends(get_current_user)`를 붙입니다.

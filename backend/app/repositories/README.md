@@ -7,7 +7,7 @@
 | `user_repo.py` | A | users |
 | `review_repo.py` | A | reviews, `v_venue_rating`(읽기) |
 | `catalog_repo.py` | B | categories, regions, facilities |
-| `venue_repo.py` | B | venues, venue_facilities, venue_images, `v_venue_rating`(읽기) |
+| `venue_repo.py` | B | venues, venue_facilities, venue_images(조회·F-61 출처별 등록/갱신·시설/그림 전체 교체), `v_venue_rating`(읽기) |
 | `slot_repo.py` | B | reservation_slots (조회·예약 INSERT·충돌 조회) |
 | `reservation_repo.py` | B | reservations (생성·10분 재시도 조회·`get_owned`) |
 | `payment_repo.py` | B | payments (모의 결제 INSERT) |
