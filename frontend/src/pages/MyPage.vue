@@ -406,21 +406,16 @@ a.menu__item:hover,
   font-size: var(--fs-15);
   font-weight: 800;
 }
-.status--wait {
-  background: var(--c-highlight);
-  color: var(--c-highlight-ink);
-}
+/* 상태는 알약 대신 색 글자 */
+.status--wait,
 .status--ok {
-  background: var(--c-brand);
-  color: var(--c-on-dark);
+  color: var(--c-brand-ink);
 }
 .status--done {
-  background: var(--c-success-soft);
-  color: var(--c-success);
+  color: var(--c-ink-2);
 }
 .status--off {
-  background: var(--c-slot-taken);
-  color: var(--c-muted);
+  color: var(--c-subtle);
 }
 .dday {
   color: var(--c-brand-ink);

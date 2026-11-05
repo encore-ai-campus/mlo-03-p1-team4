@@ -14,7 +14,7 @@ const arts = { studyroom: 'group', studio: 'studio', cafe: 'cafe', lectureroom: 
   <ul class="bento">
     <li v-for="c in categories" :key="c.code" class="bento__cell" :class="`bento__cell--${c.code}`">
       <RouterLink :to="{ path: '/search', query: { category: c.code } }" class="tile">
-        <RoomArt :kind="arts[c.code]" class="tile__art" />
+        <RoomArt :kind="arts[c.code]" class="tile__art" aria-hidden="true" />
         <span class="tile__text">
           <span class="tile__name">{{ c.name }}</span>
           <span class="tile__use">{{ uses[c.code] }}</span>

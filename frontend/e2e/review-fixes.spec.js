@@ -17,7 +17,7 @@ test('QA-04: 메인 패널에서 고른 칸을 들고 상세로 간다', async (
   await page.goto('/')
   const strip = page.locator('section', { has: page.getByRole('heading', { name: '오늘 남은 칸' }) })
   const free = strip.getByRole('button', { name: /^\d{2}:00부터 1시간$/ })
-  const first = (await free.first().textContent()).slice(0, 2)
+  const first = (await free.first().getAttribute('aria-label')).slice(0, 2)
   await free.first().click()
   await strip.getByRole('button', { name: '이 시간으로 예약하기' }).click()
   await expect(page).toHaveURL(new RegExp(`/venues/1\\?date=2026-11-02&hours=${Number(first)}`))

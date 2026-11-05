@@ -17,7 +17,7 @@ const bars = computed(() =>
     peak: v >= PEAK,
   })),
 )
-const peakHours = computed(() => bars.value.filter((b) => b.peak).map((b) => `${b.label}시`).join(', '))
+const peakHours = computed(() => bars.value.filter((b) => b.peak).map((b) => b.label).join(', '))
 </script>
 
 <template>
@@ -36,7 +36,7 @@ const peakHours = computed(() => bars.value.filter((b) => b.peak).map((b) => `${
         <caption>시간대별 평균 예약률</caption>
         <thead><tr><th scope="col">시간</th><th scope="col">예약률</th></tr></thead>
         <tbody>
-          <tr v-for="b in bars" :key="b.hour"><td>{{ b.label }}시</td><td>{{ b.v }}%</td></tr>
+          <tr v-for="b in bars" :key="b.hour"><td>{{ b.label }}</td><td>{{ b.v }}%</td></tr>
         </tbody>
       </table>
     </div>

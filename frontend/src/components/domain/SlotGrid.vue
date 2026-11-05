@@ -39,7 +39,7 @@ function toggle(h) {
     <li v-for="s in slots" :key="s.hour">
       <UiTooltip v-if="s.taken" :text="`${hourLabel(s.hour)} 칸은 이미 예약됐어요`">
         <button type="button" class="slot is-off" aria-disabled="true" :aria-label="`${hourLabel(s.hour)} 마감`">
-          <span class="slot__h num">{{ s.hour }}</span>
+          <span class="slot__h num">{{ s.hour }}시</span>
           <span class="slot__s">마감</span>
         </button>
       </UiTooltip>
@@ -53,7 +53,7 @@ function toggle(h) {
         :aria-label="`${hourLabel(s.hour)}부터 1시간`"
         @click="toggle(s.hour)"
       >
-        <span class="slot__h num">{{ s.hour }}</span>
+        <span class="slot__h num">{{ s.hour }}시</span>
         <span class="slot__s">{{ selected.includes(s.hour) ? '선택' : s.past ? '지남' : '가능' }}</span>
       </button>
     </li>
@@ -110,6 +110,7 @@ function toggle(h) {
   font-size: var(--fs-15);
   font-weight: 700;
   line-height: 1.15;
+  white-space: nowrap; /* '10시'가 좁은 칸에서 두 줄로 나뉘지 않게 */
 }
 .slot__s {
   font-size: 11px;

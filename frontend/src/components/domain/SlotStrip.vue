@@ -87,7 +87,8 @@ function goReserve() {
 </template>
 
 <style scoped>
-.slot.is-past:not(.is-on) { background: var(--c-dark-taken); color: var(--c-on-dark-faint); }
+/* 지난 칸도 예약할 수 있다: 빈 칸과 같은 바탕, 글자만 한 단계 약하게. 마감 칸(가장 짙은 바탕)과 구분된다 */
+.slot.is-past:not(.is-on) { color: var(--c-on-dark-2); }
 .strip {
   display: flex;
   flex-direction: column;
