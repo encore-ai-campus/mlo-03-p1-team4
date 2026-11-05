@@ -32,6 +32,13 @@ def validate_password(value: str) -> str:
     return value
 
 
+def validate_phone(value: str) -> str:
+    normalized = value.strip()
+    if not re.fullmatch(r"01[016789]-?\d{3,4}-?\d{4}", normalized):
+        raise ValueError("휴대폰 번호 형식을 확인해 주세요.")
+    return normalized
+
+
 Email = Annotated[str, Field(min_length=3, max_length=100)]
 Password = Annotated[str, Field(min_length=8)]
 
@@ -49,6 +56,7 @@ class SignupCreate(RequestModel):
 
     _email = field_validator("email")(validate_email)
     _password = field_validator("password")(validate_password)
+    _phone = field_validator("phone")(validate_phone)
 
     @field_validator("name")
     @classmethod

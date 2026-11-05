@@ -5,9 +5,10 @@
 
 from sqlalchemy.orm import Session
 
+from app.core.clock import get_now
 from app.core.errors import fail
-from app.core.security import hash_password, verify_password
-from app.repositories import user_repo
+from app.core.security import hash_password, unusable_password_hash, verify_password
+from app.repositories import reservation_repo, user_repo
 from app.schemas.users import PasswordUpdate, UserUpdate
 
 
@@ -50,7 +51,24 @@ def change_password(db: Session, user_id: int, body: PasswordUpdate) -> None:
 
 
 def withdraw(db: Session, user_id: int) -> None:
-    """예약·환불 확인을 B와 연결하기 전까지 모든 탈퇴 요청을 보류한다."""
-    # B의 예약·환불 상태 확인과 동시 예약 방지 계약이 마련되기 전에는
-    # 예약이 없다고 추측하거나 개인정보를 지우지 않는다.
-    raise fail("SERVICE_UNAVAILABLE", 503)
+    """취소할 수 있는 예약이 없을 때 개인정보를 익명화하고 탈퇴 처리한다."""
+    try:
+        user = user_repo.get_active(db, user_id, for_update=True)
+        if user is None:
+            raise fail("UNAUTHORIZED", 401)
+
+        cancellable_count = reservation_repo.count_cancellable(db, user_id)
+        if cancellable_count > 0:
+            raise fail("HAS_UPCOMING_RESERVATION", 409, {"count": cancellable_count})
+
+        user.deleted_at = get_now()
+        user.name = "탈퇴회원"
+        user.phone = None
+        user.birth = "000000"
+        user.email = f"deleted+{user_id}@invalid"
+        user.password_hash = unusable_password_hash()
+        user.marketing_agreed = False
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise

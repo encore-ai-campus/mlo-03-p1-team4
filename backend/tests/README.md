@@ -4,8 +4,9 @@
 
 | 파일 | 담당 | 꼭 확인할 것 |
 | --- | --- | --- |
-| `test_auth.py` | A | 이메일 중복 409 `EMAIL_TAKEN`, 가입·로그인·프로필, 인증된 로그아웃 204, Swagger Bearer 계약, 토큰 없이 회원 전용 API 401 |
-| `test_users.py`, `test_reviews.py` | A | `password_hash` 없음, 후기 자격 404·403·403·409, 작성 직후 내 후기에 보임 |
+| `test_auth.py` | A | 가입 입력·필수 동의·이메일 중복 409 `EMAIL_TAKEN`, 프론트 휴대폰 형식, 만 14세 제한, 로그인·로그아웃 204, Swagger Bearer 계약 |
+| `test_users.py` | A | 내 정보 응답 필드·시간대, 조회 인증, 프로필 수정·잘못된 입력, 비밀번호 변경·현재 비밀번호 오류·길이 제한·bcrypt 저장, 취소 가능 예약 탈퇴 차단·개인정보 익명화·이메일 재가입 |
+| `test_reviews.py` | A | 후기 자격 404·403·403·409, 작성 직후 내 후기에 보임 |
 | `test_events.py` | A | 51건 400, MongoDB가 꺼져도 202이고 `events.log`에는 남음, replay해도 중복 없음 |
 | `test_models_match_db.py` | A | `app/models`의 표·컬럼 이름·NULL 여부가 `spacecube_test`의 실제 표와 같은지 (SQLAlchemy `inspect`) |
 | `test_health.py`, `test_db_routing.py`, `test_metrics.py` | A | primary 끊김 503 / replica·MongoDB 끊김 200 degraded, replica 주소가 틀려도 공개 조회 성공 |
@@ -155,18 +156,18 @@ python -m pytest backend/tests/test_reservation_dependencies.py -q
 11-05 현재 프로젝트의 `localhost:3306/spacecube_test`에서 **17건 통과**했습니다(기존 예약 의존성 14건 + 공간 모델 3건).
 F-12·13까지 추가한 전체 pytest는 **161건 통과**, Starlette TestClient 사용 중단 예정
 경고 1건입니다. 비밀번호는 테스트 프로세스에만 전달했고 파일이나 영구 환경변수에 저장하지 않았습니다.
-- `test_core_contracts.py`, `test_core_events.py`, `test_auth.py`는 이슈 #1 공통 계약·이벤트·회원 흐름 확인용입니다. 회원 테스트는 로컬 `spacecube_test`의 `CHECK_DB_URL`이 필요합니다.
+- `test_core_contracts.py`, `test_core_events.py`, `test_auth.py`, `test_users.py`는 공통 계약·이벤트·회원 흐름 확인용입니다. 회원 테스트는 로컬 `spacecube_test`의 `CHECK_DB_URL`이 필요합니다.
 - 프로젝트 어디서 실행해도 테스트 파일 위치를 기준으로 경로를 잡는 PowerShell 실행 파일은 `run_auth_tests.ps1`입니다. 로컬 사용자 설정에서 `CHECK_DB_URL`을 찾고, 못 찾으면 현재 PowerShell 세션의 `CHECK_DB_URL`을 사용합니다.
-- 확인한 명령: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\run_auth_tests.ps1` (backend 폴더에서 실행). 결과: 40 passed. 테스트 데이터는 MariaDB 트랜잭션 롤백으로 보존하지 않습니다.
+- 확인 명령: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\run_auth_tests.ps1` (backend 폴더에서 실행). 회원 테스트는 MariaDB 트랜잭션 롤백으로 테스트 데이터를 보존하지 않습니다.
 
 ## #31 A 공통 코드 통합·F-04 탈퇴 지원
 
 develop(c007470)의 공식 A 코드와 B 조회를 통합하고 main.py에 catalog·venues를 등록했습니다.
 test_reservation_dependencies.py는 count_cancellable의 시작 직전·정각·직후, 날짜 경계,
 confirmed·completed·cancelled, 타인 예약·0건·복수 예약 수와 호출자 트랜잭션 유지를 12건 추가 검증합니다.
-함수는 primary 세션을 전달받으며 커밋하지 않습니다. A의 탈퇴 서비스 호출 연결은 별도 후속 작업입니다.
+함수는 primary 세션을 전달받으며 커밋하지 않습니다. A의 탈퇴 서비스는 같은 세션에서 이 함수를 호출해 양수면 409 `HAS_UPCOMING_RESERVATION` + `detail.count`, 0이면 개인정보 익명화를 커밋합니다.
 
-11-05 로컬 MariaDB spacecube_test에서 전체 pytest **217건 통과**, Starlette TestClient 경고 1건입니다.
+11-05 로컬 MariaDB spacecube_test에서 전체 pytest **230건 통과**, Starlette TestClient 경고 1건입니다.
 Ruff 린트·포맷과 프론트 verify(단위 **54건**, 린트·색 검사·빌드)도 통과했습니다.
 프론트 기존 e2e/account.spec.js의 조건문 린트 경고 1건은 남아 있습니다.
 pro_1은 Miniforge 경로의 실행기를 사용했고, DB 접속 정보는 테스트 프로세스에만 전달했습니다.
