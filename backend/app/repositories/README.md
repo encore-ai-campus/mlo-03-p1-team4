@@ -9,8 +9,8 @@
 | `catalog_repo.py` | B | categories, regions, facilities |
 | `venue_repo.py` | B | venues, venue_facilities, venue_images(조회·F-61 출처별 등록/갱신·시설/그림 전체 교체), `v_venue_rating`(읽기) |
 | `slot_repo.py` | B | reservation_slots (조회·예약 INSERT·충돌 조회) |
-| `reservation_repo.py` | B | reservations (생성·10분 재시도 조회·`get_owned`·`count_cancellable`), 후기 목록용 예약·공간·유형 조회식 |
-| `payment_repo.py` | B | payments (모의 결제 INSERT) |
+| `reservation_repo.py` | B | reservations (생성·잠금·10분 재시도 조회·`get_owned`·`count_cancellable`), reservation_slots 취소 삭제, 후기 목록용 예약·공간·유형 조회식 |
+| `payment_repo.py` | B | payments (모의 결제 INSERT·전액 환불) |
 
 - 사용자 이벤트는 표가 아니라 `core/events.py`(로그 파일 + MongoDB)가 씁니다. `crawl_jobs`·MongoDB `crawl_raw`는 크롤러(DB 담당)가 씁니다.
 

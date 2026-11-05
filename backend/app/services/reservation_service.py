@@ -12,7 +12,13 @@ from app.core.errors import AppError
 from app.core.events import log_event
 from app.core.metrics import reservation_counter
 from app.repositories import payment_repo, reservation_repo, slot_repo, venue_repo
-from app.schemas.reservations import PaymentRead, ReservationCreate, ReservationCreateRead
+from app.schemas.reservations import (
+    PaymentRead,
+    ReservationCancelPaymentRead,
+    ReservationCancelRead,
+    ReservationCreate,
+    ReservationCreateRead,
+)
 
 _METHODS = frozenset({"transfer", "card", "phone"})
 _DUPLICATE_WINDOW = timedelta(minutes=10)
@@ -268,4 +274,60 @@ def create_reservation(
             ),
         ),
         201,
+    )
+
+
+def cancel_reservation(
+    db: Session,
+    *,
+    user_id: int,
+    reservation_id: int,
+    session_id: str | None,
+) -> ReservationCancelRead:
+    """시작 전 본인 예약을 잠그고 칸 반납·전액 모의 환불을 한 번에 커밋한다."""
+    try:
+        reservation = reservation_repo.get_owned_for_update(
+            db, user_id=user_id, reservation_id=reservation_id
+        )
+        if reservation is None:
+            raise AppError("RESERVATION_NOT_FOUND", "예약을 찾을 수 없어요.", 404)
+        if reservation.status == "cancelled":
+            raise AppError("ALREADY_CANCELLED", "이미 취소된 예약이에요.", 409)
+
+        now = get_now()
+        starts_at = datetime.combine(reservation.reserve_date, time(reservation.start_hour))
+        if reservation.status != "confirmed" or starts_at <= now:
+            raise AppError("NOT_CANCELLABLE", "이용이 시작된 예약은 취소할 수 없어요.", 409)
+
+        reservation.status = "cancelled"
+        if reservation_repo.delete_slots(db, reservation_id=reservation_id) <= 0:
+            raise RuntimeError("확정 예약에 연결된 시간 칸이 없습니다.")
+        payment = payment_repo.refund(db, reservation_id=reservation_id, refunded_at=now)
+        if payment is None:
+            raise RuntimeError("예약에 연결된 결제 정보가 없습니다.")
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+
+    log_event(
+        session_id,
+        user_id,
+        "reserve_cancel_ok",
+        venue_id=reservation.venue_id,
+        payload={"reservation_id": reservation_id},
+        is_synthetic=reservation.is_synthetic,
+    )
+    reservation_counter.labels(result="cancel").inc()
+    return ReservationCancelRead(
+        reservation_id=reservation_id,
+        status="cancelled",
+        total_price=reservation.total_price,
+        payment=ReservationCancelPaymentRead(
+            method=payment.method,
+            status="refunded",
+            paid_at=as_korean_time(payment.paid_at),
+            refunded_at=as_korean_time(payment.refunded_at),
+        ),
+        can_cancel=False,
     )

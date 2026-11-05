@@ -1,4 +1,4 @@
-"""F-30~32 예약·모의 결제 요청과 응답."""
+"""F-30~34 예약·모의 결제 요청과 응답."""
 
 from datetime import date, datetime
 from typing import Annotated, Literal
@@ -36,3 +36,18 @@ class ReservationCreateRead(BaseModel):
     headcount: int
     total_price: int
     payment: PaymentRead
+
+
+class ReservationCancelPaymentRead(BaseModel):
+    method: Literal["transfer", "card", "phone"]
+    status: Literal["refunded"]
+    paid_at: datetime
+    refunded_at: datetime
+
+
+class ReservationCancelRead(BaseModel):
+    reservation_id: int
+    status: Literal["cancelled"]
+    total_price: int
+    payment: ReservationCancelPaymentRead
+    can_cancel: Literal[False]

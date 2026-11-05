@@ -130,6 +130,23 @@ def _run_concurrently(test_app, requests):
         return list(pool.map(submit, requests))
 
 
+def _run_cancel_concurrently(test_app, reservation_id, user_id):
+    barrier = Barrier(2)
+
+    def submit(_):
+        barrier.wait(timeout=30)
+        return test_client.post(
+            f"/reservations/{reservation_id}/cancel",
+            headers={"X-Test-User-Id": str(user_id)},
+        )
+
+    with (
+        TestClient(test_app, raise_server_exceptions=False) as test_client,
+        ThreadPoolExecutor(max_workers=2) as pool,
+    ):
+        return list(pool.map(submit, range(2)))
+
+
 @pytest.fixture
 def concurrency_environment(monkeypatch):
     engine = create_engine(_database_url(), poolclass=NullPool, hide_parameters=True)
@@ -292,3 +309,49 @@ def test_simultaneous_overlapping_windows_leave_one_booking(concurrency_environm
         reservation_counter.labels(result="conflict")._value.get() == state["before_conflict"] + 1
     )
     assert sorted(event[0] for event in state["events"]) == ["reserve_conflict", "reserve_ok"]
+
+
+def test_two_simultaneous_cancellations_commit_once(concurrency_environment):
+    state = concurrency_environment
+    user_id = state["user_ids"][0]
+    before_cancel = reservation_counter.labels(result="cancel")._value.get()
+    with TestClient(state["app"], raise_server_exceptions=False) as client:
+        created = client.post(
+            "/reservations",
+            json=_booking(state["venue_id"]),
+            headers={"X-Test-User-Id": str(user_id)},
+        )
+    assert created.status_code == 201
+    reservation_id = created.json()["reservation_id"]
+
+    responses = _run_cancel_concurrently(state["app"], reservation_id, user_id)
+
+    assert sorted(response.status_code for response in responses) == [200, 409]
+    conflict = next(response for response in responses if response.status_code == 409)
+    assert conflict.json()["code"] == "ALREADY_CANCELLED"
+    assert sum(response.status_code == 200 for response in responses) == 1
+    with state["engine"].connect() as connection:
+        assert (
+            connection.scalar(
+                text("SELECT status FROM reservations WHERE reservation_id=:id"),
+                {"id": reservation_id},
+            )
+            == "cancelled"
+        )
+        assert (
+            connection.scalar(
+                text("SELECT status FROM payments WHERE reservation_id=:id"),
+                {"id": reservation_id},
+            )
+            == "refunded"
+        )
+        assert (
+            connection.scalar(
+                text("SELECT COUNT(*) FROM reservation_slots WHERE reservation_id=:id"),
+                {"id": reservation_id},
+            )
+            == 0
+        )
+
+    assert reservation_counter.labels(result="cancel")._value.get() == before_cancel + 1
+    assert sum(event[0] == "reserve_cancel_ok" for event in state["events"]) == 1

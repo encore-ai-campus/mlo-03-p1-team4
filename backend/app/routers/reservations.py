@@ -2,13 +2,17 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Request, Response
+from fastapi import APIRouter, Depends, Path, Request, Response
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db_write
 from app.core.deps import CurrentUser, get_current_user, get_session_id
 from app.core.synthetic import is_synthetic_request
-from app.schemas.reservations import ReservationCreate, ReservationCreateRead
+from app.schemas.reservations import (
+    ReservationCancelRead,
+    ReservationCreate,
+    ReservationCreateRead,
+)
 from app.services import reservation_service
 
 router = APIRouter()
@@ -39,3 +43,22 @@ def create_reservation(
     )
     response.status_code = status_code
     return result
+
+
+@router.post(
+    "/{reservation_id}/cancel",
+    summary="예약 취소",
+)
+def cancel_reservation(
+    reservation_id: Annotated[int, Path(ge=1, le=9223372036854775807)],
+    request: Request,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db_write)],
+) -> ReservationCancelRead:
+    """이용 시작 전 본인 예약을 취소하고 모의 결제를 전액 환불한다."""
+    return reservation_service.cancel_reservation(
+        db,
+        user_id=current_user.user_id,
+        reservation_id=reservation_id,
+        session_id=get_session_id(request),
+    )

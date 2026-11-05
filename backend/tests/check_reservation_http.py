@@ -1,4 +1,4 @@
-"""F-30~32 별도 HTTP 검증: 공식 앱·실제 인증·Postman 컬렉션·MariaDB를 연결한다.
+"""F-30~34 HTTP 검증: 공식 앱·실제 인증·Postman 컬렉션·MariaDB를 연결한다.
 
 pro_1에서 실행하며 CHECK_DB_URL은 로컬 spacecube_test만 허용한다.
 임시 가상 회원·공간과 예약은 생성한 ID로만 정리한다. 비밀값은 출력하지 않는다.
@@ -249,22 +249,36 @@ def main() -> None:
                             ),
                             {"user": user_id, "venue": venue_id},
                         ).all()
-                        assert len(rows) == 1 and rows[0][1:] == ("confirmed", 1)
+                        assert len(rows) == 1 and rows[0][1:] == ("cancelled", 1)
                         reservation_id = rows[0][0]
-                        assert db.scalars(
-                            text(
-                                "SELECT slot_hour FROM reservation_slots WHERE reservation_id=:id ORDER BY slot_hour"
-                            ),
-                            {"id": reservation_id},
-                        ).all() == [13, 14]
+                        assert (
+                            db.scalars(
+                                text(
+                                    "SELECT slot_hour FROM reservation_slots WHERE reservation_id=:id ORDER BY slot_hour"
+                                ),
+                                {"id": reservation_id},
+                            ).all()
+                            == []
+                        )
                         assert db.execute(
                             text("SELECT method,status FROM payments WHERE reservation_id=:id"),
                             {"id": reservation_id},
-                        ).all() == [("card", "paid")]
+                        ).all() == [("card", "refunded")]
+                        assert (
+                            db.scalar(
+                                text(
+                                    "SELECT refunded_at IS NOT NULL FROM payments WHERE reservation_id=:id"
+                                ),
+                                {"id": reservation_id},
+                            )
+                            == 1
+                        )
                     metrics = client.get("/metrics").text
                     assert 'reservation_total{result="ok"} 1.0' in metrics
+                    assert 'reservation_total{result="cancel"} 1.0' in metrics
                     print(
-                        "HTTP/DB verified: one synthetic reservation, two slots, one payment, one success counter"
+                        "HTTP/DB verified: one synthetic cancelled reservation, refunded payment, "
+                        "released slots, booking and cancellation counters"
                     )
             finally:
                 process.terminate()
