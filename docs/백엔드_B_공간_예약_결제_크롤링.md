@@ -256,8 +256,9 @@ POST /reservations  — 결제 화면에 들어올 때는 아무것도 잡지 �
  6. COMMIT → 201, log_event(session_id = get_session_id(request), user_id, "reserve_ok", venue_id, category = venue.category.code, payload = {date, start_hour, hours}), reservation_total{result="ok"} +1
     4에서 중복 키(1062) → ROLLBACK
       → primary에서 그날 겹친 칸과 그 예약의 주인을 다시 읽음
-        ① 같은 사용자·공간·날짜·시작·시간인 예약이 10분 안에 만들어져 있으면 → **200 + 그 예약**(두 번 누름·재시도, 새 이벤트·카운터 없음)
+        ① 같은 사용자·공간·날짜·시작·시간인 예약이 10분 안에 만들어져 있고, 상태가 confirmed/completed이며 결제가 paid이면 → **200 + 그 예약**(두 번 누름·재시도, 새 이벤트·카운터 없음). cancelled 또는 refunded인 건은 재시도 후보에서 제외
         ② 겹친 칸이 모두 내 다른 예약이면 → 409 SLOT_TAKEN, detail = {slots, mine: true, reservation_id}
+           겹친 예약이 여러 건이면 reservation_id가 가장 작은 예약을 대표로 반환
         ③ 그 밖 → 409 SLOT_TAKEN, detail = {slots}, log_event(reserve_conflict), reservation_total{result="conflict"} +1
 ```
 
@@ -265,6 +266,7 @@ POST /reservations  — 결제 화면에 들어올 때는 아무것도 잡지 �
 - **먼저 커밋한 요청이 이깁니다.** 이것이 11-03 결정 2의 '최종 결제순 확정'입니다.
 - 3 이전에 '빈 칸인지 먼저 SELECT'로 막지 않습니다. 두 서버가 동시에 '비었음'을 볼 수 있고, replica라면 더 그렇습니다.
 - 겹친 칸을 다시 읽는 것도 **primary**에서 합니다. replica에서는 방금 이긴 예약이 아직 안 보일 수 있습니다.
+- 본인 예약 여러 건과 겹친 경우 대표 `reservation_id`는 겹친 예약 ID의 최솟값입니다. 자동 증가 ID 순서가 실제 커밋 순서까지 보장하지는 않습니다.
 - 칸과 예약의 공간·날짜가 어긋나지 않게 `reservations` UNIQUE `(reservation_id, venue_id, reserve_date)` + 복합 외래키가 필요합니다. DB 담당 스키마에서 확인합니다.
 - MongoDB가 꺼져 있어도 예약은 성공해야 합니다. 이벤트는 A의 `log_event()`가 응답 뒤에 따로 씁니다.
 
@@ -331,8 +333,9 @@ UPDATE reservations SET status = 'completed'
 | test_catalog.py | 유형 5개, 시·도 → 시·군·구, 시설 목록 |
 | test_reservation_dependencies.py | 모델 DDL·`get_owned()`·A 후기 작성 연결, `count_cancellable()`의 회원·상태·시작 정각·날짜 경계·0건·복수 예약 집계 및 호출자 트랜잭션 유지 |
 | test_venues.py | 필터 조합, 정렬 4종, 칸 상태(taken·past), 이미지 누락 시 대표·갤러리 group-0, 실제 이미지 순서, NEW 오늘·13일 전 포함 및 14일 전·미래 제외, 비활성 404, 날짜 더보기(offset) |
-| test_reservations.py | 성공 201(3개 표 모두 생김), **같은 요청 다시 보내면 200 + 같은 reservation_id(표에 새 행 없음)**, 내 예약과 일부 겹치면 409 + `mine`, 범위 밖 400(±365일 밖·영업시간 밖·5칸·`min_hours` 미만), 지난 시간 예약은 201 + 바로 completed, 인원 초과, 결제수단 오류, 남의 예약 404, 취소 후 칸 반납·환불, 지난 예약 취소 409, **예약 직후 `/reservations/me`에 보임** |
-| test_concurrency.py | **같은 칸 동시 50건 → 201 정확히 1건, 409 49건.** 겹치는 범위(13~15 vs 14~16)도 1건만. 409의 `detail.slots`가 정확함 |
+| test_reservations.py | 성공 201(3개 표 모두 생김), **10분 안 같은 유효 요청은 200 + 같은 reservation_id(표에 새 행 없음)**, 취소·환불 건 재시도 제외, 취소 후 재예약의 새 ID 반환·타인 선점 409, 본인 예약 충돌의 최소 ID·혼합 소유자 정보 비노출, 결제수단·인원·기간·시간 검증, 지난 시간은 바로 completed, 가상 요청 키 확인, 결제 INSERT 실패 시 전체 롤백 |
+| test_concurrency.py | **다른 회원 50명이 같은 칸을 동시에 요청하면 201 1건·409 49건**, 한 회원의 같은 요청 50건은 201 1건·200 49건, 겹치는 시간 범위는 한 요청만 성공. 409 `detail.slots`·이벤트·카운터와 DB 행 수를 확인 |
+| check_reservation_http.py (별도 실행) | 공식 앱·실제 가상 회원가입/로그인·Postman 컬렉션으로 OpenAPI 200·무인증 401·생성 201·동일 요청 200, 예약/칸/결제·가상 표시·성공 카운터·가상 데이터 정리 확인 |
 | test_jobs.py | 끝나는 시각이 지난 confirmed만 completed(오늘 끝난 것 포함), 두 번 돌려도 같음 |
 | test_internal.py | 키 없음 401, 신규 201·같은 출처 200(갱신), 모르는 시설 무시, 모르는 지역 400, CHECK 위반 값 400 |
 | test_read_routing.py | 공개 조회 라우터는 `get_db_read`, 예약·내 예약은 `get_db_write`를 쓰는지(의존성 목록 검사) |

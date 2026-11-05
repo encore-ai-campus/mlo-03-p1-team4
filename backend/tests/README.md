@@ -10,8 +10,8 @@
 | `test_models_match_db.py` | A | `app/models`의 표·컬럼 이름·NULL 여부가 `spacecube_test`의 실제 표와 같은지 (SQLAlchemy `inspect`) |
 | `test_health.py`, `test_db_routing.py`, `test_metrics.py` | A | primary 끊김 503 / replica·MongoDB 끊김 200 degraded, replica 주소가 틀려도 공개 조회 성공 |
 | `test_catalog.py`, `test_venues.py` | B | 기준정보 필터·캐시, 공간 검색·정렬·상세·이미지·NEW·시간 칸·예약 가능 날짜 |
-| `test_reservations.py` | B | 성공 201(표 3개 모두 생김), 범위 밖 400, 취소 후 칸 반납·환불, 예약 직후 `/reservations/me`에 보임 |
-| `test_concurrency.py` | B | **같은 칸 동시 50건 → 201 정확히 1건, 409 49건** (MVP 통과 조건), `detail.slots` 정확 |
+| `test_reservations.py` | B | 예약·칸·모의결제 201, 10분 재시도 200, 409 소유권·대표 ID, 기간·시간·인원·수단 검증, 지난 시간 `completed`, 키 있는 가상 요청, 결제 실패 시 전체 롤백 |
+| `test_concurrency.py` | B | **다른 회원 50명이 같은 칸을 동시 요청 → 201 1건·409 49건**, 한 회원의 같은 요청 50건은 201 1건·200 49건, 겹치는 시간 범위 경쟁. DB 행 수·이벤트·카운터 확인 |
 | `test_jobs.py`, `test_internal.py`, `test_read_routing.py` | B | 완료 배치 멱등, upsert 201·200·400, 공개 조회만 `get_db_read` |
 
 ## F-12 검색·F-13 정렬·F-14 NEW 목록
@@ -171,3 +171,42 @@ Ruff 린트·포맷과 프론트 verify(단위 **54건**, 린트·색 검사·�
 프론트 기존 e2e/account.spec.js의 조건문 린트 경고 1건은 남아 있습니다.
 pro_1은 Miniforge 경로의 실행기를 사용했고, DB 접속 정보는 테스트 프로세스에만 전달했습니다.
 예약 생성·Postman 산출물은 별도 예약 브랜치에 보존했으며, 이번 브랜치에는 포함하지 않습니다.
+
+
+## F-30~32 공식 앱·공통 키·실제 HTTP 통합 검증
+
+현재 예약 브랜치는 develop(eae5068)의 공식 A 코드를 통합하고 main.py에
+reservations 라우터를 등록했습니다. test_reservations.py 16건은 별도 간이 앱 대신
+공식 create_app()을 사용하며 OpenAPI·인증 차단·공통 가상 키 미설정/오류/정상 처리까지 확인합니다.
+동시성 3건은 서로 다른 회원 50명, 같은 회원 재시도 50건, 겹친 이용 시간 경쟁을 검증합니다.
+
+11-05 MariaDB **11.4.13 spacecube_test에서 전체 pytest 236건 통과**했습니다.
+Ruff 린트·포맷, 프론트 단위 54건·린트·색 검사·빌드도 통과했습니다.
+기존 Starlette TestClient 경고 1건과 프론트 E2E 조건문 린트 경고 1건이 있습니다.
+검증 구성요소를 Miniforge pro_1과 설치된 Node 실행기를 지정해 각각 실행했습니다.
+
+check_reservation_http.py는 pytest 기본 수집에서 제외된 별도 실행 검증기입니다.
+CHECK_DB_URL에 기존 DDL·seed가 있는 로컬 spacecube_test 접속 정보를 지정하고 실행합니다.
+
+    python backend/tests/check_reservation_http.py
+
+공식 앱을 임시 포트에 띄우고 가상 회원가입·실제 로그인 후 기존 Postman 컬렉션을 실행합니다.
+**4개 요청·8개 검증 통과**: OpenAPI 200, 무인증 401, 생성 201, 동일 예약 재시도 200.
+DB의 예약 1건·칸 2개·결제 1건·가상 데이터 표시와 성공 카운터 1회를 확인했습니다.
+종료 시 서버·임시 비밀 환경과 생성한 ID의 회원·공간·예약을 정리합니다.
+Postman CLI와 Node가 필요하며 컬렉션 4개 요청 파일·환경 lint도 오류·경고 0건입니다.
+프론트 화면 전체의 실제 예약 API 연결과 실제 replica 장애·복제 지연 시험은 포함하지 않습니다.
+
+## PR #39: 취소·환불 예약의 재시도 성공 제외
+
+`test_reservations.py`는 취소·환불 후 같은 칸을 재예약한 요청을 다시 보내면 새 예약 ID로
+200을 반환하고, 다른 회원이 선점했으면 예약 ID를 노출하지 않는 409를 반환하는지 확인합니다.
+예약 상태가 confirmed/completed여도 결제가 refunded이면 재시도 성공에서 제외하며,
+confirmed/completed + paid인 기존 예약의 재시도 200은 유지합니다.
+취소 API는 구현 전이므로 취소·환불·칸 반납 상태는 테스트 트랜잭션 안의 SQL로 준비합니다.
+이 시험은 예약 생성 API의 재시도 처리 검증이며 취소 API 검증을 뜻하지 않습니다.
+
+11-05 설치된 MariaDB 11.4.13으로 별도 loopback 임시 인스턴스를 띄우고 기존 0001·seed를 적용했습니다.
+수정 전 회귀 사례 4건의 실패를 확인한 뒤, 수정 후 전체 pytest **241건 통과**
+(예약 API 21건·기존 동시성 3건 포함), 기존 Starlette TestClient 경고 1건입니다.
+Ruff 린트·포맷 확인과 실제 HTTP Postman **4요청·8검증**도 통과했습니다.
