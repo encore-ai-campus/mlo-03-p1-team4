@@ -161,6 +161,7 @@ A1~A4는 11-03에 확정했고, **A5~A8은 추후 확정**으로 미뤘다(11-03
 
 ## 최근 변경 (최신이 위)
 
+- 11-05 · FE · 이슈 점검으로 찾은 프론트 빈 곳 보완: ① 탈퇴 막기(11-05 결정) — 취소할 수 있는 예약이 있으면 탈퇴 버튼 대신 '예약 내역 보기', 서버 409 `HAS_UPCOMING_RESERVATION`도 같은 안내, 목업도 409 ② 회원 정보 수정(F-03: 이름·휴대폰·소식 받기)·비밀번호 변경(`WRONG_PASSWORD` 칸 오류) ③ 내가 쓴 후기 고치기·지우기(F-50, 지우기 창은 '지우지 않기' 기본 초점) ④ Playwright `E2E_BASE_URL`·`E2E_SYNTHETIC_KEY`로 실제 서버·가상 데이터 헤더 ⑤ 창 뒤 배경 올리브 토큰 `--c-overlay`, 내 메뉴 탭 제목. 단위 55·E2E 67 통과(재시도 없음)·7 기기 조건 건너뜀
 - 11-05 · B · #31 브랜치 전용 작업 트리에서 origin/develop(c007470, A #34 포함)을 통합. STATE.md는 A 진행·로그아웃 결정과 B 조회 검증 기록을 함께 보존하고 backend/tests/README.md는 양쪽 검증 안내를 보존해 충돌 해결. 공식 main.py에 catalog·venues만 등록. A 탈퇴용 count_cancellable(db, user_id) → int 제공: 한국 시각 한 번을 기준으로 시작 전 confirmed 예약만 primary에서 집계하며 시작 정각은 제외, 커밋하지 않음. 기존 205건 + 경계·집계 12건 = MariaDB pytest 217건 통과(Starlette 경고 1건), Ruff 린트·포맷과 FE verify(단위 54건·린트·색 검사·빌드) 통과. FE 기존 E2E 파일의 조건문 린트 경고 1건. A 탈퇴 서비스는 503 유지, 실제 호출 연결·동시 탈퇴/예약 통합은 A와 후속 확인. 예약·Postman 커밋은 별도 예약 브랜치에 보존. 그 브랜치의 로컬 A 전달본 제외 설정은 공식 A 통합 때 정리하며 이 작업 트리는 모든 A 파일을 Git 추적 상태로 사용. 검색 개선 권고·실제 replica 장애 시험·브라우저 E2E는 이번에 진행하지 않음.
 
 - 11-05 · B · PR #31 브랜치에 origin/develop(1cc11a8)을 머지. STATE.md 충돌 2곳은 B 구현·검증 기록과 공동의 11-05 통합일·로컬 VM 배포·회의 결정을 함께 보존해 해결. STRUCTURE·B API 명세·요구사항은 양쪽 변경을 자동 병합. A 전달본의 로컬 Git 제외는 유지하며, 새 공유 계약 count_cancellable()과 X-Synthetic-Key 반영 여부는 A 통합 및 후속 구현에서 확인해야 함. 머지 후 verify.ps1 전체 통과: pytest 165건·프론트 단위 54건·Ruff 린트/포맷·프론트 린트/색 검사/빌드. Starlette 경고 1건. A 전달본을 사용한 로컬 검증이며 실제 replica 장애·복제 지연과 GitHub A 통합 후 재검증은 후속 항목.

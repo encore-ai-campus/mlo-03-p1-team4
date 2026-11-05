@@ -84,6 +84,43 @@ describe('F-01~04 회원 계약', () => {
       user_id: 3
     });
   });
+  it('F-03 내 정보 수정·비밀번호 변경', async () => {
+    await auth.signup(body);
+    const { access_token } = await auth.login(body);
+    expect(await users.updateMe({
+      name: '바뀐이름', phone: '010-3333-4444', marketing_agreed: true
+    }, access_token)).toMatchObject({
+      name: '바뀐이름', phone: '010-3333-4444', marketing_agreed: true, email: body.email
+    });
+    await expect(users.updateMe({
+      name: '  '
+    }, access_token)).rejects.toMatchObject({
+      code: 'VALIDATION', detail: {
+        fields: [{
+          field: 'name', reason: '이름을 입력해 주세요.'
+        }]
+      }
+    });
+    await expect(users.changePassword({
+      current_password: '틀린비번1234', new_password: 'newpass1234'
+    }, access_token)).rejects.toMatchObject({
+      code: 'WRONG_PASSWORD', status: 400
+    });
+    await expect(users.changePassword({
+      current_password: body.password, new_password: 'short'
+    }, access_token)).rejects.toMatchObject({
+      code: 'VALIDATION'
+    });
+    await users.changePassword({
+      current_password: body.password, new_password: 'newpass1234'
+    }, access_token);
+    await expect(auth.login(body)).rejects.toMatchObject({
+      code: 'INVALID_CREDENTIALS'
+    });
+    expect(await auth.login({
+      ...body, password: 'newpass1234'
+    })).toHaveProperty('access_token');
+  });
   it('새 회원 비밀번호는 정확히 비교한다', async () => {
     await auth.signup(body);
     await expect(auth.login({
