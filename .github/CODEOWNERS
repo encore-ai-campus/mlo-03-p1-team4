@@ -1,0 +1,15 @@
+# 폴더별 담당 — PR이 이 폴더를 바꾸면 담당자에게 리뷰 요청이 자동으로 간다 (STRUCTURE.md 담당 표와 같게)
+*                           @jinsan02
+/frontend/                  @jinsan02
+/backend/                   @naturedevworks @hun117
+/backend/app/core/          @naturedevworks
+/backend/scripts/           @naturedevworks
+/infra/monitoring/          @naturedevworks
+/backend/app/jobs/          @hun117
+/simulator/locust/          @hun117
+/infra/nginx/               @hun117
+/db/                        @gmlwjd0055
+/docs/db/                   @gmlwjd0055
+/crawler/                   @gmlwjd0055
+/simulator/generator/       @gmlwjd0055
+/infra/local/               @gmlwjd0055

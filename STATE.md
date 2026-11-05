@@ -11,7 +11,7 @@
 
 | 파트 | 담당자 | 지금 | 다음 할 일 | 막힌 것 |
 | --- | --- | --- | --- | --- |
-| 프론트 | [이름] | FE-1~9 확정안 반영, Claude 시안 대조·FE 오류/모바일 결제/가입 UX 재검토 및 목업·화면 검증 | A·B 구현 후 실제 API 연결·오류·예약 동시성 통합 검증 | 실제 API 미구현 |
+| 프론트 | 노진산(FE·PM) | FE-1~9 확정안 반영, Claude 시안 대조·FE 오류/모바일 결제/가입 UX 재검토 및 목업·화면 검증 | A·B 구현 후 실제 API 연결·오류·예약 동시성 통합 검증 | 실제 API 미구현 |
 | FastAPI A | [이름] | 문서 확정(`docs/백엔드_A`), 폴더·README | 1일차 오전 `core/`(두 DB 세션·오류·`get_current_user`·`log_event`·`get_today`)·`models/base.py` → 회원 → 후기 → 이벤트 | 없음 |
 | FastAPI B | [이름] | 문서 확정(`docs/백엔드_B`), 폴더·README | 공개 조회(catalog·venues·slots) → 예약+결제 트랜잭션·동시성 테스트 → `/internal/venues` | A의 core (DDL은 11-04 로컬 검증 끝) |
 | DB | [이름] | `0001_init.sql`·`mongo_init.js` 검증(설치형 11.8·compose 11.4 둘 다 29건 통과), seed(유형 5·시설 20·지역 230 → `seed.sql`), `infra/local` compose, 크롤러 시제품(옛 필터) | 크롤러 새 필터(유형 5·별칭) → `/internal/venues` 등록(B와) → 가상 데이터 생성기 | 없음(A2 결정을 팀원에게 공유) |
@@ -62,6 +62,7 @@
 | 11-03 | 크롤링 유지(스페이스클라우드 → MongoDB crawl_raw → `/internal/venues`), 날짜는 실제 날짜 + 과거 데이터 생성 | 사용자 결정 |
 | 11-03 | 구현 기준 문서는 `docs/산출물_01~04`·`docs/백엔드_A·B`·`docs/프론트_변경목록_11-03.md`. 10-30 설계는 `docs/지난설계/`, 회의·검토는 `docs/기록/`로 옮김. 폴더 지도는 `STRUCTURE.md` | 폴더 정리 |
 | 11-03 | DB 접근은 SQLAlchemy 2.1 동기 + PyMySQL, MongoDB는 pymongo, 엔드포인트는 `def`. 표 변경은 SQL 파일 마이그레이션(Alembic 안 씀), 모델은 DDL에 맞춤. 백엔드 패키지 버전을 `environment.yml`에 고정 | 사용자 결정 · `backend/AGENTS.md` |
+| 11-04 | 일정: 11-04(수) 로컬 개발 → 11-05(목) 합치기·전체 기능 점검 → 11-06(금) 피드백·검토 → 11-07(토) 반영 → 11-08(일) 발표 자료 → 11-09(월) 발표. GitHub 마일스톤·이슈로 관리 | 팀 결정 |
 | 11-04 | HTTPS는 먼저 HTTP로 배포·시연 흐름이 다 되면 그때 검토(도메인 + Let's Encrypt 또는 ALB + ACM). 그 전에는 HTTP라 로그인 비밀번호·토큰이 평문으로 감을 알고 시연 계정만 씀 | 사용자 결정 · 2차 검토 #3 |
 | 11-04 | 지역 seed는 기초자치단체 단위 230행(시·도 16, 일반구 제외), 2026-11-04 기준(전남광주통합특별시·인천 2군 9구 반영). 둘로 나뉜 옛 구(인천 중구·서구) 주소는 제외 | `db/seed/README.md` |
 | 11-04 | 로컬 DB는 `infra/local` compose(MariaDB 11.4 포트 3308 + MongoDB 7), 첫 실행 때 0001·seed·mongo_init 자동 | `infra/local/README.md` |
@@ -137,6 +138,11 @@ A1~A4는 11-03에 확정했고, **A5~A8은 추후 확정**으로 미뤘다(11-03
 
 ## 최근 변경 (최신이 위)
 
+- 11-04 · FE · 화면 이름을 다락큐브로 통일(헤더·푸터·로그인·약관·페이지 제목·`index.html`), 공통 푸터를 디자인 캔버스 SiteFooter 시안대로 바꿈(서비스 소개·바로가기·프로젝트·안내 + 캠프 표기, 발표 11-09). `npm run verify`·E2E 59개 통과, README 시연 화면 6장 다시 찍음
+- 11-04 · 공동 · GitHub Project 보드 [팀 방조 · 다락큐브 1차](https://github.com/orgs/encore-ai-campus/projects/5) 만듦: 상태 5개(할 일·하는 중·리뷰·막힘·끝), 파트 필드, 보기 4개(전체 표·보드·내 일·목 11-05 통합), 이슈 23개 넣음. 이슈 템플릿이 보드에 자동으로 넣게 함. 사용법: CONTRIBUTING 1절
+- 11-04 · 공동 · CI 확장(`.github/workflows/ci.yml`): 바뀐 폴더별로 프론트 verify·E2E, DB·백엔드 테스트(compose MariaDB·MongoDB로 seed 확인·`check_ddl.py`·`check_mongo_init.js`·pytest) + 결과를 모으는 `CI 결과` job. 루트 `pytest.ini` 추가, `check_ddl.py`는 `CHECK_DB_URL`이 있으면 `.env`를 읽지 않게 함. 설명: CONTRIBUTING 4-1절
+- 11-04 · 공동 · 시스템 아키텍처 그림을 1차 구성(C안: EC2 3대 + RDS, MongoDB는 정문 EC2, Grafana Cloud) 아이콘 그림으로 새로 그림(`docs/figures/architecture.png`). 11-03 그림은 확장안(`architecture_expanded.png`)으로 이름을 바꿔 남김. README 3장의 mermaid를 이 그림으로 바꿈
+- 11-04 · 공동 · `docs/산출물_05_구현_운영_계획.md`(강사님 고려사항 답변) 추가. README를 강사님 목차(주요 프로시저·수행결과·한 줄 회고)로 바꾸고 시연 화면 6장(`docs/figures/screens`) 넣음. 일정 확정: 11-05(목) 통합 → 11-06(금) 피드백·검토 → 11-07(토) 반영 → 11-08(일) 발표 자료 → 11-09(월) 발표
 - 11-04 · FE·공동 · 프론트–명세 대조(가입 필드·이벤트 9종·`X-Session-Id`·오류 코드) 통과. 작은 차이 3건 고침: `오류코드.md` EMAIL_TAKEN에서 '(탈퇴 회원 포함)' 정정(A4), 500 토스트에 `request_id` 표시, 405 토스트 추가(`App.vue`, 단위 테스트 2개 추가 → 54개). `npm run verify` 통과
 - 11-04 · 공동 · AWS 1차 배치를 C안으로: EC2 3대(정문 Nginx+MongoDB, FastAPI #1·#2), Docker 없이 직접 설치, 보안 그룹 4개, 월 약 $17(작업 시간). `AWS_프리티어_구성.md`·`infra/aws` 체크리스트·산출물_02·인프라 검토·캔버스 메모 반영
 - 11-04 · DB(공동 대신 실행) · seed: `db/seed/*.csv`(유형 5·시설 20·지역 230·시도/시군구 별칭·유형 대응표)와 `db/loaders/load_seed.py`(→ `seed.sql`, 표본 주소 197/200 풀림). 로컬 compose `infra/local/docker-compose.yml`(MariaDB 11.4:3308, MongoDB 7) — 첫 실행 자동 초기화 확인, 11.4에서 `check_ddl.py` 29건 통과. HTTPS는 HTTP로 다 되면 검토로 결정

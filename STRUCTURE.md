@@ -18,11 +18,14 @@
 ```
 Pro_1/
 ├─ AGENTS.md                  [공동] AI 작업 지침 (Codex·Claude Code 공용)
+├─ CONTRIBUTING.md            [공동] GitHub 규칙: 이슈·브랜치·커밋·PR·리뷰·라벨 (11-04)
+├─ .github/                   [공동] PR·이슈 템플릿, CODEOWNERS(폴더별 리뷰어), CI(Ruff·프론트 verify·E2E·DB·pytest, CONTRIBUTING 4-1절)
 ├─ README.md                  [공동] 소개, 처음 받았을 때 할 일
 ├─ STATE.md                   [공동] 진행 상태·결정 기록·열린 질문
 ├─ STRUCTURE.md               [공동] 이 파일
 ├─ environment.yml            [공동] conda 환경 pro_1 (Python 3.12)
 ├─ ruff.toml · verify.ps1     [공동] 파이썬 린트 규칙, 커밋 전 전체 검증
+├─ pytest.ini                 [공동] pytest 공통 설정(테스트 폴더, backend import 경로)
 ├─ .gitignore                 [공동] .env·node_modules·글꼴 원본 등 제외
 │
 ├─ docs/                      설계 문서 (docs/README.md)
@@ -30,6 +33,7 @@ Pro_1/
 │  ├─ 산출물_02_시스템아키텍처_흐름도.md  구성, primary/replica 경로, 네트워크, 포트
 │  ├─ 산출물_03_서비스흐름도.md          화면 지도, 시퀀스
 │  ├─ 산출물_04_DB명세서.md              표 12개·컬렉션 3개, 정규화, 로그·지표 데이터
+│  ├─ 산출물_05_구현_운영_계획.md          [공동] AI 활용·서버·자동화·데이터 계획 (11-04)
 │  ├─ 백엔드_A_회원_후기_이벤트.md       [A] 구현 명세
 │  ├─ 백엔드_B_공간_예약_결제_크롤링.md  [B] 구현 명세
 │  ├─ 오류코드.md                        [공동] 오류 코드 전체 (유일한 기준)
@@ -40,6 +44,7 @@ Pro_1/
 │  ├─ AWS_네트워크_설계.md · MVP_시뮬레이션_크롤링_수치.md   (10-30 기준, 맨 위 안내 참고)
 │  ├─ db/                     [DB] mongo_init.js (검증 끝). spacecube_mariadb.sql은 0001로 옮겼다는 안내만
 │  ├─ figures/                [공동] 그림 PNG·SVG, src/ 원본, tools/ 렌더 스크립트
+│  │  └─ screens/            [공동] README 시연 화면 캡처(목업, 11-04)
 │  ├─ architecture/icons/     [공동] 아키텍처 아이콘, SOURCES.md
 │  ├─ 기록/                   회의·리뷰·검토 기록 (이력)
 │  └─ 지난설계/               10-30 설계, 맛집 주제 research/ (이력)

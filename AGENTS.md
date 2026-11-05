@@ -120,6 +120,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File verify.ps1
 - 문서·주석·커밋 메시지는 한국어, 코드 식별자는 영어.
 - 새 폴더를 만들면 그 폴더 역할을 적은 `README.md`를 같이 만들고 `STRUCTURE.md` 트리에도 한 줄 더한다.
 - 커밋 메시지: `[파트] F-ID 요약` (예: `[B] F-30 예약·결제 트랜잭션`). 파트는 FE, A, B, DB, 공동.
+- GitHub 규칙: 이슈 → `develop`에서 브랜치 `feat/<파트>-<F-ID>` → `develop`으로 PR → 리뷰 1명 → Squash 머지. `main`·`develop`에 바로 푸시 금지, 검증이 같은 원인으로 2번 실패하면 멈추고 사람에게. 자세한 것은 [`CONTRIBUTING.md`](CONTRIBUTING.md). 작업 전 `gh issue view <번호>`로 완료 조건·기준 문서를 읽고, 진행 상태는 Project 보드(`gh project item-list 5 --owner encore-ai-campus`)에서 본다.
 
 ## 작업을 끝낼 때
 

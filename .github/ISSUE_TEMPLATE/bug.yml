@@ -1,0 +1,35 @@
+name: 버그
+description: 기대와 다르게 동작하는 것
+title: "[파트] 버그 요약"
+labels: ["bug"]
+projects: ["encore-ai-campus/5"]  # 만들면 Project 보드에 자동으로 들어감
+body:
+  - type: dropdown
+    id: part
+    attributes:
+      label: 파트
+      options: [FE, A, B, DB, 공동]
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 재현 순서
+      value: |
+        1. 
+        2. 
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 기대 결과
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: 실제 결과
+      description: 오류 코드·메시지, 화면·로그(비밀번호·토큰·개인정보는 가림)
+    validations:
+      required: true

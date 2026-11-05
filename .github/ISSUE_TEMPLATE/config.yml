@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 규칙 보기
+    url: https://github.com/encore-ai-campus/mlo-03-p1-team4/blob/main/CONTRIBUTING.md
+    about: 브랜치·커밋·PR·이슈 규칙
