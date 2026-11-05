@@ -55,6 +55,16 @@ test('헤더 사용자 메뉴에서 로그아웃하면 홈으로 가고 회원 �
   await expect(page).toHaveURL(/\/login\?next=(\/|%2F)me$/)
 })
 
+test('내 예약 내역의 내 메뉴에서도 로그아웃할 수 있다', async ({ page }) => {
+  await loginFirst(page, '/me')
+  const button = page.getByRole('button', { name: '로그아웃', exact: true })
+  if (!(await button.first().isVisible())) await page.getByRole('button', { name: '내 메뉴', exact: true }).click()
+  await page.getByRole('button', { name: '로그아웃', exact: true }).filter({ visible: true }).first().click()
+  await expect(page).toHaveURL('/')
+  await expect(page.locator('[data-sonner-toast]').filter({ hasText: '로그아웃했어요' })).toBeVisible()
+  await expect(page.getByRole('link', { name: '회원가입', exact: true })).toBeVisible()
+})
+
 test('이용 완료 예약에 쓴 후기가 내 후기에 바로 보인다', async ({ page }) => {
   await loginFirst(page, '/me?tab=completed&review=1003')
   const dialog = page.getByRole('dialog', { name: '후기 쓰기', exact: true })
