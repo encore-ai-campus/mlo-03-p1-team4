@@ -51,7 +51,8 @@ try {
         '--basetemp', $testTempRoot,
         'tests\test_core_contracts.py',
         'tests\test_core_events.py',
-        'tests\test_auth.py'
+        'tests\test_auth.py',
+        'tests\test_users.py'
     )
     if ($pythonExe) {
         & $pythonExe @pytestArgs

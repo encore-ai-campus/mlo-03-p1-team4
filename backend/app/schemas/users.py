@@ -16,7 +16,7 @@ from pydantic import (
 )
 
 from app.core.clock import as_korean_time
-from app.schemas.auth import RequestModel, validate_password
+from app.schemas.auth import RequestModel, validate_password, validate_phone
 
 
 class UserRead(BaseModel):
@@ -41,6 +41,13 @@ class UserUpdate(RequestModel):
     name: str | None = Field(default=None, min_length=1, max_length=50)
     phone: str | None = Field(default=None, max_length=20)
     marketing_agreed: StrictBool | None = None
+
+    @field_validator("phone")
+    @classmethod
+    def valid_phone(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        return validate_phone(value)
 
     @model_validator(mode="after")
     def check_values(self):
