@@ -15,7 +15,7 @@ B가 1일차부터 쓰므로 A가 가장 먼저 만듭니다. 바꿀 때는 B에
 | `metrics.py` | `/metrics`, `reservation_counter`(`reservation_total{result}`), `mongo_event_write_failures_total`, `db_read_fallback_total` | A, B |
 | `logging.py` | `app.log`·`events.log` (JSON 한 줄) | 전체 |
 | `clock.py` | `get_today()`, `get_now()`(시간대 없는 한국 시각), `TODAY_OVERRIDE`는 테스트 전용 | 전체 |
-| `synthetic.py` | `is_synthetic_request(request)` (헤더 `X-Synthetic: 1`) | 전체 |
+| `synthetic.py` | `is_synthetic_request(request)` (헤더 `X-Synthetic: 1` + `X-Synthetic-Key`(= `.env` `SYNTHETIC_API_KEY`), 키 틀리면 401) | 전체 |
 
 ## 오류 코드
 

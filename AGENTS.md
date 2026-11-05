@@ -47,6 +47,7 @@ Codex와 Claude Code가 함께 읽는 작업 지침입니다. 사람이 채팅�
   - `get_today()`·`get_now()` → Asia/Seoul 오늘·지금. `get_now()`는 **시간대 없는 한국 시각**(MariaDB `DATETIME`과 같음), `TODAY_OVERRIDE`는 테스트 전용 (A 제공)
   - `AppError(code, message, status, detail=None)`, `paginate()`, `is_synthetic_request()`, `get_session_id()`(헤더 `X-Session-Id`), `reservation_counter` (A 제공)
   - `reservation_repo.get_owned(db, user_id, reservation_id)` → `(reservation_id, venue_id, reserve_date, start_hour, end_hour, status, created_at)` 또는 `None` (B 제공)
+  - `reservation_repo.count_cancellable(db, user_id)` → `int`: 시작 전 `confirmed` 예약 수, 탈퇴 전 확인용 (B 제공, 11-05)
   - 뷰 `v_venue_rating(venue_id, rating_avg, review_count)` (DB 제공)
   - 표·컬럼 이름, API 경로와 응답 형식
 
@@ -61,7 +62,7 @@ Codex와 Claude Code가 함께 읽는 작업 지침입니다. 사람이 채팅�
 - 회원이 쓰는 글은 후기만(예약당 1개, `completed`일 때만). 자유게시판·댓글·공지·관리자 역할은 없다.
 - 사용자 이벤트는 `events.log`(→ Alloy → Loki)에 먼저 쓰고 MongoDB `user_events`에는 응답 뒤 백그라운드로 쓴다. MongoDB가 꺼져도 예약·이벤트 API는 성공해야 한다.
 - 공간 이미지는 일러스트 풀(`art:<종류>-<색>`, `frontend/src/components/domain/RoomArt.vue`)을 돌려 쓴다. 크롤링한 사진·업체 실명·원문 소개를 저장하지 않는다.
-- 가상 데이터는 `is_synthetic = true`. API로 넣을 때 헤더 `X-Synthetic: 1`.
+- 가상 데이터는 `is_synthetic = true`. API로 넣을 때 헤더 `X-Synthetic: 1` + `X-Synthetic-Key`(= `.env` `SYNTHETIC_API_KEY`). 키가 없거나 틀리면 401 `UNAUTHORIZED` (11-05 A6)
 - 시간대 Asia/Seoul(MongoDB 저장은 UTC), 날짜 `YYYY-MM-DD`, 금액은 원 단위 정수. 오늘·지금은 `get_today()`·`get_now()`로만 읽는다(`date.today()`·`datetime.now()` 직접 호출 금지).
 - 오류 응답 `{"code","message","detail"}`, 목록 응답 `{"items","page","size","total"}`.
 

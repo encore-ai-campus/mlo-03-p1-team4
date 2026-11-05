@@ -28,5 +28,5 @@
 ## 가상 데이터 표시
 
 - generator: 모든 행에 `is_synthetic = true`, 이벤트 `server = "generator"`
-- locust: 요청 헤더 `X-Synthetic: 1` → 백엔드가 `is_synthetic = true`로 저장
+- locust: 요청 헤더 `X-Synthetic: 1` + `X-Synthetic-Key` → 백엔드가 `is_synthetic = true`로 저장(키 틀리면 401)
 - 부하테스트로 쌓인 예약은 분석에서 빼거나 테스트 후 지웁니다.

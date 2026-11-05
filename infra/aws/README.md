@@ -21,7 +21,7 @@
 - [ ] AWS Budgets $10·$30 알림
 - [ ] 리전 서울, VPC `10.1n.0.0/16`, 서브넷 4개: public-a `.1.0/24`(2a), public-c `.2.0/24`(2c), private-db-a `.21.0/24`, private-db-c `.22.0/24`. 퍼블릭 라우팅 테이블에만 `0.0.0.0/0 → IGW`(NAT 없음)
 - [ ] 보안 그룹 4개: sg-web(80 ← 전체, 22 ← 내 IP/32) · sg-mongo(27017 ← sg-app) · sg-app(8000 ← sg-web, 22 ← 내 IP/32) · sg-db(3306 ← sg-app)
-- [ ] RDS MariaDB 11.4 db.t4g.micro 단일 AZ(2a), 20GB gp2, 퍼블릭 액세스 끔, 백업·삭제 보호·파라미터 그룹(`time_zone=Asia/Seoul`, utf8mb4, **`sql_mode=STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION`**)
+- [ ] RDS MariaDB 11.4 db.t4g.micro 단일 AZ(2a), 20GB gp2, 퍼블릭 액세스 끔, 자동 백업 7일(백업 저장은 DB 크기까지 무료)·삭제 보호·파라미터 그룹(`time_zone=Asia/Seoul`, utf8mb4, **`sql_mode=STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION`**)
 - [ ] RDS에 `db/migrations/0001_init.sql` → `db/seed/seed.sql` 적용(②에서 접속), `db/tests/check_ddl.py`를 `CHECK_DB_URL`로 RDS의 `spacecube_test`에 한 번 돌려 파라미터 그룹까지 확인
 - [ ] ① 정문 EC2 t4g.micro(public-a, `10.1n.1.10`, 탄력적 IP): Nginx, MongoDB 7.0(인증 켬, WiredTiger 캐시 0.25GB, `docs/db/mongo_init.js` 실행), 스왑 1GB, Alloy
 - [ ] ② FastAPI #1 t4g.micro(public-a, `10.1n.1.11`): Python 3.12 venv + `environment.yml` 버전, uvicorn systemd 유닛(`--workers 2`), 이용 완료 배치·크롤러 cron, Alloy
@@ -30,7 +30,7 @@
 - [ ] Grafana Cloud 무료 스택, 세 서버의 Alloy가 로그·지표를 밀어 보냄
 - [ ] 확인: 정문 주소로 `/api/health`가 두 서버에서 번갈아 응답, ③을 중지해도 요청이 ②로 감
 - [ ] 측정하는 날만 read replica 생성 → Locust 비교 → **삭제**
-- [ ] 다 쓰면 EC2 3대 중지 → RDS 일시 중지(7일 뒤 저절로 켜짐 주의). 정문 탄력적 IP는 꺼 둬도 요금이 나감. 프로젝트 끝나면 전부 삭제
+- [ ] 다 쓰면 EC2 3대 중지 → RDS 일시 중지(7일 뒤 저절로 켜짐 주의). 정문 탄력적 IP는 꺼 둬도 요금이 나감. 프로젝트 끝나면 전부 삭제(RDS는 **삭제 보호를 먼저 끔**, 최종 스냅샷은 만들지 않음)
 
 ## 확장안 만드는 순서 (11-03, 기준 `docs/산출물_02` 5~6절, 크레딧이 넉넉할 때)
 

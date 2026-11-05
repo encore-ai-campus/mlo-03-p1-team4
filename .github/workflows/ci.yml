@@ -186,6 +186,7 @@ jobs:
           JWT_SECRET: ci-only-not-a-secret-0123456789abcdef
           JWT_EXPIRE_MINUTES: "60"
           INTERNAL_API_KEY: ci-only-internal-key
+          SYNTHETIC_API_KEY: ci-only-synthetic-key
           LOG_DIR: ${{ runner.temp }}/logs
           SERVER_NAME: api-ci
           CORS_ORIGINS: http://localhost:5173
