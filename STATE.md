@@ -3,7 +3,7 @@
 사람과 에이전트(Codex, Claude Code)가 함께 고치는 진행 기록입니다. 작업을 끝낼 때마다 해당 줄을 고치고 '최근 변경' 맨 위에 한 줄 더합니다. 설계 내용 자체는 `docs/`에, 여기는 상태와 결정만 둡니다.
 
 - 마지막 갱신: 2026-11-05
-- 단계: **11-05 통합일** · 설계 11-03 확정안 + 11-05 회의(탈퇴·A6·A7 확정, A8 보류) · DB 0001·seed·로컬 compose 검증 · 프론트 7화면(목업, 다락큐브·푸터 반영) · GitHub develop 흐름·CI·Project 보드 · **1차 배포 로컬 VM 7대(노트북 4대, 11-05)** · B F-10~14·20~22·시설 목록·get_owned() MariaDB 검증 완료, A 전달본 로컬 사용(Git 제외), GitHub A·B 통합 전
+- 단계: **11-05 통합일** · 설계 11-03 확정안 + 11-05 회의(탈퇴·A6·A7 확정, A8 보류) · DB 0001·seed·로컬 compose 검증 · 프론트 7화면(목업, 다락큐브·푸터 반영) · GitHub develop 흐름·CI·Project 보드 · **1차 배포 로컬 VM 7대(노트북 4대, 11-05)** · B F-10~14·20~22·F-30~32, 시설 목록·get_owned() 구현·MariaDB 검증 완료. A core #34는 develop 병합 완료, B 조회 #31은 리뷰 중. 현재 예약 브랜치는 A 전달본 로컬 사용(Git 제외), 최신 develop 통합 전
 - 디자인 캔버스(화면 설계 · 시스템 아키텍처 · 글꼴 시안): https://claude.ai/artifact/5dQciCDEaMm8uNjw6sqZpm
 - 실행 환경: Python은 conda `pro_1`(`environment.yml`), 프론트는 `frontend/`의 npm
 
@@ -13,7 +13,7 @@
 | --- | --- | --- | --- | --- |
 | 프론트 | 노진산(FE·PM) | FE-1~9 확정안 반영, Claude 시안 대조·FE 오류/모바일 결제/가입 UX 재검토 및 목업·화면 검증 | A·B 구현 후 실제 API 연결·오류·예약 동시성 통합 검증 | 실제 API 미구현 |
 | FastAPI A | [이름] | 문서 확정(`docs/백엔드_A`), 폴더·README | 1일차 오전 `core/`(두 DB 세션·오류·`get_current_user`·`log_event`·`get_today`)·`models/base.py` → 회원 → 후기 → 이벤트 | 없음 |
-| FastAPI B | [이름] | F-10~14·시설 목록·F-20~22 공개 조회 API 구현·MariaDB 검증, PR #31 리뷰 중·develop 동기화. 전체 pytest 165건, Chrome API 1건, 프론트 단위 54건·린트·포맷·빌드 통과. A 공통 파일은 로컬 사용(Git 제외 유지) | 예약·동시성(#7) → 내 예약·취소·완료(#8). `/internal/venues`는 크롤러 논의 후 진행. A 통합 PR에 venues 라우터 등록, 후기 목록 연결 확인 필요 | A 공통 코드의 GitHub 통합은 A PR 필요. 실제 replica 장애·복제 지연은 DB 구성 후 검증 |
+| FastAPI B | [이름] | F-10~14·시설 목록·F-20~22 공개 조회 및 F-30~32 예약·모의 결제 API 구현·MariaDB 검증. 예약 코드 커밋 `ad16619`. 전체 pytest 182건, 프론트 단위 54건·Ruff·프론트 린트·색 검사·빌드 통과 기록은 로컬 A 전달본 기준 | #31에 최신 develop 통합·B 조회 라우터 등록·`count_cancellable()` 제공·재검증 → 예약 브랜치 통합 → 내 예약 목록·상세(F-40, #8)·취소(F-34)·완료 배치(F-35). `/internal/venues`는 크롤러 논의 후 진행 | A core #34는 develop 병합 완료, 현재 예약 브랜치는 미반영. 실제 replica 장애·복제 지연은 DB 구성 후 검증 |
 | DB | [이름] | `0001_init.sql`·`mongo_init.js` 검증(설치형 11.8·compose 11.4 둘 다 29건 통과), seed(유형 5·시설 20·지역 230 → `seed.sql`), `infra/local` compose, 크롤러 시제품(옛 필터) | 크롤러 새 필터(유형 5·별칭) → `/internal/venues` 등록(B와) → 가상 데이터 생성기 | 없음(A2 결정을 팀원에게 공유) |
 
 ## 기능 진행표
@@ -31,7 +31,7 @@
 | F-20 | 공간 상세 | B / A·FE 연계 | B 상세 API 구현·검증: test_venues 28건, 공간 모델 DDL 3건, 실제 API Chrome 1건 통과. 공개 읽기 경로 3건·기존 목업 E2E 59건 통과. A 후기 목록·FE 실제 서버 연결은 별도 통합 항목 |
 | F-21 | 예약 가능 날짜 | B | 검증: 공개 available-dates API 구현. 빈 칸 총수·min_hours 이상 연속 빈 칸 판정, 음수 offset·days 1~31·기간 양끝·0일 설정·마지막 페이지 잘림·큰 offset·점유 분리·재조회·SQL 2회·400/404·읽기 의존성 등 48건 추가. test_venues 114건, 전체 pytest 153건, 실제 HTTP Chrome 1건 통과. FE 전체 연결은 별도 |
 | F-22 | 날짜별 시간 칸 | B | 검증: 공개 GET /venues/{venue_id}/slots?date=YYYY-MM-DD 구현. 엄격한 날짜·설정 범위 양끝·0일 설정, 공간/날짜별 점유·완료 칸·past·F-20 일치·재조회·400/404·읽기 의존성 등 38건 추가. test_venues 총 66건, 전체 pytest 105건, 실제 HTTP Chrome 1건 통과 |
-| F-30~32 | 예약+모의 결제 한 번, 중복 차단 | B | 서버 설계 확정 / FE 한 번 결제·409·지난 예약 목업 검증 |
+| F-30~32 | 예약+모의 결제 한 번, 중복 차단 | B | 검증: POST `/reservations`, primary에서 날짜·영업시간·최소시간·인원·수단 확인, 예약·칸·결제 단일 트랜잭션, 지난 이용은 completed, 10분 재시도 200, 1062 롤백 후 409. MariaDB API 테스트 14건·경쟁 테스트: 50명 201 1건/409 49건, 같은 회원 재시도 201 1건/200 49건, 겹친 시간 201 1건/409 1건. 전체 pytest 182건·FE 단위 54건·Ruff·프론트 검증 통과 |
 | F-34~35 | 취소, 이용 완료 배치 | B | 설계 확정 |
 | F-40~41 | 내 예약, 내 후기 | B / A | 서버 설계 확정 / FE 내 예약 3상태·내 후기 목업 검증 |
 | F-50 지원 | A 후기 작성용 예약 소유권 조회 | B | 예약·칸·결제 모델 및 `get_owned()`를 이전 프로젝트에서 가져옴. DDL 일치·매퍼 구성 4건, 실제 MariaDB 소유권·A 후기 작성 연결 10건 통과. 예약 생성 API 구현 완료를 뜻하지 않음 |
@@ -46,6 +46,7 @@
 
 | 날짜 | 결정 | 근거 |
 | --- | --- | --- |
+| 11-05 | F-30~32에서 본인 예약 여러 건과 모두 겹치면 `SLOT_TAKEN.detail.reservation_id`는 겹친 예약 ID 중 최솟값으로 반환한다. 자동 증가 ID는 실제 커밋 순서를 보장하지 않는다고 구분한다 | 사용자 승인 · `docs/백엔드_B` 6절 · `docs/오류코드.md` |
 | 11-05 | F-21은 offset 기본 0·음수 허용, days 기본 14·1~31. 시작 범위 밖은 OUT_OF_RANGE, 마지막 페이지 뒷부분은 최대 날짜에서 자르고 응답 days는 요청값 유지. free는 빈 칸 총수, bookable은 연속 빈 칸 ≥ min_hours이며 지난 칸 포함 | 사용자 승인 계획 · 기존 FE venuesApi 목업 · `백엔드_B` 5-2절 |
 | 11-05 | F-22 날짜는 필수 `YYYY-MM-DD` 실제 날짜. 형식·누락은 `VALIDATION`, 설정 범위 밖은 `OUT_OF_RANGE`와 날짜 양끝 detail 반환. 지난 칸·완료 점유 유지, F-20과 시간 칸 조합 함수 공유 | 사용자 승인 구현 계획 · `백엔드_B` 5-2절 · `오류코드` |
 | 11-05 | F-20 이미지 누락은 RoomArt 기본값 `art:group-0`으로 대표 이미지·상세 갤러리를 통일하고 별도 lounge 대체값은 추가하지 않음. NEW는 한국 날짜 기준 오늘 포함 최근 14일(`0 <= 날짜 차이 < 14`), 미래 날짜 제외 | 사용자 지시 · `산출물_01` F-14·20, `백엔드_B` 5-2절 |
@@ -158,6 +159,8 @@ A1~A4는 11-03에 확정했고, **A5~A8은 추후 확정**으로 미뤘다(11-03
 - 개인 기억(Claude 자동 메모리 등)은 팀에 공유되지 않는다. 팀이 알아야 할 것은 이 파일과 `docs/`에 쓴다.
 
 ## 최근 변경 (최신이 위)
+
+- 11-05 · B · F-30~32 `POST /reservations` 예약·모의 결제 구현. primary에서 공간·기간·영업시간·`min_hours`·인원·결제수단을 검증하고 `reservations`·`reservation_slots`·`payments`를 한 트랜잭션으로 커밋. 지난 종료 시각은 즉시 `completed`, 성공 201, 10분 안 같은 요청은 200 + 기존 결제. 시간 칸 기본키의 1062만 롤백 후 충돌로 처리하며 `slots`, 본인 단일·복수 충돌의 최소 ID, 혼합 소유자 ID 비노출을 확인. 가상 예약은 `X-Synthetic`과 `SYNTHETIC_API_KEY`를 함께 검사. MariaDB API 14건·경쟁 테스트: 다른 회원 50명(201 1건/409 49건), 같은 회원 재시도 50건(201 1건/200 49건), 겹친 시간 경쟁(201 1건/409 1건) 통과. 전체 `verify.ps1`: pytest 182건, FE 단위 54건, Ruff·프론트 린트·색 검사·빌드 통과, Starlette TestClient 경고 1건. 로컬 A `main.py`에는 reservations 라우터를 연결했으나 Git 제외 상태라 A 통합 후 등록을 확인해야 함. develop의 A 공통 `is_synthetic_request`는 키 검증을 제공하므로 통합 후 B의 별도 검증과 정합성을 확인해야 함. 예약 코드·테스트·API 문서는 `ad16619`로 커밋 완료; 이 진행 기록은 별도 문서 커밋으로 정리.
 
 - 11-05 · B · PR #31 브랜치에 origin/develop(1cc11a8)을 머지. STATE.md 충돌 2곳은 B 구현·검증 기록과 공동의 11-05 통합일·로컬 VM 배포·회의 결정을 함께 보존해 해결. STRUCTURE·B API 명세·요구사항은 양쪽 변경을 자동 병합. A 전달본의 로컬 Git 제외는 유지하며, 새 공유 계약 count_cancellable()과 X-Synthetic-Key 반영 여부는 A 통합 및 후속 구현에서 확인해야 함. 머지 후 verify.ps1 전체 통과: pytest 165건·프론트 단위 54건·Ruff 린트/포맷·프론트 린트/색 검사/빌드. Starlette 경고 1건. A 전달본을 사용한 로컬 검증이며 실제 replica 장애·복제 지연과 GitHub A 통합 후 재검증은 후속 항목.
 

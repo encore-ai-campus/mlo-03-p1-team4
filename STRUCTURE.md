@@ -70,13 +70,13 @@ Pro_1/
 │  │  ├─ main.py              [A] (예정)
 │  │  ├─ core/                [A] config, db, mongo, security, deps, errors, pagination, events, metrics, logging, clock, synthetic (예정)
 │  │  ├─ models/              [A] base, user, review / [B] catalog·reservation·venue 구현 — DDL 대응 모델
-│  │  ├─ routers/             [A] auth, users, reviews, events, health / [B] catalog·venues(검색·정렬·NEW·상세·예약 가능 날짜·시간 칸) 구현, reservations·internal 예정
-│  │  ├─ schemas/             라우터와 같은 이름 ([B] catalog·venues 검색·NEW·상세·날짜 목록·시간 칸 계약 구현)
-│  │  ├─ services/            [A] auth_service, user_service, review_service / [B] catalog_service·venue_service(검색·정렬·NEW·상세·예약 가능 날짜·시간 칸) 구현, reservation_service·internal_service 예정
-│  │  ├─ repositories/        [A] user_repo, review_repo / [B] catalog_repo·reservation_repo(get_owned)·venue_repo(검색·정렬·NEW)·slot_repo(공간·일자별 점유 조회) 구현, payment_repo 예정
+│  │  ├─ routers/             [A] auth, users, reviews, events, health / [B] catalog·venues(검색·정렬·NEW·상세·예약 가능 날짜·시간 칸), reservations(F-30~32) 구현, internal 예정
+│  │  ├─ schemas/             라우터와 같은 이름 ([B] catalog·venues 조회, reservations 생성 계약 구현)
+│  │  ├─ services/            [A] auth_service, user_service, review_service / [B] catalog_service·venue_service 조회, reservation_service(F-30~32) 구현, internal 예정
+│  │  ├─ repositories/        [A] user_repo, review_repo / [B] catalog_repo·reservation_repo(생성·재시도·get_owned)·venue_repo·slot_repo·payment_repo 구현
 │  │  └─ jobs/                [B] complete_reservations (예정)
 │  ├─ scripts/                [A] replay_events (예정)
-│  └─ tests/                  [B] test_catalog·test_reservation_dependencies·test_venues·test_read_routing 구현
+│  └─ tests/                  [B] test_catalog·test_reservation_dependencies·test_venues·test_reservations·test_concurrency·test_read_routing 구현
 │     └─ check_venue_browser.py·mjs  [B] 별도 실행: 임시 실제 API + Chrome 검색·정렬·NEW·오류·상세·날짜 목록·시간 칸 검증
 │
 ├─ db/                        [DB] (스키마는 docs/db, 검증 후 여기로)
