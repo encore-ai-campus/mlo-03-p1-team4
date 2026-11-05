@@ -52,7 +52,7 @@ def find_recent_matching(
     created_after: datetime,
     created_before: datetime,
 ) -> dict | None:
-    """10분 안에 같은 이용 시간으로 만든 본인 예약과 결제를 찾는다."""
+    """10분 안에 같은 이용 시간으로 만든 본인의 유효한 예약과 결제를 찾는다."""
     row = (
         db.execute(
             select(
@@ -71,6 +71,8 @@ def find_recent_matching(
             .join(Payment, Payment.reservation_id == Reservation.reservation_id)
             .where(
                 Reservation.user_id == user_id,
+                Reservation.status.in_(("confirmed", "completed")),
+                Payment.status == "paid",
                 Reservation.venue_id == venue_id,
                 Reservation.reserve_date == reserve_date,
                 Reservation.start_hour == start_hour,

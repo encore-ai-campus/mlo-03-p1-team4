@@ -253,11 +253,12 @@ def test_synthetic_booking_requires_its_own_key_and_sets_the_database_flag(
     assert api.app.state.booking_events[-1][1]["is_synthetic"] is True
 
 
+@pytest.mark.parametrize("day_offset", [-1, 1])
 def test_retry_within_ten_minutes_returns_original_booking_without_extra_rows(
-    connection, sample, api
+    connection, sample, api, day_offset
 ):
     before_ok = reservation_counter.labels(result="ok")._value.get()
-    body = booking(sample["venue_id"])
+    body = booking(sample["venue_id"], day=TODAY + timedelta(days=day_offset))
     first = api.post("/reservations", json=body)
     second = api.post(
         "/reservations",
@@ -273,6 +274,102 @@ def test_retry_within_ten_minutes_returns_original_booking_without_extra_rows(
     assert count_reservation_slots(connection, reservation_id) == 2
     assert reservation_counter.labels(result="ok")._value.get() == before_ok + 1
     assert [event[0] for event in api.app.state.booking_events] == ["reserve_ok"]
+
+
+def cancel_test_reservation(connection, reservation_id):
+    """취소 API 구현 전이므로 현재 명세의 취소·환불·칸 반납 상태를 만든다."""
+    connection.execute(
+        text("UPDATE reservations SET status='cancelled' WHERE reservation_id=:id"),
+        {"id": reservation_id},
+    )
+    connection.execute(
+        text("UPDATE payments SET status='refunded', refunded_at=:now WHERE reservation_id=:id"),
+        {"id": reservation_id, "now": NOW},
+    )
+    connection.execute(
+        text("DELETE FROM reservation_slots WHERE reservation_id=:id"), {"id": reservation_id}
+    )
+
+
+def test_retry_after_cancellation_and_rebooking_returns_the_new_paid_reservation(
+    connection, sample, api
+):
+    body = booking(sample["venue_id"])
+    first = api.post("/reservations", json=body)
+    assert first.status_code == 201
+    cancelled_id = first.json()["reservation_id"]
+    cancel_test_reservation(connection, cancelled_id)
+
+    rebooked = api.post("/reservations", json={**body, "method": "phone"})
+    assert rebooked.status_code == 201
+    new_id = rebooked.json()["reservation_id"]
+    assert new_id != cancelled_id
+    before_ok = reservation_counter.labels(result="ok")._value.get()
+    retried = api.post("/reservations", json=body)
+
+    assert retried.status_code == 200
+    assert retried.json() == rebooked.json()
+    assert retried.json()["payment"]["status"] == "paid"
+    assert count_venue_reservations(connection, sample["venue_id"]) == 2
+    assert count_reservation_slots(connection, cancelled_id) == 0
+    assert count_reservation_slots(connection, new_id) == 2
+    assert count_reservation_payments(connection, cancelled_id) == 1
+    assert count_reservation_payments(connection, new_id) == 1
+    assert reservation_counter.labels(result="ok")._value.get() == before_ok
+    assert [event[0] for event in api.app.state.booking_events] == ["reserve_ok", "reserve_ok"]
+
+
+def test_retry_after_cancellation_reports_conflict_when_another_user_books_the_slots(
+    connection, sample, api
+):
+    body = booking(sample["venue_id"])
+    first = api.post("/reservations", json=body)
+    assert first.status_code == 201
+    cancel_test_reservation(connection, first.json()["reservation_id"])
+    other = api.post(
+        "/reservations",
+        json=body,
+        headers={"X-Test-User-Id": str(sample["create_user"]())},
+    )
+    assert other.status_code == 201
+
+    retried = api.post("/reservations", json=body)
+
+    assert retried.status_code == 409
+    assert retried.json()["code"] == "SLOT_TAKEN"
+    assert retried.json()["detail"] == {"slots": [13, 14]}
+    assert count_venue_reservations(connection, sample["venue_id"]) == 2
+    assert [event[0] for event in api.app.state.booking_events] == [
+        "reserve_ok",
+        "reserve_ok",
+        "reserve_conflict",
+    ]
+
+
+@pytest.mark.parametrize("day_offset", [-1, 1])
+def test_retry_excludes_refunded_payment_for_an_active_reservation(
+    connection, sample, api, day_offset
+):
+    """예약 상태 조건과 별개로 결제 paid 조건도 재시도 성공에 필요하다."""
+    body = booking(sample["venue_id"], day=TODAY + timedelta(days=day_offset))
+    first = api.post("/reservations", json=body)
+    assert first.status_code == 201
+    reservation_id = first.json()["reservation_id"]
+    connection.execute(
+        text("UPDATE payments SET status='refunded', refunded_at=:now WHERE reservation_id=:id"),
+        {"id": reservation_id, "now": NOW},
+    )
+
+    retried = api.post("/reservations", json=body)
+
+    assert retried.status_code == 409
+    assert retried.json()["code"] == "SLOT_TAKEN"
+    assert retried.json()["detail"] == {
+        "slots": [13, 14],
+        "mine": True,
+        "reservation_id": reservation_id,
+    }
+    assert count_venue_reservations(connection, sample["venue_id"]) == 1
 
 
 def test_retry_older_than_ten_minutes_is_conflict_with_own_reservation(connection, sample, api):
