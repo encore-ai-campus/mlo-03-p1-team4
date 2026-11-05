@@ -1,8 +1,8 @@
-"""F-20~22 공간 상세·예약 가능 날짜·시간 칸의 공개 계약."""
+"""F-12~14·20~22 공간 검색·상세·날짜·시간 칸의 공개 계약."""
 
 import re
 from datetime import date
-from typing import Annotated
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, BeforeValidator
 
@@ -51,6 +51,28 @@ class AvailableDatesRead(BaseModel):
     min_date: date
     max_date: date
     dates: list[AvailableDateRead]
+
+
+class VenueListItem(BaseModel):
+    """공간 검색 결과 한 줄. 상세 설명·이미지 목록은 포함하지 않는다."""
+
+    venue_id: int
+    name: str
+    category: CategoryRead
+    region: VenueRegionRead
+    capacity_max: int
+    price_per_hour: int
+    open_hour: int
+    close_hour: int
+    rating_avg: float
+    review_count: int
+    image: str
+    facilities: list[str]
+    is_new: bool
+    slots: list[SlotRead]
+
+
+type VenueSort = Literal["default", "popular", "price", "rating"]
 
 
 class VenueRead(BaseModel):

@@ -1,4 +1,4 @@
-"""F-20~22 실제 상세·예약 가능 날짜·시간 칸 API와 MariaDB 계약을 검증한다."""
+"""F-12~13 검색·정렬과 F-20~22 공간 API의 MariaDB 계약을 검증한다."""
 
 import inspect
 import os
@@ -1003,3 +1003,390 @@ def test_available_dates_batch_query_for_maximum_page(venue_client, synthetic_ve
     assert len(statements) == 2
     assert "reservation_slots" in statements[1]
     assert all("venue_images" not in sql and "v_venue_rating" not in sql for sql in statements)
+
+
+@pytest.fixture
+def search_catalog(synthetic_venue):
+    """검색용 공간은 고유 키워드로 격리하고 같은 DB 트랜잭션에서 롤백한다."""
+    connection, base_id, today = synthetic_venue
+    keyword = f"검색검증-{uuid4().hex}"
+    base_region = connection.execute(
+        text(
+            "SELECT r.region_id, r.sido, r.sigungu FROM regions r "
+            "JOIN venues v ON v.region_id = r.region_id WHERE v.venue_id = :id"
+        ),
+        {"id": base_id},
+    ).one()
+    other_region = connection.execute(
+        text(
+            "SELECT region_id, sido, sigungu FROM regions WHERE sido <> :sido "
+            "ORDER BY region_id LIMIT 1"
+        ),
+        {"sido": base_region.sido},
+    ).one()
+    categories = {
+        row.code: row.category_id
+        for row in connection.execute(text("SELECT category_id, code FROM categories"))
+    }
+    facility_ids = list(
+        connection.execute(
+            text("SELECT facility_id FROM facilities ORDER BY facility_id LIMIT 2")
+        ).scalars()
+    )
+    assert len(facility_ids) == 2, "기존 seed.sql 적용이 필요합니다."
+    connection.execute(
+        text("UPDATE venues SET name = :name WHERE venue_id = :id"),
+        {"name": f"{keyword} 기준 공간", "id": base_id},
+    )
+
+    def create(
+        suffix,
+        *,
+        category="studyroom",
+        region=base_region,
+        capacity=6,
+        price=10000,
+        min_hours=1,
+        open_hour=9,
+        close_hour=23,
+    ):
+        source_id = f"search-test-{uuid4().hex}"
+        venue_id = connection.execute(
+            text(
+                "INSERT INTO venues "
+                "(region_id, category_id, name, capacity_max, price_per_hour, min_hours, "
+                "open_hour, close_hour, source_site, source_id, created_at) "
+                "VALUES (:region, :category, :name, :capacity, :price, :min_hours, "
+                ":open, :close, 'synthetic', :source_id, :created_at)"
+            ),
+            {
+                "region": region.region_id,
+                "category": categories[category],
+                "name": f"{keyword} {suffix}",
+                "capacity": capacity,
+                "price": price,
+                "min_hours": min_hours,
+                "open": open_hour,
+                "close": close_hour,
+                "source_id": source_id,
+                "created_at": datetime.combine(today, time(12)),
+            },
+        ).lastrowid
+        return venue_id
+
+    def link_facilities(venue_id, ids):
+        connection.execute(
+            text(
+                "INSERT INTO venue_facilities (venue_id, facility_id) "
+                "VALUES (:venue_id, :facility_id)"
+            ),
+            [{"venue_id": venue_id, "facility_id": facility_id} for facility_id in ids],
+        )
+
+    connection.execute(
+        text(
+            "UPDATE venues SET region_id = :region, category_id = :category, "
+            "capacity_max = 6, price_per_hour = 30000, min_hours = 2, open_hour = 9, close_hour = 15 "
+            "WHERE venue_id = :id"
+        ),
+        {"id": base_id, "region": base_region.region_id, "category": categories["studyroom"]},
+    )
+    link_facilities(base_id, facility_ids)
+    return {
+        "base_id": base_id,
+        "keyword": keyword,
+        "today": today,
+        "base_region": base_region,
+        "other_region": other_region,
+        "facility_ids": facility_ids,
+        "connection": connection,
+        "create": create,
+        "link_facilities": link_facilities,
+    }
+
+
+def test_search_default_public_contract_and_q_across_fields(venue_client, search_catalog):
+    data = search_catalog
+    response = venue_client.get("/venues", params={"q": data["keyword"]})
+    assert response.status_code == 200
+    body = response.json()
+    assert body["page"] == 1
+    assert body["size"] == 10
+    assert body["total"] == 1
+    item = body["items"][0]
+    assert set(item) == {
+        "venue_id",
+        "name",
+        "category",
+        "region",
+        "capacity_max",
+        "price_per_hour",
+        "open_hour",
+        "close_hour",
+        "rating_avg",
+        "review_count",
+        "image",
+        "facilities",
+        "is_new",
+        "slots",
+    }
+    assert item["venue_id"] == data["base_id"]
+    assert item["name"] == f"{data['keyword']} 기준 공간"
+    assert item["price_per_hour"] == 30000
+    assert item["image"] == "art:group-0"
+    assert item["facilities"] == [
+        row["name"]
+        for row in venue_client.get("/facilities").json()
+        if row["facility_id"] in data["facility_ids"]
+    ]
+    assert item["is_new"] is True
+    assert item["slots"] == [
+        {"hour": hour, "taken": False, "past": hour <= 12} for hour in range(9, 15)
+    ]
+
+    facility_name = item["facilities"][0]
+    for query in (facility_name, data["base_region"].sigungu):
+        matches = venue_client.get("/venues", params={"q": query}).json()["items"]
+        assert data["base_id"] in [match["venue_id"] for match in matches]
+
+
+def test_search_combines_type_region_people_and_all_facilities(venue_client, search_catalog):
+    data = search_catalog
+    studio = data["create"](
+        "스튜디오", category="studio", region=data["other_region"], capacity=10, min_hours=1
+    )
+    small_cafe = data["create"]("작은 카페", category="cafe", capacity=2)
+    data["link_facilities"](studio, [data["facility_ids"][0]])
+    data["link_facilities"](small_cafe, [data["facility_ids"][1]])
+
+    cases = [
+        ({"category": "studio"}, [studio]),
+        (
+            {"category": "all", "sido": "전국", "sigungu": "전체"},
+            [data["base_id"], studio, small_cafe],
+        ),
+        ({"sido": data["base_region"].sido}, [data["base_id"], small_cafe]),
+        ({"people": 5}, [data["base_id"], studio]),
+        ({"facilities": ",".join(map(str, data["facility_ids"]))}, [data["base_id"]]),
+        ({"facilities": str(data["facility_ids"][0])}, [data["base_id"], studio]),
+    ]
+    for filters, expected_ids in cases:
+        response = venue_client.get("/venues", params={"q": data["keyword"], **filters})
+        assert response.status_code == 200
+        assert {item["venue_id"] for item in response.json()["items"]} == set(expected_ids)
+        assert response.json()["total"] == len(expected_ids)
+
+
+def test_search_filters_requested_hours_and_now_against_live_slots(
+    venue_client, search_catalog, add_taken_slots
+):
+    data = search_catalog
+    studio = data["create"](
+        "오늘 가능한 스튜디오", category="studio", open_hour=13, close_hour=15, min_hours=1
+    )
+    response = venue_client.get(
+        "/venues",
+        params={
+            "q": data["keyword"],
+            "category": "studio",
+            "start_hour": 13,
+            "hours": 2,
+            "date": data["today"].isoformat(),
+        },
+    )
+    assert response.status_code == 200
+    assert [item["venue_id"] for item in response.json()["items"]] == [studio]
+
+    one_hour = data["create"](
+        "최소 한 시간 스튜디오", category="studio", open_hour=9, close_hour=10, min_hours=1
+    )
+    response = venue_client.get(
+        "/venues",
+        params={
+            "q": data["keyword"],
+            "start_hour": 9,
+            "hours": 1,
+            "date": data["today"].isoformat(),
+        },
+    )
+    assert response.status_code == 200
+    assert [item["venue_id"] for item in response.json()["items"]] == [one_hour]
+
+    response = venue_client.get(
+        "/venues",
+        params={
+            "q": data["keyword"],
+            "category": "studio",
+            "start_hour": 13,
+            "hours": 2,
+            "date": (data["today"] - timedelta(days=1)).isoformat(),
+            "now": "true",
+        },
+    )
+    assert [item["venue_id"] for item in response.json()["items"]] == [studio]
+    assert response.json()["items"][0]["slots"] == [
+        {"hour": 13, "taken": False, "past": False},
+        {"hour": 14, "taken": False, "past": False},
+    ]
+
+    add_taken_slots(data["today"], [13, 14], other_venue_id=studio)
+    blocked = venue_client.get(
+        "/venues",
+        params={"q": data["keyword"], "category": "studio", "now": "true"},
+    )
+    assert blocked.status_code == 200
+    assert blocked.json()["items"] == []
+
+
+def test_search_sorts_and_paginates_after_filtering(venue_client, search_catalog):
+    data = search_catalog
+    cheap = data["create"]("저가 공간", price=5000)
+    expensive = data["create"]("고가 공간", price=30000)
+    default_order = venue_client.get("/venues", params={"q": data["keyword"]})
+    assert default_order.status_code == 200
+    assert [item["venue_id"] for item in default_order.json()["items"]] == [
+        data["base_id"],
+        cheap,
+        expensive,
+    ]
+    response = venue_client.get("/venues", params={"q": data["keyword"], "sort": "price"})
+    assert response.status_code == 200
+    assert [item["venue_id"] for item in response.json()["items"]] == [
+        cheap,
+        data["base_id"],
+        expensive,
+    ]
+
+    first_page = venue_client.get(
+        "/venues", params={"q": data["keyword"], "page": 1, "size": 2}
+    ).json()
+    last_page = venue_client.get(
+        "/venues", params={"q": data["keyword"], "page": 2, "size": 2}
+    ).json()
+    assert first_page["total"] == last_page["total"] == 3
+    assert first_page["page"] == 1 and first_page["size"] == 2
+    assert len(first_page["items"]) == 2
+    assert last_page["items"][0]["venue_id"] == expensive
+    assert last_page["items"][0]["venue_id"] not in [
+        item["venue_id"] for item in first_page["items"]
+    ]
+
+
+def test_search_rating_sort_reads_the_venue_rating_view(
+    venue_client, search_catalog, add_reservation
+):
+    data = search_catalog
+    high_rating = data["create"]("높은 평점 공간", price=5000)
+    low_rating = data["create"]("낮은 평점 공간", price=15000)
+    connection = data["connection"]
+    today = data["today"]
+    created_at = datetime.combine(today, time(12))
+    for target, ratings in [(data["base_id"], [4, 5]), (high_rating, [5]), (low_rating, [3])]:
+        for rating in ratings:
+            reservation_id, user_id = add_reservation()
+            connection.execute(
+                text("UPDATE reservations SET venue_id = :venue_id WHERE reservation_id = :id"),
+                {"venue_id": target, "id": reservation_id},
+            )
+            connection.execute(
+                text(
+                    "INSERT INTO reviews (reservation_id, user_id, rating, content, created_at) "
+                    "VALUES (:reservation_id, :user_id, :rating, '검색 평점 검증', :created_at)"
+                ),
+                {
+                    "reservation_id": reservation_id,
+                    "user_id": user_id,
+                    "rating": rating,
+                    "created_at": created_at,
+                },
+            )
+    response = venue_client.get("/venues", params={"q": data["keyword"], "sort": "rating"})
+    assert response.status_code == 200
+    items = response.json()["items"]
+    assert [item["venue_id"] for item in items] == [high_rating, data["base_id"], low_rating]
+    assert [item["rating_avg"] for item in items] == [5.0, 4.5, 3.0]
+
+
+def test_search_popular_sort_excludes_cancelled_past_and_old_reservations(
+    venue_client, search_catalog, add_reservation
+):
+    data = search_catalog
+    popular = data["create"]("인기 공간", price=5000)
+    medium = data["create"]("중간 인기 공간", price=15000)
+    connection = data["connection"]
+    today = data["today"]
+    now = datetime.combine(today, time(12, 30))
+
+    def book(venue_id, *, day=today, status="confirmed", created_at=now):
+        reservation_id, _ = add_reservation(day=day, status=status)
+        connection.execute(
+            text(
+                "UPDATE reservations SET venue_id = :venue_id, created_at = :created_at "
+                "WHERE reservation_id = :id"
+            ),
+            {"venue_id": venue_id, "created_at": created_at, "id": reservation_id},
+        )
+
+    book(popular)
+    book(popular)
+    book(medium)
+    book(popular, status="cancelled")
+    book(medium, day=today - timedelta(days=1))
+    book(medium, created_at=now - timedelta(days=7, seconds=1))
+    response = venue_client.get("/venues", params={"q": data["keyword"], "sort": "popular"})
+    assert response.status_code == 200
+    assert [item["venue_id"] for item in response.json()["items"]] == [
+        popular,
+        medium,
+        data["base_id"],
+    ]
+
+
+def test_search_validates_filters_and_date_range(venue_client, search_catalog):
+    data = search_catalog
+    invalid_cases = [
+        ({"sort": "newest"}, "sort"),
+        ({"category": "unknown-type"}, "category"),
+        ({"facilities": "abc"}, "facilities"),
+        ({"start_hour": 10}, "hours"),
+        ({"hours": 2}, "start_hour"),
+        ({"start_hour": 8, "hours": 1}, None),
+        ({"start_hour": 10, "hours": 5}, None),
+        ({"people": 0}, "people"),
+        ({"page": 0}, "page"),
+        ({"size": 51}, "size"),
+        ({"date": "2026-02-30"}, "date"),
+    ]
+    for params, field in invalid_cases:
+        response = venue_client.get("/venues", params={"q": data["keyword"], **params})
+        assert response.status_code == 400
+        assert response.json()["code"] in {"VALIDATION", "OUT_OF_RANGE"}
+        if field is not None:
+            assert response.json()["detail"]["fields"][0]["field"] == field
+
+    outside = venue_client.get("/venues", params={"q": data["keyword"], "date": "0001-01-01"})
+    assert outside.status_code == 400
+    assert outside.json()["code"] == "OUT_OF_RANGE"
+    assert outside.json()["detail"]["reason"] == "date"
+
+
+def test_search_uses_bounded_queries_for_page_items(venue_client, search_catalog):
+    data = search_catalog
+    data["create"]("두 번째 공간")
+    statements = []
+
+    def collect_sql(conn, cursor, statement, parameters, context, executemany):
+        if statement.lstrip().upper().startswith("SELECT"):
+            statements.append(statement.lower())
+
+    event.listen(data["connection"], "before_cursor_execute", collect_sql)
+    try:
+        response = venue_client.get("/venues", params={"q": data["keyword"]})
+    finally:
+        event.remove(data["connection"], "before_cursor_execute", collect_sql)
+    assert response.status_code == 200
+    assert response.json()["total"] == 2
+    assert len(statements) == 5
+    assert "venue_facilities" in statements[2]
+    assert "venue_images" in statements[3]
+    assert "reservation_slots" in statements[4]

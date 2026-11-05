@@ -1,4 +1,4 @@
-"""F-20~22 공개 공간 상세·날짜·시간 칸. /venues 접두사는 앱에서 등록한다."""
+"""F-12~13 검색·정렬과 F-20~22 공개 공간 조회. /venues 접두사는 앱에서 등록한다."""
 
 from typing import Annotated
 
@@ -6,10 +6,54 @@ from fastapi import APIRouter, Depends, Path, Query
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db_read
-from app.schemas.venues import AvailableDatesRead, BookingDate, SlotRead, VenueRead
+from app.core.pagination import Page
+from app.schemas.venues import (
+    AvailableDatesRead,
+    BookingDate,
+    SlotRead,
+    VenueListItem,
+    VenueRead,
+    VenueSort,
+)
 from app.services import venue_service
 
 router = APIRouter()
+
+
+@router.get("", summary="공간 검색·정렬")
+def search_venues(
+    db: Annotated[Session, Depends(get_db_read)],
+    q: Annotated[str | None, Query()] = None,
+    category: Annotated[str | None, Query()] = None,
+    sido: Annotated[str | None, Query()] = None,
+    sigungu: Annotated[str | None, Query()] = None,
+    requested_date: Annotated[BookingDate | None, Query(alias="date")] = None,
+    start_hour: Annotated[int | None, Query()] = None,
+    hours: Annotated[int | None, Query()] = None,
+    people: Annotated[int | None, Query(ge=1)] = None,
+    facilities: Annotated[str | None, Query()] = None,
+    now_only: Annotated[bool, Query(alias="now")] = False,
+    sort: Annotated[VenueSort, Query()] = "default",
+    page: Annotated[int, Query(ge=1)] = 1,
+    size: Annotated[int, Query(ge=1, le=50)] = 10,
+) -> Page[VenueListItem]:
+    """검색 조건을 적용한 공간 목록과 검색 조건 이후 전체 결과 수를 반환한다."""
+    return venue_service.search_venues(
+        db,
+        q=q,
+        category=category,
+        sido=sido,
+        sigungu=sigungu,
+        requested_date=requested_date,
+        start_hour=start_hour,
+        hours=hours,
+        people=people,
+        facilities=facilities,
+        now_only=now_only,
+        sort=sort,
+        page=page,
+        size=size,
+    )
 
 
 @router.get("/{venue_id}", summary="공간 상세 조회")

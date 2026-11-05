@@ -1,4 +1,4 @@
-// F-20~22 실제 API를 Chrome의 네트워크 경로로 호출한다. 목업 화면 E2E와는 별도 시험이다.
+// F-12·13·20~22 실제 API를 Chrome의 네트워크 경로로 호출한다. 목업 화면 E2E와는 별도 시험이다.
 import assert from 'node:assert/strict';
 import { chromium } from '../../frontend/node_modules/@playwright/test/index.mjs';
 
@@ -29,6 +29,49 @@ try {
   assert.equal(Object.hasOwn(detail, 'source_id'), false);
   assert.equal(Object.hasOwn(detail, 'created_at'), false);
   assert.match(await page.locator('body').innerText(), /정책 검증용 가상 공간/);
+
+  const searchQuery = new URLSearchParams({ q: detail.name });
+  for (const sort of ['default', 'popular', 'price', 'rating']) {
+    searchQuery.set('sort', sort);
+    const search = await page.goto(`${baseUrl}/venues?${searchQuery}`);
+    assert.equal(search.status(), 200);
+    const result = await search.json();
+    assert.equal(result.page, 1);
+    assert.equal(result.size, 10);
+    assert.equal(result.total, 1);
+    assert.equal(result.items.length, 1);
+    const item = result.items[0];
+    assert.deepEqual(Object.keys(item).sort(), [
+      'venue_id', 'name', 'category', 'region', 'capacity_max', 'price_per_hour',
+      'open_hour', 'close_hour', 'rating_avg', 'review_count', 'image', 'facilities',
+      'is_new', 'slots',
+    ].sort());
+    assert.equal(item.venue_id, Number(venueId));
+    assert.equal(item.name, detail.name);
+    assert.equal(item.image, 'art:group-0');
+    assert.deepEqual(item.slots, detail.slots);
+  }
+
+  const nowSearch = await page.goto(`${baseUrl}/venues?${new URLSearchParams({
+    q: detail.name,
+    now: 'true',
+  })}`);
+  assert.equal(nowSearch.status(), 200);
+  assert.equal((await nowSearch.json()).total, 1);
+  for (const [query, field] of [
+    ['sort=invalid', 'sort'],
+    ['category=unknown', 'category'],
+    ['date=2026-02-30', 'date'],
+    ['start_hour=13', 'hours'],
+  ]) {
+    const invalid = await page.goto(
+      `${baseUrl}/venues?${new URLSearchParams({ q: detail.name })}&${query}`,
+    );
+    assert.equal(invalid.status(), 400);
+    const error = await invalid.json();
+    assert.equal(error.code, 'VALIDATION');
+    assert.equal(error.detail.fields[0].field, field);
+  }
 
   const missing = await page.goto(`${baseUrl}/venues/9223372036854775807`);
   assert.equal(missing.status(), 404);
@@ -115,7 +158,7 @@ try {
   assert.deepEqual(await missingDates.json(), {
     code: 'VENUE_NOT_FOUND', message: '공간을 찾을 수 없어요.', detail: null,
   });
-  process.stdout.write('F-20~22 Chrome: 실제 상세·시간 칸·날짜 200, 과거·마지막 페이지, 검증·범위 400, 공간 404 통과\n');
+  process.stdout.write('F-12~13·20~22 Chrome: 검색·정렬·검증, 실제 상세·시간 칸·날짜 응답 통과\n');
 } finally {
   await browser.close();
 }

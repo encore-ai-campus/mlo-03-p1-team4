@@ -9,10 +9,22 @@
 | `test_events.py` | A | 51건 400, MongoDB가 꺼져도 202이고 `events.log`에는 남음, replay해도 중복 없음 |
 | `test_models_match_db.py` | A | `app/models`의 표·컬럼 이름·NULL 여부가 `spacecube_test`의 실제 표와 같은지 (SQLAlchemy `inspect`) |
 | `test_health.py`, `test_db_routing.py`, `test_metrics.py` | A | primary 끊김 503 / replica·MongoDB 끊김 200 degraded, replica 주소가 틀려도 공개 조회 성공 |
-| `test_catalog.py`, `test_venues.py` | B | 필터·정렬, 칸 상태(taken·past), 예약 가능 날짜(`min_hours`) |
+| `test_catalog.py`, `test_venues.py` | B | 기준정보 필터·캐시, 공간 검색·정렬·상세·이미지·NEW·시간 칸·예약 가능 날짜 |
 | `test_reservations.py` | B | 성공 201(표 3개 모두 생김), 범위 밖 400, 취소 후 칸 반납·환불, 예약 직후 `/reservations/me`에 보임 |
 | `test_concurrency.py` | B | **같은 칸 동시 50건 → 201 정확히 1건, 409 49건** (MVP 통과 조건), `detail.slots` 정확 |
 | `test_jobs.py`, `test_internal.py`, `test_read_routing.py` | B | 완료 배치 멱등, upsert 201·200·400, 공개 조회만 `get_db_read` |
+
+## F-12 검색·F-13 정렬
+
+`test_venues.py`는 실제 MariaDB `spacecube_test`와 연결한 `GET /venues` 검색 API 테스트를 포함합니다.
+
+- 공간명·시도·시군구·시설명 검색, 유형·지역·인원·복수 시설(모두 보유) 필터 조합을 확인합니다.
+- 날짜·시작 시각·이용 시간의 빈 칸 조건과 공간별 최소 이용시간, `now=true`의 오늘 기준 동작, 점유 칸 변경 후 재검색을 확인합니다.
+- 기본·낮은 가격·평점·인기 정렬, 검색 필터 적용 후 전체 `total`, 페이지 중복 없는 분할을 확인합니다.
+- 인기순은 최근 7일 범위에서 취소·예약일이 생성일보다 이른 예약을 제외합니다. 잘못된 값은 기존 400 오류 형식을 반환합니다.
+- 페이지별 시설·이미지·점유 시간 조회가 공간 수에 따라 늘지 않고 5회 SELECT로 끝나는지 검사합니다.
+
+가상 공간·예약·후기는 테스트 트랜잭션 안에서 만들고 종료 시 롤백합니다. Chrome HTTP 시험도 검색 항목 계약·정렬 값·입력 오류를 확인합니다.
 
 - 테스트 DB는 로컬 MariaDB(`infra/local`)의 `spacecube_test`. SQLite는 제약 동작이 달라 쓰지 않습니다.
 - 동시성 테스트는 스레드 50개로 요청을 한꺼번에 보냅니다.
@@ -48,8 +60,8 @@ TestClient는 lifespan을 시작하지 않으며 공개 DB 의존성을 테스�
 python -m pytest backend/tests/test_venues.py -q
 ```
 
-11-05 F-21 추가 후 이 파일은 **114건 통과**했습니다. 기존 F-20·22 66건에 F-21 검증 48건을 추가했습니다.
-`verify.ps1` 전체도 통과했습니다: pytest **153건**, 프론트 단위 **54건**, Ruff 린트·포맷,
+11-05 F-12·13 검색 검증을 추가한 뒤 이 파일은 **122건 통과**했습니다. 검색 전용 8건을 추가했습니다.
+`verify.ps1` 전체도 통과했습니다: pytest **161건**, 프론트 단위 **54건**, Ruff 린트·포맷,
 프론트 린트·색 검사·빌드. Starlette TestClient 사용 중단 예정 경고 1건이며 실패는 없습니다.
 
 현재 A 앱은 로컬 전달본이므로 `main.py`의 Git 제외는 유지했습니다. A 통합 PR에는 다음 import·등록이 필요합니다.
@@ -62,7 +74,7 @@ app.include_router(venues.router, prefix="/venues", tags=["venues"])
 
 F-21·22는 기존 venues 라우터에 포함되어 추가 main.py 변경이 없습니다. 공간별 후기 목록은 A API로 별도 연결하며, 실제 프론트 화면 전체 흐름은 이후 검증합니다.
 
-## F-20~22 추가 검증: 브라우저·읽기 연결 대체
+## F-12·13·20~22 추가 검증: 브라우저·읽기 연결 대체
 
 `test_read_routing.py`는 A의 `get_db_read()`를 대체하지 않고 실제 MariaDB 연결을 사용합니다.
 시험용 설정·연결 풀은 테스트 프로세스에서만 분리하고, 읽기 주소 미설정·동일 DB의 정상 읽기 연결·수신하지
@@ -75,7 +87,8 @@ python -m pytest backend/tests/test_read_routing.py -q
 ```
 
 `check_venue_browser.py`·`.mjs`는 별도 실행하는 B 검증기입니다. 기본 pytest 수집에는 들어가지 않으며,
-가상 공간이 있는 트랜잭션에 실제 앱을 연결해 임시 Uvicorn을 띄우고 Chrome으로 상세 200·JSON 계약·본문과
+가상 공간이 있는 트랜잭션에 실제 앱을 연결해 임시 Uvicorn을 띄우고 Chrome으로 F-12·13 검색 항목 계약·정렬 값·
+입력 오류, 상세 200·JSON 계약·본문과
 없는 공간 404를 확인합니다. F-22는 오늘 칸과 상세 응답 일치·미래 날짜 200, 날짜 누락·형식·달력 오류와
 범위 밖 400, 없는 공간 404를 확인합니다. F-21은 기본 날짜 목록·F-22 빈 칸 수 일치·지난 날짜·마지막 페이지
 잘림 200, 입력·범위 400, 없는 공간 404를 확인합니다. 테스트가 끝나면 Chrome·임시 API 서버를 종료하고 공간을 롤백합니다.
@@ -90,7 +103,7 @@ python -m pytest backend/tests/check_venue_browser.py -q -s -p no:cacheprovider
 목업 데이터 기반의 화면·접근성·가입·예약 흐름 검증입니다. 실제 F-20과 상세 페이지 전체를 연결한 시험과
 구분합니다. F-20·21·22·A 후기 목록까지 실제로 연결한 화면 흐름은 여전히 별도 통합 항목입니다.
 
-11-05 F-21 추가 후 별도 Chrome **1건 통과**, Starlette 사용 중단 예정 경고 1건입니다.
+11-05 F-12·13 추가 후 F-12·13·20·21·22 별도 Chrome **1건 통과**, Starlette 사용 중단 예정 경고 1건입니다.
 기존 F-20 단계의 읽기 경로 **3건 통과**, 목업 화면 E2E **59건 통과·7건 기기 조건 건너뜀** 기록은 유지합니다.
 이번 F-21 작업에서 목업 화면 E2E는 재실행하지 않았습니다(프론트 변경 없음).
 
@@ -136,5 +149,5 @@ python -m pytest backend/tests/test_reservation_dependencies.py -q
 ```
 
 11-05 현재 프로젝트의 `localhost:3306/spacecube_test`에서 **17건 통과**했습니다(기존 예약 의존성 14건 + 공간 모델 3건).
-F-21까지 추가한 전체 pytest는 **153건 통과**, Starlette TestClient 사용 중단 예정
+F-12·13까지 추가한 전체 pytest는 **161건 통과**, Starlette TestClient 사용 중단 예정
 경고 1건입니다. 비밀번호는 테스트 프로세스에만 전달했고 파일이나 영구 환경변수에 저장하지 않았습니다.

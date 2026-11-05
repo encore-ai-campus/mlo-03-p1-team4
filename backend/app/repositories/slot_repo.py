@@ -1,4 +1,4 @@
-"""F-20~22 공간·날짜별 점유 시간 조회. 공개 조회 세션은 호출자가 전달한다."""
+"""F-12·20~22 공간·날짜별 점유 시간 조회. 공개 조회 세션은 호출자가 전달한다."""
 
 from datetime import date
 
@@ -27,4 +27,19 @@ def list_taken_hours_by_date(
     taken: dict[date, set[int]] = {}
     for slot_date, slot_hour in db.execute(query):
         taken.setdefault(slot_date, set()).add(slot_hour)
+    return taken
+
+
+def list_taken_hours_by_venues(
+    db: Session, venue_ids: list[int], slot_date: date
+) -> dict[int, set[int]]:
+    """검색 결과 공간의 한 날짜 점유 칸을 공간별로 한 번에 읽는다."""
+    if not venue_ids:
+        return {}
+    query = select(ReservationSlot.venue_id, ReservationSlot.slot_hour).where(
+        ReservationSlot.venue_id.in_(venue_ids), ReservationSlot.slot_date == slot_date
+    )
+    taken: dict[int, set[int]] = {}
+    for venue_id, slot_hour in db.execute(query):
+        taken.setdefault(venue_id, set()).add(slot_hour)
     return taken

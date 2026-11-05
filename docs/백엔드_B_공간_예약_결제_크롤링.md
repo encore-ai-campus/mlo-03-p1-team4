@@ -100,12 +100,22 @@ infra/nginx/       spacecube.conf         # [B] upstream 2대, /health
 | category | `studio` | categories.code |
 | sido, sigungu | `서울`, `마포구` | regions |
 | date | `2026-11-05` | 예약 가능 범위(오늘 −365일 ~ +365일) 안. 없으면 오늘 |
-| start_hour, hours | `13`, `2` | 둘 다 있으면 그 칸이 모두 비고 영업시간 안인 공간만 |
+| start_hour, hours | `13`, `2` | 둘 다 입력. 이용시간 1~4시간, 최소 이용시간 이상이며 영업시간 안의 모든 칸이 비어 있는 공간만 |
 | people | `4` | `capacity_max >= people` |
 | facilities | `1,4` | 시설 id를 모두 가진 공간 (`GROUP BY … HAVING COUNT = 2`) |
 | now | `true` | 오늘, 지금 시 이후 빈 칸이 있는 곳만 |
 | sort | `default`·`popular`·`price`·`rating` | popular = 최근 7일(`created_at`, 실제 결제 시각) 동안 결제된 예약 수. 취소·지난 날짜 예약(`reserve_date < DATE(created_at)`)은 빼고 셈 |
-| page, size | `1`, `10` | '더 보기'로 다음 page |
+| page, size | `1`, `10` | 기본 `1`, `10`; size는 1~50. '더 보기'로 다음 page |
+
+F-12·13 검색·정렬 구현 기준:
+
+- 활성 공간만 검색합니다. `q`는 공간명·시도·시군구·시설명에 포함되는지 찾습니다. `category=all`, `sido=전국`, `sigungu=전체`는 해당 필터를 적용하지 않습니다. 지정한 시설 ID는 모두 가진 공간을 찾습니다.
+- `date`는 선택이며 없으면 한국 오늘입니다. `now=true`면 선택 날짜가 있어도 오늘로 조회하고 현재 시각보다 뒤인 빈 시간 칸이 하나 이상 있는 공간만 남깁니다.
+- `start_hour`와 `hours`는 함께 입력해야 합니다. 이용시간은 1~4시간이며, 공간의 `min_hours` 이상이어야 합니다. 시작 시각부터 요청한 모든 칸이 영업시간 안이고 비어 있는 공간만 결과에 포함합니다. 지정한 날짜는 설정된 예약 범위 안이어야 합니다.
+- 응답은 `{"items": [...], "page": 1, "size": 10, "total": 132}`입니다. `total`은 모든 검색 조건을 적용한 전체 결과 수이며 페이지를 자르기 전에 계산합니다. 기본 정렬은 공간 ID 오름차순으로 유지합니다.
+- F-13 정렬은 가격 낮은 순·평점 높은 순·인기 높은 순입니다. 인기 수는 최근 7일 안에 생성된 예약 중 취소되지 않았고 `reserve_date >= DATE(created_at)`인 예약을 셉니다. 동률은 공간 ID 오름차순으로 고정합니다.
+- 날짜 형식·정렬·유형·시설 ID·인원·시각 입력 오류는 400 `VALIDATION`, 예약 범위 밖 날짜는 400 `OUT_OF_RANGE`입니다. 잘못된 검색값은 새 오류 코드를 추가하지 않습니다.
+- 검색 결과의 `slots`·시설명·대표 그림은 현재 페이지 공간 ID를 모아 일괄 조회합니다. 이미지 누락 기본값, NEW 날짜 기준, 평점은 F-20과 같습니다.
 
 검색 항목:
 

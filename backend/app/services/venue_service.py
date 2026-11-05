@@ -1,4 +1,4 @@
-"""F-20~22 공간 상세·예약 가능 날짜·시간 칸과 F-14 공통 NEW 판정."""
+"""F-12~14·20~22 공간 검색·상세·예약 가능 날짜·시간 칸 업무 규칙."""
 
 from collections.abc import Sequence
 from datetime import date, datetime, timedelta
@@ -7,15 +7,18 @@ from sqlalchemy.orm import Session
 
 from app.core.clock import get_now, get_today
 from app.core.config import get_settings
-from app.core.errors import AppError
+from app.core.errors import AppError, invalid_field
+from app.core.pagination import Page, paginate
 from app.repositories import slot_repo, venue_repo
 from app.schemas.catalog import CategoryRead, FacilityRead
 from app.schemas.venues import (
     AvailableDateRead,
     AvailableDatesRead,
     SlotRead,
+    VenueListItem,
     VenueRead,
     VenueRegionRead,
+    VenueSort,
 )
 
 _DEFAULT_IMAGE = "art:group-0"
@@ -31,6 +34,121 @@ def is_new_venue(created_at: datetime) -> bool:
     """DB의 시간대 없는 한국 시각을 날짜로 비교한다. 오늘부터 13일 전까지 NEW다."""
     age_days = (get_today() - created_at.date()).days
     return 0 <= age_days < 14
+
+
+def _parse_facility_ids(value: str | None) -> list[int]:
+    if not value:
+        return []
+    try:
+        identifiers = [int(item.strip()) for item in value.split(",") if item.strip()]
+    except ValueError:
+        raise invalid_field("facilities", "시설 ID는 쉼표로 구분한 양의 정수여야 합니다.") from None
+    if any(identifier < 1 for identifier in identifiers):
+        raise invalid_field("facilities", "시설 ID는 양의 정수여야 합니다.")
+    return list(dict.fromkeys(identifiers))
+
+
+def _validate_search_range(start_hour: int | None, hours: int | None) -> None:
+    if (start_hour is None) != (hours is None):
+        field = "hours" if hours is None else "start_hour"
+        raise invalid_field(field, "시작 시각과 이용 시간은 함께 입력해야 합니다.")
+    if start_hour is not None and not 9 <= start_hour <= 22:
+        raise AppError(
+            "OUT_OF_RANGE",
+            "예약할 수 없는 날짜나 시간이에요.",
+            400,
+            detail={"reason": "hours"},
+        )
+    if hours is not None and not 1 <= hours <= 4:
+        reason = "min_hours" if hours < 1 else "max_hours"
+        raise AppError(
+            "OUT_OF_RANGE",
+            "예약할 수 없는 날짜나 시간이에요.",
+            400,
+            detail={"reason": reason},
+        )
+
+
+def search_venues(
+    db: Session,
+    *,
+    q: str | None,
+    category: str | None,
+    sido: str | None,
+    sigungu: str | None,
+    requested_date: date | None,
+    start_hour: int | None,
+    hours: int | None,
+    people: int | None,
+    facilities: str | None,
+    now_only: bool,
+    sort: VenueSort,
+    page: int,
+    size: int,
+) -> Page[VenueListItem]:
+    """모든 검색 조건을 적용·정렬·페이지 한 뒤 목록 부가 정보를 일괄 조합한다."""
+    today = get_today()
+    now = get_now()
+    slot_date = today if now_only or requested_date is None else requested_date
+    _booking_date_range(today, (slot_date - today).days)
+    _validate_search_range(start_hour, hours)
+    category_code = category if category and category != "all" else None
+    if category_code and not venue_repo.category_exists(db, category_code):
+        raise invalid_field("category", "등록되지 않은 공간 유형입니다.")
+    facility_ids = _parse_facility_ids(facilities)
+    criteria = {
+        "q": q or None,
+        "category": category_code,
+        "sido": sido,
+        "sigungu": sigungu,
+        "people": people,
+        "facility_ids": facility_ids,
+        "slot_date": slot_date,
+        "start_hour": start_hour,
+        "hours": hours,
+        "now_only": now_only,
+        "current_hour": now.hour,
+    }
+    total = venue_repo.count_search_venues(db, **criteria)
+    rows = venue_repo.list_search_venues(
+        db,
+        **criteria,
+        sort=sort,
+        page=page,
+        size=size,
+        popular_since=now - timedelta(days=7),
+    )
+    venue_ids = [row["venue_id"] for row in rows]
+    facilities_by_venue = venue_repo.list_facilities_by_venues(db, venue_ids)
+    images_by_venue = venue_repo.list_images_by_venues(db, venue_ids)
+    taken_by_venue = slot_repo.list_taken_hours_by_venues(db, venue_ids, slot_date)
+    items = [
+        VenueListItem(
+            venue_id=row["venue_id"],
+            name=row["name"],
+            category=CategoryRead(code=row["category_code"], name=row["category_name"]),
+            region=VenueRegionRead(sido=row["sido"], sigungu=row["sigungu"]),
+            capacity_max=row["capacity_max"],
+            price_per_hour=row["price_per_hour"],
+            open_hour=row["open_hour"],
+            close_hour=row["close_hour"],
+            rating_avg=row["rating_avg"],
+            review_count=row["review_count"],
+            image=resolve_images(images_by_venue.get(row["venue_id"], []))[0],
+            facilities=facilities_by_venue.get(row["venue_id"], []),
+            is_new=is_new_venue(row["created_at"]),
+            slots=build_slots(
+                row["open_hour"],
+                row["close_hour"],
+                slot_date,
+                taken_by_venue.get(row["venue_id"], set()),
+                today=today,
+                now=now,
+            ),
+        )
+        for row in rows
+    ]
+    return Page[VenueListItem].model_validate(paginate(items, page, size, total))
 
 
 def build_slots(
