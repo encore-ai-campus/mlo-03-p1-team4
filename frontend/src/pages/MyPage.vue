@@ -14,8 +14,8 @@ import UiPagination from '@/components/ui/UiPagination.vue'
 import RoomArt from '@/components/domain/RoomArt.vue'
 import ReviewCard from '@/components/domain/ReviewCard.vue'
 import { cancelReservation, getMyReservations } from '@/api/reservationsApi'
-import { createReview, getMyReviews } from '@/api/reviewsApi'
-import { getMe, withdraw } from '@/api/usersApi'
+import { createReview, deleteReview, getMyReviews, updateReview } from '@/api/reviewsApi'
+import { changePassword, getMe, updateMe, withdraw } from '@/api/usersApi'
 import { useAuth } from '@/composables/useAuth'
 import { useEventLogger } from '@/composables/useEventLogger'
 import { addDays, dateLabel, hourLabel, todayISO, won } from '@/utils/date'
@@ -99,6 +99,7 @@ const review = reactive({ rating: 0, content: '', error: '' })
 const posting = ref(false)
 const RATING_LABEL = ['', '별로예요', '아쉬워요', '괜찮아요', '좋아요', '최고예요']
 function askReview(r) {
+  editTarget.value = null
   reviewTarget.value = r
   Object.assign(review, { rating: 0, content: '', error: '' })
   reviewOpen.value = true
@@ -118,6 +119,111 @@ async function postReview() {
   } catch (e) { review.error = e.message } finally { posting.value = false }
 }
 watch(() => [review.rating, review.content], () => (review.error = ''))
+// 내가 쓴 후기 수정·삭제(F-50). 수정은 후기 쓰기 창을 같이 쓴다.
+const editTarget = ref(null)
+function askEdit(item) {
+  editTarget.value = item
+  reviewTarget.value = null
+  Object.assign(review, { rating: item.rating, content: item.content, error: '' })
+  reviewOpen.value = true
+}
+async function saveEdit() {
+  if (posting.value) return
+  if (!review.content.trim()) return (review.error = '후기 내용을 적어 주세요.')
+  const body = {}
+  if (review.rating !== editTarget.value.rating) body.rating = review.rating
+  if (review.content.trim() !== editTarget.value.content) body.content = review.content.trim()
+  if (!Object.keys(body).length) { reviewOpen.value = false; return }
+  posting.value = true
+  try {
+    await updateReview(editTarget.value.review_id, body, token.value)
+    toast.success('후기를 고쳤어요.')
+    reviewOpen.value = false
+    await loadReviews()
+  } catch (e) {
+    review.error = e.message
+    if (e.code === 'REVIEW_NOT_FOUND') { reviewOpen.value = false; toast.error(e.message); await loadReviews() }
+  } finally { posting.value = false }
+}
+function submitReview() { return editTarget.value ? saveEdit() : postReview() }
+watch(reviewOpen, (open) => { if (!open) editTarget.value = null })
+const deleteTarget = ref(null)
+const deleteOpen = ref(false)
+const deleting = ref(false)
+const keepReviewButton = ref(null)
+function askDelete(item) { deleteTarget.value = item; deleteOpen.value = true }
+function focusKeepReview(event) { event.preventDefault(); keepReviewButton.value?.focus() }
+async function doDelete() {
+  if (deleting.value) return
+  deleting.value = true
+  try {
+    await deleteReview(deleteTarget.value.review_id, token.value)
+    toast.success('후기를 지웠어요.')
+  } catch (e) {
+    if (e.code !== 'REVIEW_NOT_FOUND') { toast.error(e.message); return }
+  } finally { deleting.value = false }
+  deleteOpen.value = false
+  await loadReviews()
+}
+
+// 회원 정보 수정·비밀번호 변경(F-03)
+const PHONE = /^01[016789]-?\d{3,4}-?\d{4}$/
+const info = reactive({ name: '', phone: '', marketing_agreed: false })
+const infoErr = reactive({})
+const savingInfo = ref(false)
+function fillInfo(me) { if (me) Object.assign(info, { name: me.name ?? '', phone: me.phone ?? '', marketing_agreed: !!me.marketing_agreed }) }
+watch(user, fillInfo, { immediate: true })
+const infoChanges = computed(() => {
+  if (!user.value) return {}
+  const body = {}
+  if (info.name.trim() !== user.value.name) body.name = info.name.trim()
+  if (info.phone.trim() !== (user.value.phone ?? '')) body.phone = info.phone.trim()
+  if (info.marketing_agreed !== !!user.value.marketing_agreed) body.marketing_agreed = info.marketing_agreed
+  return body
+})
+const infoDirty = computed(() => Object.keys(infoChanges.value).length > 0)
+;['name', 'phone'].forEach((k) => watch(() => info[k], () => delete infoErr[k]))
+function fieldErrors(e, target) {
+  if (e.code !== 'VALIDATION' || !e.detail?.fields) return false
+  e.detail.fields.forEach(({ field, reason }) => { target[field] = reason })
+  return true
+}
+async function saveInfo() {
+  if (savingInfo.value || !infoDirty.value) return
+  if (!info.name.trim()) infoErr.name = '이름을 입력해 주세요.'
+  if (!PHONE.test(info.phone.trim())) infoErr.phone = '휴대폰 번호를 010-1234-5678 형식으로 적어 주세요.'
+  if (infoErr.name || infoErr.phone) return
+  savingInfo.value = true
+  try {
+    const me = await updateMe(infoChanges.value, token.value)
+    setSession(token.value, { ...user.value, ...me })
+    toast.success('회원 정보를 저장했어요.')
+  } catch (e) { if (!fieldErrors(e, infoErr)) toast.error(e.message) } finally { savingInfo.value = false }
+}
+const pw = reactive({ current: '', next: '', next2: '' })
+const pwErr = reactive({})
+const savingPw = ref(false)
+;['current', 'next', 'next2'].forEach((k) => watch(() => pw[k], () => delete pwErr[k]))
+async function savePassword() {
+  if (savingPw.value) return
+  if (!pw.current) pwErr.current = '현재 비밀번호를 입력해 주세요.'
+  if (pw.next.length < 8 || new TextEncoder().encode(pw.next).length > 72) pwErr.next = '8자 이상, 72바이트 이하로 입력해 주세요.'
+  else if (pw.next === pw.current) pwErr.next = '지금 비밀번호와 다르게 정해 주세요.'
+  if (pw.next2 !== pw.next) pwErr.next2 = '새 비밀번호가 서로 달라요.'
+  if (pwErr.current || pwErr.next || pwErr.next2) return
+  savingPw.value = true
+  try {
+    await changePassword({ current_password: pw.current, new_password: pw.next }, token.value)
+    Object.assign(pw, { current: '', next: '', next2: '' })
+    toast.success('비밀번호를 바꿨어요.')
+  } catch (e) {
+    if (e.code === 'WRONG_PASSWORD') pwErr.current = e.message
+    else if (!fieldErrors(e, pwErr)) toast.error(e.message)
+    else if (pwErr.new_password) { pwErr.next = pwErr.new_password; delete pwErr.new_password }
+  } finally { savingPw.value = false }
+}
+
+// 회원 탈퇴(F-04, 11-05): 취소할 수 있는 예약이 남으면 막고 예약 내역으로 안내한다. 이용 중인 예약은 막지 않는다.
 const withdrawOpen = ref(false)
 const withdrawing = ref(false)
 const futureCount = ref(0)
@@ -128,15 +234,16 @@ async function askWithdraw() {
   withdrawReady.value = false
   withdrawConfirmed.value = false
   withdrawError.value = ''
+  futureCount.value = 0
   withdrawOpen.value = true
   try {
-    const data = await getMyReservations(token.value, { status: 'confirmed', page: 1, size: 1 })
-    futureCount.value = data.total
+    const data = await getMyReservations(token.value, { status: 'confirmed', page: 1, size: 50 })
+    futureCount.value = data.items.filter((r) => r.can_cancel).length
     withdrawReady.value = true
   } catch (e) { withdrawError.value = e.message }
 }
 async function doWithdraw() {
-  if (!withdrawReady.value || !withdrawConfirmed.value || withdrawing.value) return
+  if (!withdrawReady.value || futureCount.value || !withdrawConfirmed.value || withdrawing.value) return
   withdrawing.value = true
   try {
     await withdraw(token.value)
@@ -144,7 +251,14 @@ async function doWithdraw() {
     withdrawOpen.value = false
     toast.success('탈퇴했어요. 개인정보가 삭제됐어요.')
     await router.replace('/')
-  } catch (e) { withdrawError.value = e.message } finally { withdrawing.value = false }
+  } catch (e) {
+    if (e.code === 'HAS_UPCOMING_RESERVATION') futureCount.value = e.detail?.count ?? 1
+    else withdrawError.value = e.message
+  } finally { withdrawing.value = false }
+}
+function goUpcoming() {
+  withdrawOpen.value = false
+  router.push({ path: '/me', query: { tab: 'confirmed' } })
 }
 getMe(token.value).then((me) => setSession(token.value, me)).catch((e) => toast.error(e.message))
 load()
@@ -190,13 +304,46 @@ load()
         <div v-if="mineError" class="empty" role="alert"><p>{{ mineError }}</p><BaseButton variant="secondary" @click="loadReviews">다시 시도</BaseButton></div>
         <UiSkeleton v-else-if="!mine" height="180px" />
         <p v-else-if="!mine.items.length" class="empty">아직 쓴 후기가 없어요. 이용 완료 예약에서 후기를 작성해 보세요.</p>
-        <template v-else><div class="cards"><ReviewCard v-for="item in mine.items" :key="item.review_id" :review="item" show-room class="own-review" /></div><UiPagination v-model="minePage" :total="mine.total" :size="20" /></template>
+        <template v-else>
+          <ul class="cards">
+            <li v-for="item in mine.items" :key="item.review_id" class="own-review">
+              <ReviewCard :review="item" show-room />
+              <div class="own-review__actions">
+                <BaseButton variant="secondary" :aria-label="`${item.venue_name} 후기 고치기`" @click="askEdit(item)">고치기</BaseButton>
+                <BaseButton variant="quiet" :aria-label="`${item.venue_name} 후기 지우기`" @click="askDelete(item)">지우기</BaseButton>
+              </div>
+            </li>
+          </ul>
+          <UiPagination v-model="minePage" :total="mine.total" :size="20" />
+        </template>
       </section>
-      <section v-else-if="section === 'account'" class="review-form" aria-label="회원 정보">
-        <dl class="account"><dt>이름</dt><dd>{{ user?.name }}</dd><dt>이메일</dt><dd>{{ user?.email }}</dd><dt>휴대폰 번호</dt><dd>{{ user?.phone }}</dd></dl>
-        <p class="dialog-note">탈퇴하면 개인정보가 바로 지워져요. 예약과 후기는 회원 번호로 남아요.</p>
-        <BaseButton variant="secondary" @click="askWithdraw">회원 탈퇴</BaseButton>
-      </section>
+      <div v-else-if="section === 'account'" class="account-page">
+        <section class="account-box" aria-labelledby="info-title">
+          <h2 id="info-title" class="account-box__title">기본 정보</h2>
+          <form class="review-form" novalidate @submit.prevent="saveInfo">
+            <dl class="account"><dt>이메일</dt><dd>{{ user?.email }}</dd></dl>
+            <UiInput v-model="info.name" label="이름" autocomplete="name" maxlength="50" :error="infoErr.name" />
+            <UiInput v-model="info.phone" label="휴대폰 번호" type="tel" inputmode="numeric" autocomplete="tel" placeholder="010-1234-5678" :error="infoErr.phone" />
+            <label class="withdraw-check"><input v-model="info.marketing_agreed" type="checkbox" />새 공간·할인 소식 받기(선택)</label>
+            <p class="dialog-note">이메일·생년월일·성별은 바꿀 수 없어요.</p>
+            <div><BaseButton type="submit" :disabled="!infoDirty" :loading="savingInfo">회원 정보 저장</BaseButton></div>
+          </form>
+        </section>
+        <section class="account-box" aria-labelledby="pw-title">
+          <h2 id="pw-title" class="account-box__title">비밀번호 변경</h2>
+          <form class="review-form" novalidate @submit.prevent="savePassword">
+            <UiInput v-model="pw.current" label="현재 비밀번호" type="password" autocomplete="current-password" :error="pwErr.current" />
+            <UiInput v-model="pw.next" label="새 비밀번호" type="password" autocomplete="new-password" hint="8자 이상" :error="pwErr.next" />
+            <UiInput v-model="pw.next2" label="새 비밀번호 확인" type="password" autocomplete="new-password" :error="pwErr.next2" />
+            <div><BaseButton type="submit" variant="secondary" :loading="savingPw">비밀번호 변경</BaseButton></div>
+          </form>
+        </section>
+        <section class="account-box" aria-labelledby="leave-title">
+          <h2 id="leave-title" class="account-box__title">회원 탈퇴</h2>
+          <p class="dialog-note">탈퇴하면 개인정보가 바로 지워져요. 예약과 후기는 회원 번호로 남아요. 이용 예정 예약이 있으면 먼저 취소해야 해요.</p>
+          <div><BaseButton variant="secondary" @click="askWithdraw">회원 탈퇴</BaseButton></div>
+        </section>
+      </div>
       <UiTabs v-else v-model="tab" :tabs="tabs" label="예약 상태">
         <template #panel>
           <div v-if="listError" class="empty" role="alert"><p>{{ listError }}</p><BaseButton variant="secondary" @click="load">다시 시도</BaseButton></div>
@@ -235,8 +382,8 @@ load()
       </template>
     </UiDialog>
 
-    <UiDialog v-model:open="reviewOpen" title="후기 쓰기" :description="reviewTarget ? `${reviewTarget.venue.name} · ${reviewDeadline(reviewTarget)}까지 작성 가능` : ''">
-      <form id="review-form" class="review-form" novalidate @submit.prevent="postReview">
+    <UiDialog v-model:open="reviewOpen" :title="editTarget ? '후기 고치기' : '후기 쓰기'" :description="editTarget ? editTarget.venue_name : reviewTarget ? `${reviewTarget.venue.name} · ${reviewDeadline(reviewTarget)}까지 작성 가능` : ''">
+      <form id="review-form" class="review-form" novalidate @submit.prevent="submitReview">
         <fieldset class="stars">
           <legend>별점</legend>
           <div class="stars__row">
@@ -252,18 +399,29 @@ load()
       </form>
       <template #actions>
         <BaseButton variant="secondary" @click="reviewOpen = false">닫기</BaseButton>
-        <BaseButton type="submit" form="review-form" :loading="posting">후기 올리기</BaseButton>
+        <BaseButton type="submit" form="review-form" :loading="posting">{{ editTarget ? '고친 후기 저장' : '후기 올리기' }}</BaseButton>
+      </template>
+    </UiDialog>
+    <UiDialog v-model:open="deleteOpen" title="이 후기를 지울까요?" :description="deleteTarget ? deleteTarget.venue_name : ''" @open-auto-focus="focusKeepReview">
+      <p class="dialog-note">지운 후기는 되돌릴 수 없고, 같은 예약으로 다시 쓸 수 없어요.</p>
+      <template #actions>
+        <button ref="keepReviewButton" type="button" class="safe-button" @click="deleteOpen = false">지우지 않기</button>
+        <BaseButton class="danger-button" :loading="deleting" @click="doDelete">후기 지우기</BaseButton>
       </template>
     </UiDialog>
     <UiDialog v-model:open="withdrawOpen" title="회원 탈퇴" description="탈퇴하면 되돌릴 수 없어요. 아래 내용을 확인해 주세요.">
       <div class="review-form">
         <p>이름·이메일·연락처·생년월일은 바로 지워지고, 예약·후기는 ‘탈퇴한 회원’으로 남아요.</p>
         <p v-if="!withdrawReady && !withdrawError" role="status">이용 예정 예약을 확인하고 있어요.</p>
-        <p v-if="withdrawReady && futureCount" class="err">이용 예정 예약이 {{ futureCount }}건 있어요. 탈퇴해도 예약은 자동 취소되지 않아요. 예약 내역에서 먼저 취소하는 것을 권해요.</p>
+        <p v-if="futureCount" class="err" role="alert">이용 예정 예약이 {{ futureCount }}건 있어요. 예약 내역에서 먼저 취소해 주세요.</p>
         <p v-if="withdrawError" class="err" role="alert">{{ withdrawError }}</p>
-        <label class="withdraw-check"><input v-model="withdrawConfirmed" type="checkbox" :disabled="!withdrawReady" />개인정보 삭제와 예약·후기 유지 내용을 확인했어요.</label>
+        <label v-if="!futureCount" class="withdraw-check"><input v-model="withdrawConfirmed" type="checkbox" :disabled="!withdrawReady" />개인정보 삭제와 예약·후기 유지 내용을 확인했어요.</label>
       </div>
-      <template #actions><BaseButton variant="secondary" @click="withdrawOpen = false">탈퇴하지 않기</BaseButton><BaseButton class="danger-button" :disabled="!withdrawReady || !withdrawConfirmed" :loading="withdrawing" @click="doWithdraw">탈퇴하기</BaseButton></template>
+      <template #actions>
+        <BaseButton variant="secondary" @click="withdrawOpen = false">탈퇴하지 않기</BaseButton>
+        <BaseButton v-if="futureCount" @click="goUpcoming">예약 내역 보기</BaseButton>
+        <BaseButton v-else class="danger-button" :disabled="!withdrawReady || !withdrawConfirmed" :loading="withdrawing" @click="doWithdraw">탈퇴하기</BaseButton>
+      </template>
     </UiDialog>
   </div>
 </template>
@@ -518,7 +676,11 @@ a.menu__item:hover,
 
 .safe-button { min-height: var(--tap); padding: 0 var(--sp-16); border: 0; border-radius: var(--r-md); background: var(--c-fill); color: var(--c-ink); font-weight: 700; cursor: pointer; }
 .danger-button, .danger-button:hover:not(:disabled) { background: var(--c-danger); color: var(--c-on-dark); }
-.own-review { padding-block: var(--sp-16); }
+.own-review { display: flex; flex-direction: column; gap: var(--sp-8); padding-block: var(--sp-16); }
+.own-review__actions { display: flex; flex-wrap: wrap; gap: var(--sp-8); }
+.account-page { display: flex; flex-direction: column; gap: var(--sp-24); max-width: 560px; }
+.account-box { display: flex; flex-direction: column; gap: var(--sp-16); padding: var(--sp-24); border-radius: var(--r-lg); background: var(--c-surface); }
+.account-box__title { font-size: var(--fs-18, 1.125rem); font-weight: 800; }
 .account { display: grid; grid-template-columns: auto 1fr; gap: var(--sp-12) var(--sp-24); }
 .account dd { margin: 0; overflow-wrap: anywhere; }
 .withdraw-check { display: flex; align-items: center; min-height: var(--tap); gap: var(--sp-8); }

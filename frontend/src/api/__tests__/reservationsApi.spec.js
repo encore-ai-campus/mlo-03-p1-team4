@@ -148,6 +148,18 @@ describe('F-30~41 결제와 후기', () => {
       rating: 4
     });
     const users = await import('../usersApi');
+    // 11-05: 취소할 수 있는 예약이 남으면 탈퇴는 409로 막히고, 먼저 취소하면 탈퇴된다
+    const upcoming = (await api.getMyReservations(token, {
+      status: 'confirmed', size: 50
+    })).items.filter(x => x.can_cancel);
+    expect(upcoming.length).toBeGreaterThan(0);
+    await expect(users.withdraw(token)).rejects.toMatchObject({
+      code: 'HAS_UPCOMING_RESERVATION', status: 409, detail: {
+        count: upcoming.length
+      }
+    });
+    for (const x of upcoming)
+      await api.cancelReservation(x.reservation_id, token);
     await users.withdraw(token);
     expect((await reviews.getReviews()).items.find(x => x.review_id === r.review_id).author).toBe('탈퇴한 회원');
   });

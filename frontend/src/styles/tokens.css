@@ -79,7 +79,8 @@
 
   --shadow-card: none;
   --shadow-lift: none;
-  --shadow-pop: 0 16px 40px rgba(23, 22, 29, 0.18);
+  --c-overlay: rgba(47, 58, 13, 0.45); /* 창·드로어 뒤 어두운 배경(올리브 잉크 45%) */
+  --shadow-pop: 0 16px 40px rgba(47, 58, 13, 0.18);
 
   /* 움직임 */
   /* 기준: emilkowalski/skills review-animations — UI는 300ms 이하, 들어오고 나갈 때 ease-out, 닫힘은 열림보다 빠르게 */

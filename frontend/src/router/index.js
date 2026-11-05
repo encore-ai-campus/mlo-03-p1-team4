@@ -36,8 +36,11 @@ router.beforeEach((to) => {
   }
 })
 
+// 내 메뉴(/me)는 같은 화면에서 section으로 예약 내역·내 후기·회원 정보를 바꾸므로 제목도 따라 바꾼다
+const ME_TITLES = { reviews: '내가 쓴 후기', account: '회원 정보' }
 router.afterEach((to) => {
-  document.title = to.meta.title === '다락큐브' ? '다락큐브 · 1시간 단위 공간 예약' : `${to.meta.title} · 다락큐브`
+  const title = to.name === 'me' ? ME_TITLES[to.query.section] ?? to.meta.title : to.meta.title
+  document.title = title === '다락큐브' ? '다락큐브 · 1시간 단위 공간 예약' : `${title} · 다락큐브`
 })
 
 setUnauthorizedHandler(() => {
