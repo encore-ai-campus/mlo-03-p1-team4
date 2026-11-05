@@ -3,7 +3,7 @@
 사람과 에이전트(Codex, Claude Code)가 함께 고치는 진행 기록입니다. 작업을 끝낼 때마다 해당 줄을 고치고 '최근 변경' 맨 위에 한 줄 더합니다. 설계 내용 자체는 `docs/`에, 여기는 상태와 결정만 둡니다.
 
 - 마지막 갱신: 2026-11-05
-- 단계: **11-03 설계 확정안** · 프론트 화면 7개 목업 동작 · DB DDL·seed 검증 기록 있음 · B F-10~14·20~22·시설 목록·`get_owned()` MariaDB 검증 완료, A 코드는 담당자에게 직접 전달받아 로컬 사용(Git 제외, 통합 전)
+- 단계: **11-05 통합일** · 설계 11-03 확정안 + 11-05 회의(탈퇴·A6·A7 확정, A8 보류) · DB 0001·seed·로컬 compose 검증 · 프론트 7화면(목업, 다락큐브·푸터 반영) · GitHub develop 흐름·CI·Project 보드 · **1차 배포 로컬 VM 7대(노트북 4대, 11-05)** · B F-10~14·20~22·시설 목록·get_owned() MariaDB 검증 완료, A 전달본 로컬 사용(Git 제외), GitHub A·B 통합 전
 - 디자인 캔버스(화면 설계 · 시스템 아키텍처 · 글꼴 시안): https://claude.ai/artifact/5dQciCDEaMm8uNjw6sqZpm
 - 실행 환경: Python은 conda `pro_1`(`environment.yml`), 프론트는 `frontend/`의 npm
 
@@ -13,7 +13,7 @@
 | --- | --- | --- | --- | --- |
 | 프론트 | 노진산(FE·PM) | FE-1~9 확정안 반영, Claude 시안 대조·FE 오류/모바일 결제/가입 UX 재검토 및 목업·화면 검증 | A·B 구현 후 실제 API 연결·오류·예약 동시성 통합 검증 | 실제 API 미구현 |
 | FastAPI A | [이름] | 문서 확정(`docs/백엔드_A`), 폴더·README | 1일차 오전 `core/`(두 DB 세션·오류·`get_current_user`·`log_event`·`get_today`)·`models/base.py` → 회원 → 후기 → 이벤트 | 없음 |
-| FastAPI B | [이름] | F-10~14·시설 목록·F-20~22 공개 조회 API 구현·MariaDB 검증. 전체 pytest 165건, Chrome API 1건, 프론트 단위 54건·린트·포맷·빌드 통과. A 공통 파일은 로컬 사용(Git 제외 유지) | 예약·동시성(#7) → 내 예약·취소·완료(#8). `/internal/venues`는 크롤러 논의 후 진행. A 통합 PR에 venues 라우터 등록, 후기 목록 연결 확인 필요 | A 공통 코드의 GitHub 통합은 A PR 필요. 실제 replica 장애·복제 지연은 DB 구성 후 검증 |
+| FastAPI B | [이름] | F-10~14·시설 목록·F-20~22 공개 조회 API 구현·MariaDB 검증, PR #31 리뷰 중·develop 동기화. 전체 pytest 165건, Chrome API 1건, 프론트 단위 54건·린트·포맷·빌드 통과. A 공통 파일은 로컬 사용(Git 제외 유지) | 예약·동시성(#7) → 내 예약·취소·완료(#8). `/internal/venues`는 크롤러 논의 후 진행. A 통합 PR에 venues 라우터 등록, 후기 목록 연결 확인 필요 | A 공통 코드의 GitHub 통합은 A PR 필요. 실제 replica 장애·복제 지연은 DB 구성 후 검증 |
 | DB | [이름] | `0001_init.sql`·`mongo_init.js` 검증(설치형 11.8·compose 11.4 둘 다 29건 통과), seed(유형 5·시설 20·지역 230 → `seed.sql`), `infra/local` compose, 크롤러 시제품(옛 필터) | 크롤러 새 필터(유형 5·별칭) → `/internal/venues` 등록(B와) → 가상 데이터 생성기 | 없음(A2 결정을 팀원에게 공유) |
 
 ## 기능 진행표
@@ -90,6 +90,10 @@
 | 11-03 | 토큰은 액세스 토큰만(JWT HS256 60분, Bearer 헤더, `sub` 문자열), 리프레시·쿠키·로그아웃 API 없음. 프론트는 401이면 로그인으로 보내고 선택 유지 | 사용자 결정 · `docs/백엔드_A` 5-1 |
 | 11-03 | 이벤트 `unselect_slot`·`abandon`은 만들지 않고 이탈은 세션 분석으로 계산. `POST /events`는 모르는 이벤트를 그 건만 버리고 202 + `ignored`. 공간은 이벤트 맨 위 `venue_id` | 사용자 결정 · `docs/백엔드_A` 5-3 |
 | 11-03 | 공간 등록은 `/internal/venues` 한 길(DB 직접 로더 없음), 백엔드 운영 스크립트는 `backend/scripts/` | 폴더 정리 |
+| 11-05 | 취소할 수 있는 예약(`confirmed`·시작 전)이 남은 회원은 탈퇴를 막는다: 409 `HAS_UPCOMING_RESERVATION` + `detail.count`, 이용 중인 예약은 막지 않음. B가 `reservation_repo.count_cancellable(db, user_id)` 제공(A·B 확인 필요), FE는 탈퇴 창에서 버튼을 끄고 예약 내역 링크 | 11-05 회의(이슈 #12) |
+| 11-05 | A6 배포 확정: ① `X-Synthetic: 1`은 `X-Synthetic-Key`(= `SYNTHETIC_API_KEY`, `INTERNAL_API_KEY`와 따로)와 함께일 때만 인정, 키 없음·틀림은 401 `UNAUTHORIZED`(새 코드 없음) ② RDS 자동 백업 7일·삭제 보호·파라미터 그룹 ③ `limit_req`는 넣지 않음(Locust가 IP 하나라 부하 시험을 막음, B8 조건 그대로) ④ Nginx `max_fails=2`·`proxy_connect_timeout 2s`·GET만 다시 보내기. HTTPS는 11-04대로 나중. A는 새 설정 키 확인 필요 | 11-05 회의(이슈 #18) |
+| 11-05 | A7 측정 기준 확정: 동시 50명에서 판정(조회 p95 300ms·예약 p95 500ms·로그인/가입 p95 800ms 미만, 오류율 1% 미만), 200명은 한계 찾기(기록만). Locust 쪽 p95로 판정, 단계 10분(첫 1분 뺌). 오류 = 5xx·연결 실패·시간 초과(시나리오가 일부러 만드는 409·401·400은 뺌). 서버 1대 끄기는 끈 뒤 1분 오류 1% 미만·중복 0. 불합격이어도 5일 안에 서버를 늘리지 않고 원인을 발표 | 11-05 회의 |
+| 11-05 | **1차 배포를 AWS 대신 팀 노트북 4대(16코어·32GB)의 VM 7대로**: 노트북 1(DB) `gw`·`db1`·`mongo`, 노트북 2(A) `api1`·`mon`, 노트북 3(B) `api2`·`db2`, 노트북 4(FE·PM) Locust·생성기·E2E·시연. VirtualBox 브리지, 팀 공유기, Ubuntu Server 24.04, apt·systemd(Docker 없음), `ufw`. replica 계속 켬, 모니터링은 `mon` VM, 백업은 cron, 삭제 보호 대신 VM 스냅샷. A6·A7 나머지는 그대로(A7은 유선 기준). AWS C안·확장안은 참고안 | PM(노진산), `docs/로컬_VM_구성.md` |
 
 ## 후속 검증 — 실제 primary·replica 환경 준비 후
 
@@ -111,9 +115,9 @@
 | ~~A3~~ | 기초 데이터 | **확정(11-03)** — 아래 '이미 정한 것' | — | — | `db/seed/README.md` |
 | ~~A4~~ | API 세부 | **확정(11-03)** — 아래 '이미 정한 것' | — | — | `백엔드_A` 5-1·5-2, `백엔드_B` 6절 |
 | A5 (추후 확정) | 협업 | git 원격 저장소·브랜치·PR 리뷰, 비밀값(`.env` 값) 나누는 곳 | GitHub + `main` 보호 + 파트 브랜치 + PR 1명, 비밀값은 팀 채널 비밀 메시지 하나로 | 파트 합치기 | 2차 검토 4절 |
-| A6 (추후 확정) | 1차 배포 구성 | 정문은 지금 설계(Nginx) + 설정 보강, RDS 기본 안전 설정, `X-Synthetic`은 내부 키와 함께 (배치·모니터링 위치는 11-04 프리 티어, **HTTPS는 11-04에 'HTTP로 다 되면 검토'로 정함**) | Nginx 보강, 백업·삭제 보호·파라미터 그룹 켬, 예 | 2일차 배포 | `인프라_트래픽_안정성_검토.md` 1-1절 |
-| A7 (추후 확정) | 측정 기준 | 띄운 뒤 잴 것과 합격선, B의 추가 조건 | 조회 p95 300ms·예약 p95 500ms·오류 1% 미만(409 제외), 1-1절 조건표 승인 | 3일차 부하 시험 | 같은 문서 1-1절, `산출물_01` NFR-05 |
-| A8 (추후 확정) | 발표 전 | 시연 시나리오·시연 계정, 크롤링 약관 최종 확인, 서비스명 겹침 | `docs/시연_시나리오.md` 만들기, 발표 전 확인 | 3일차 발표 | 2차 검토 4절 |
+| ~~A6~~ | 1차 배포 구성 | **확정(11-05)** — 결정 기록 11-05 | — | — | `인프라_트래픽_안정성_검토.md` 1-1절 |
+| ~~A7~~ | 측정 기준 | **확정(11-05)** — 결정 기록 11-05 | — | — | 같은 문서 1-1절, `산출물_01` NFR-05 |
+| A8 (추후 확정, 11-05 회의에서 보류 → 다음 회의) | 발표 전 | 시연 시나리오·시연 계정, 크롤링 약관 최종 확인, 서비스명 겹침 | `docs/시연_시나리오.md` 만들기, 발표 전 확인 | 3일차 발표 | 2차 검토 4절 |
 
 A1~A4는 11-03에 확정했고, **A5~A8은 추후 확정**으로 미뤘다(11-03). 그 전까지는 각 줄의 '권장'을 임시 기준으로 쓰고, 코드에 박아 넣지 않는다(예: 정문·모니터링 위치·합격선은 설정값·문서로만).
 
@@ -155,6 +159,8 @@ A1~A4는 11-03에 확정했고, **A5~A8은 추후 확정**으로 미뤘다(11-03
 
 ## 최근 변경 (최신이 위)
 
+- 11-05 · B · PR #31 브랜치에 origin/develop(1cc11a8)을 머지. STATE.md 충돌 2곳은 B 구현·검증 기록과 공동의 11-05 통합일·로컬 VM 배포·회의 결정을 함께 보존해 해결. STRUCTURE·B API 명세·요구사항은 양쪽 변경을 자동 병합. A 전달본의 로컬 Git 제외는 유지하며, 새 공유 계약 count_cancellable()과 X-Synthetic-Key 반영 여부는 A 통합 및 후속 구현에서 확인해야 함. 머지 후 verify.ps1 전체 통과: pytest 165건·프론트 단위 54건·Ruff 린트/포맷·프론트 린트/색 검사/빌드. Starlette 경고 1건. A 전달본을 사용한 로컬 검증이며 실제 replica 장애·복제 지연과 GitHub A 통합 후 재검증은 후속 항목.
+
 - 11-05 · B · F-14 `GET /venues/new` 구현. 한국 날짜 오늘~13일 전의 활성 공간만 DB에서 조회하고 `created_at DESC, venue_id DESC`로 정렬, page/size·전체 `total`과 `registered_on`, `new_days_left = 14 - 경과일`을 반환. 검색과 시설·이미지·오늘 점유 칸 일괄 조합을 공유하고 새 마이그레이션 없이 구현. F-14 DB API 4건 추가 후 `test_venues.py` **126건**, 전체 `verify.ps1` pytest **165건**, 프론트 단위 **54건**, Ruff·프론트 린트·색 검사·빌드 통과. 별도 임시 Uvicorn + MariaDB + Chrome 검사 **1건 통과**(NEW 목록 날짜·14일·기본 이미지 포함), 가상 공간 롤백 확인. Starlette deprecation 경고 1건. 실제 replica 장애·지연은 미검증. A 통합 `main.py` 라우터 등록은 별도 확인 필요. 구현·검증 및 문서 변경 11개 파일을 F-14 커밋으로 정리.
 
 - 11-05 · B · 진행상황 및 오늘 작업계획을 `docs/기록/진행상황_2026-11-05_백엔드B.md`에 정리. F-20 이미지 기본값 `art:group-0`, 오늘 포함 14일 NEW 기준, `reservation_repo.py`의 `get_owned()` 위치, A 전달 로컬 파일 범위와 통합 후 재검증 필요, F-14→F-30~32 우선 작업안을 기록함.
@@ -188,6 +194,10 @@ A1~A4는 11-03에 확정했고, **A5~A8은 추후 확정**으로 미뤘다(11-03
 - 11-05 · B · 사용자 확인: `get_owned()`는 이미 구현해 A에게 전달함. 재구현을 다음 작업으로 잡지 않고, 다음 신규 기능을 F-11 지역 조회·시설 목록(#6)으로 수정. 기존 `get_owned()`의 검증·PR 반영은 통합 때 별도 확인. 상태 문서만 수정했으며 추가 테스트는 실행하지 않음.
 
 - 11-05 · B · 현재 브랜치·직접 전달받은 A 파일·기준 문서·GitHub 이슈를 대조해 남은 구현 순서를 검토. 다음 작업은 A 후기 작성을 여는 `get_owned()` 연결(#3), 이어 지역·시설 조회(#6)와 공간 데이터 공급용 `/internal/venues`를 제안(설계 결정 변경 없음). `pro_1`에서 Ruff 린트·포맷 통과, pytest 1건 통과·4건 준비 오류(`CHECK_DB_URL` 없음). 프론트는 설치된 Node 24.22.0을 직접 사용해 verify 통과(단위 테스트 54건·빌드 포함). E2E·DDL·실제 API 통합 시험은 이번에 실행하지 않음. A 파일과 Git 제외 설정은 수정하지 않음.
+
+- 11-05 · 공동 · 1차 배포를 로컬 VM으로 바꿈: `docs/로컬_VM_구성.md`·`infra/vm/README.md` 추가, 아키텍처 그림을 노트북 4대 · VM 7대로 새로 그림(AWS C안 그림은 `architecture_aws.png`로 보관). README·산출물 01·02·04·05·AGENTS·STRUCTURE·infra·simulator 반영, AWS 문서·`infra/monitoring`·`db/README`에는 맨 위 안내만
+
+- 11-05 · 공동 · PM 회의(노진산): ① 탈퇴 — 시작 전 예약이 있으면 409 `HAS_UPCOMING_RESERVATION`, B가 `reservation_repo.count_cancellable()` 제공(A·B 확인 필요) ② A6 — `X-Synthetic` + `X-Synthetic-Key`(`SYNTHETIC_API_KEY`), RDS 백업 7일·삭제 보호, `limit_req` 안 넣음, Nginx `max_fails=2` ③ A7 — 동시 50명에서 조회 300ms·예약 500ms·로그인 800ms·오류 1% 미만, 200명은 한계 찾기 ④ A8 보류. 반영: `오류코드.md`, `백엔드_A·B`, `산출물_01·02·05`, `인프라_트래픽_안정성_검토`, `AGENTS.md`, `backend/.env.example`, `backend/app/core/README.md`, `simulator/`, `infra/aws·nginx`, `프론트_변경목록` 4-1절, README, CI 환경 변수
 
 - 11-04 · FE · 화면 이름을 다락큐브로 통일(헤더·푸터·로그인·약관·페이지 제목·`index.html`), 공통 푸터를 디자인 캔버스 SiteFooter 시안대로 바꿈(서비스 소개·바로가기·프로젝트·안내 + 캠프 표기, 발표 11-09). `npm run verify`·E2E 59개 통과, README 시연 화면 6장 다시 찍음
 - 11-04 · 공동 · GitHub Project 보드 [팀 방조 · 다락큐브 1차](https://github.com/orgs/encore-ai-campus/projects/5) 만듦: 상태 5개(할 일·하는 중·리뷰·막힘·끝), 파트 필드, 보기 4개(전체 표·보드·내 일·목 11-05 통합), 이슈 23개 넣음. 이슈 템플릿이 보드에 자동으로 넣게 함. 사용법: CONTRIBUTING 1절

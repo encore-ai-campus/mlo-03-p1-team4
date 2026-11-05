@@ -28,8 +28,8 @@ proxy_set_header Connection "";
 
 ```nginx
 upstream fastapi {
-    server 10.11.1.11:8000 max_fails=3 fail_timeout=10s;   # FastAPI #1
-    server 10.11.2.11:8000 max_fails=3 fail_timeout=10s;   # FastAPI #2
+    server 10.11.1.11:8000 max_fails=2 fail_timeout=10s;   # FastAPI #1
+    server 10.11.2.11:8000 max_fails=2 fail_timeout=10s;   # FastAPI #2
 }
 
 server {

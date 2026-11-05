@@ -56,6 +56,7 @@ infra/nginx/       spacecube.conf         # [B] upstream 2대, /health
 | 이름 | 형태 | 쓰는 곳 |
 | --- | --- | --- |
 | `reservation_repo.get_owned(db, user_id, reservation_id)` | 내 예약이면 `Reservation`(reservation_id, venue_id, reserve_date, start_hour, end_hour, status, created_at), 아니면 `None`(11-03 A1 확정, `created_at`은 A의 후기 기한 계산용). **호출하는 쪽이 primary 세션을 넘김** | A 후기 자격 |
+| `reservation_repo.count_cancellable(db, user_id)` → `int` | 그 회원의 `status='confirmed'`이면서 시작 시각(`reserve_date` + `start_hour`)이 `get_now()`보다 뒤인 예약 수. **호출하는 쪽이 primary 세션을 넘김** (11-05) | A 탈퇴 전 확인 |
 | `GET /reservations/me` | 5-3 응답 | 프론트 마이페이지 |
 | 서버 쪽 이벤트 | `reserve_ok`, `reserve_conflict`, `reserve_cancel_ok` (A의 `log_event()`) | 분석 |
 
