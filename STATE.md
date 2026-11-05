@@ -3,7 +3,7 @@
 사람과 에이전트(Codex, Claude Code)가 함께 고치는 진행 기록입니다. 작업을 끝낼 때마다 해당 줄을 고치고 '최근 변경' 맨 위에 한 줄 더합니다. 설계 내용 자체는 `docs/`에, 여기는 상태와 결정만 둡니다.
 
 - 마지막 갱신: 2026-11-05
-- 단계: **11-05 통합일** · 설계 11-03 확정안 + 11-05 회의(탈퇴·A6·A7 확정, A8 보류) · DB 0001·seed·로컬 compose 검증 · 프론트 7화면(목업, 다락큐브·푸터 반영) · GitHub develop 흐름·CI·Project 보드 · **1차 배포 로컬 VM 7대(노트북 4대, 11-05)** · B 조회 #31 develop 병합 완료. 예약 브랜치는 공식 A 코드·develop(71d0681) 통합, F-30~32·실제 HTTP 검증 완료(전체 pytest 241건, Postman 4요청·8검증, PR #39 재시도 회귀 수정 반영) · **F-61 내부 공간 등록 로컬 구현·검증 완료**(전체 pytest 276건·Postman 6요청/12검증, PR 확인 전)
+- 단계: **11-05 통합일** · 설계 11-03 확정안 + 11-05 회의(탈퇴·A6·A7 확정, A8 보류) · DB 0001·seed·로컬 compose 검증 · 프론트 7화면(목업, 다락큐브·푸터 반영) · GitHub develop 흐름·CI·Project 보드 · **1차 배포 로컬 VM 7대(노트북 4대, 11-05)** · B 조회 #31 develop 병합 완료. 예약 브랜치는 공식 A 코드·develop(71d0681) 통합, F-30~32·실제 HTTP 검증 완료(전체 pytest 241건, Postman 4요청·8검증, PR #39 재시도 회귀 수정 반영) · **F-61 내부 공간 등록 로컬 구현·검증 완료**(전체 pytest 276건·Postman 6요청/12검증, PR #42 리뷰 대기)
 - 디자인 캔버스(화면 설계 · 시스템 아키텍처 · 글꼴 시안): https://claude.ai/artifact/5dQciCDEaMm8uNjw6sqZpm
 - 실행 환경: Python은 conda `pro_1`(`environment.yml`), 프론트는 `frontend/`의 npm
 
@@ -13,7 +13,7 @@
 | --- | --- | --- | --- | --- |
 | 프론트 | 노진산(FE·PM) | FE-1~9 확정안 반영, Claude 시안 대조·FE 오류/모바일 결제/가입 UX 재검토 및 목업·화면 검증 | A·B 구현 후 실제 API 연결·오류·예약 동시성 통합 검증 | 실제 API 미구현 |
 | FastAPI A | [이름] | 이슈 #1 코드·테스트를 현재 클론에 반영, 로컬 MariaDB로 pytest 40개 통과 | B 공용 함수 확인, 이벤트 자유 문자열 개인정보 정책을 팀과 합의, PR 검토 | 후기·탈퇴 B 연동 및 이벤트 개인정보 합의 대기 |
-| FastAPI B | [이름] | develop(cbb69d7, 예약 PR #39 병합)에서 feat/B-F-61-internal-venues 생성. 내부 키·출처 검증, 신규 201·재전송/갱신 200, 공간·시설·그림 한 트랜잭션 구현. MariaDB 전체 pytest 276건(F-61 35건), 실제 HTTP Postman 6요청·12검증, Ruff·프론트 verify(단위 55건) 통과 | 사용자 확인 후 F-61 PR → api1 제공·크롤러/생성기 연동. 내 예약·취소·완료 배치는 보류 | api1 실제 제공 시각은 PR·배포 협의 후 확정. 탈퇴·동시 예약 잠금은 별도 후속 작업 |
+| FastAPI B | [이름] | develop(cbb69d7, 예약 PR #39 병합)에서 feat/FastAPI-B-internal-venues로 브랜치 정리. 내부 키·출처 검증, 신규 201·재전송/갱신 200, 공간·시설·그림 한 트랜잭션 구현. MariaDB 전체 pytest 276건(F-61 35건), 실제 HTTP Postman 6요청·12검증, Ruff·프론트 verify(단위 55건) 통과 | PR #42 리뷰·CI 확인 → api1 제공·크롤러/생성기 연동. 내 예약·취소·완료 배치는 보류 | api1 실제 제공 시각은 PR·배포 협의 후 확정. 탈퇴·동시 예약 잠금은 별도 후속 작업 |
 | DB | [이름] | `0001_init.sql`·`mongo_init.js` 검증(설치형 11.8·compose 11.4 둘 다 29건 통과), seed(유형 5·시설 20·지역 230 → `seed.sql`), `infra/local` compose, 크롤러 시제품(옛 필터). 1차 수집원 2곳+부족분 생성 방향 확정 | 스페이스클라우드 새 필터·쉐어잇 파서/사이트별 robots 확인 → 속성 기반 시연용 공간 선별·`/internal/venues` 등록(B와) → 부족한 공간·과거 30일 행동 데이터 생성기 | 없음(A2 결정을 팀원에게 공유) |
 
 ## 기능 진행표
@@ -164,6 +164,8 @@ A1~A4는 11-03에 확정했고, **A5~A8은 추후 확정**으로 미뤘다(11-03
 - 개인 기억(Claude 자동 메모리 등)은 팀에 공유되지 않는다. 팀이 알아야 할 것은 이 파일과 `docs/`에 쓴다.
 
 ## 최근 변경 (최신이 위)
+
+- 11-05 · B · 사용자 승인에 따라 feat/FastAPI-B-internal-venues로 이름을 맞추고 원격 푸시, develop 대상 PR #42 생성. 본문에 Refs #38·#10·#19와 구현 범위·검증 결과·api1 후속 배포를 명시하고 A 담당 naturedevworks에게 리뷰 요청. 관련 이슈의 나머지 작업은 열어 두며 예약 후속 기능은 보류. 코드 변경 없이 진행 기록만 갱신, PR CI 결과 확인 대기.
 
 - 11-05 · B · F-61 내부 공간 등록 구현: 예약 로컬 c4c000a를 backup/B-reservation-c4c000a로 보존하고 최신 develop(cbb69d7)에서 새 브랜치 생성. POST /internal/venues에 A 내부 키 검증·primary 의존성을 연결하고 출처 3종, 신규 201·재전송/갱신 200, 최상위 venue_id·ignored_facilities, 시설·그림 전체 교체 및 트랜잭션 롤백 구현. 기존 created_at·활성 상태 보존, UNKNOWN_REGION/CATEGORY·VALIDATION 사용. MariaDB 11.4.13 loopback 임시 인스턴스에서 전체 pytest 276건(F-61 35건·같은 출처 동시 8건 포함), 실제 HTTP Postman 6요청/12검증·컬렉션/환경 lint, Ruff 린트/포맷, 프론트 단위 55건·린트·빌드 통과. 기존 Starlette·프론트 조건문 경고 각 1건. DDL·공통 계약·예약 후속 기능 변경 없음. #38 옛 초안 stash는 보존하고 확정 계약만 새 문서에 반영. 사용자 요청으로 F-61 범위만 커밋하고 푸시·PR은 별도 확인 대기. api1 배포·방화벽·실제 크롤러 연동은 후속.
 
