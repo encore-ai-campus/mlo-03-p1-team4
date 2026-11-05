@@ -86,7 +86,7 @@ infra/monitoring/  alloy.config                # [A] 로그 파일 → Loki, 로
 | `log_event(session_id, user_id, event_type, venue_id=None, category=None, payload=None, is_synthetic=False)` | ① `event_id`(UUID)를 붙여 `events.log`에 **바로** 한 줄(→ Loki) ② MongoDB 쓰기는 `core/events.py` 안의 **내부 스레드 풀**(작업자 2개, 대기열 1,000건)에 넘기고 바로 돌아옴. 시간 제한 1초, 실패·대기열 넘침이면 `mongo_event_write_failures_total` +1(그 이벤트는 `events.log`에 있어 replay 가능). `category`는 공간 유형 코드(B는 읽은 공간 값, 프론트 이벤트는 A가 `venue_id`로 채움, 5분 캐시). 라우터·서비스·배치 어디서나 같은 호출(11-03 A1 확정) | B 예약 서비스, 배치 |
 | `reservation_counter` | Prometheus 카운터 `reservation_total{result="ok"\|"conflict"\|"cancel"}` | B 예약 서비스 |
 | `get_today() -> date`, `get_now() -> datetime` | Asia/Seoul 오늘·지금. **`get_now()`는 시간대 없는(naive) 한국 시각**이라 MariaDB `DATETIME`과 그대로 비교·저장. UTC는 `log_event` 안에서만(MongoDB `ts`), 응답 JSON에는 `+09:00`을 붙여 냄. `TODAY_OVERRIDE`가 있으면 그 날짜 + 실제 시각(테스트 전용) (11-03 A1 확정) | A·B 전체 |
-| `is_synthetic_request(request) -> bool` | 헤더 `X-Synthetic: 1` | A 가입, B 예약 |
+| `is_synthetic_request(request) -> bool` | 헤더 `X-Synthetic: 1` + `X-Synthetic-Key`(= `.env` `SYNTHETIC_API_KEY`)일 때만 true. `X-Synthetic`이 있는데 키가 없거나 틀리면 `AppError("UNAUTHORIZED", …, 401)` (11-05 A6) | A 가입, B 예약 |
 | `get_session_id(request) -> str \| None` | 헤더 `X-Session-Id`(프론트가 모든 요청에 붙이는 UUID). 없거나 형식이 틀리면 `None` | B 예약 서비스가 `log_event`에 넘김 → 서버 이벤트와 프론트 이벤트를 같은 세션으로 묶음(이탈 계산에 필요) |
 
 어느 의존성을 쓸지는 **경로 규칙표**(`산출물_02` §2)를 따릅니다. 헷갈리면 primary를 씁니다. 틀린 primary는 느릴 뿐이지만, 틀린 replica는 '방금 한 예약이 안 보이는' 버그가 됩니다.
@@ -96,6 +96,7 @@ infra/monitoring/  alloy.config                # [A] 로그 파일 → Loki, 로
 | 이름 | 제공 | 쓰임 |
 | --- | --- | --- |
 | `reservation_repo.get_owned(db, user_id, reservation_id)` → `(reservation_id, venue_id, reserve_date, start_hour, end_hour, status, created_at)` 또는 `None` | B | 후기 작성 자격 (primary 세션으로 호출). `created_at`은 후기 기한 `max(이용일, 예약한 날)` 계산에 씀 |
+| `reservation_repo.count_cancellable(db, user_id)` → `int` | B | 탈퇴 전 확인(primary 세션으로 호출). 0보다 크면 409 `HAS_UPCOMING_RESERVATION` (11-05) |
 | 뷰 `v_venue_rating(venue_id, rating_avg, review_count)` | DB | 후기 모아보기 요약 |
 | MariaDB 표·기초 데이터, MongoDB 사용자·권한 | DB | 테스트·배포 |
 
@@ -134,9 +135,9 @@ infra/monitoring/  alloy.config                # [A] 로그 파일 → Loki, 로
 | marketing_agreed | 필수 boolean(값은 선택) |
 | terms_agreed, privacy_agreed | 둘 다 `true`여야 함. 서버가 받은 시각(`get_now()`)을 `terms_agreed_at`·`privacy_agreed_at`에 저장 (11-03 A2) |
 | 나이 | birth + gender_digit(1·2 → 1900년대, 3·4 → 2000년대)로 만 나이 계산, **만 14세 미만이면 400 `VALIDATION`**(`reason: "under_14"`) |
-| is_synthetic | 본문으로 받지 않음. `X-Synthetic: 1` 헤더일 때만 true |
+| is_synthetic | 본문으로 받지 않음. `X-Synthetic: 1` + `X-Synthetic-Key`(= `.env` `SYNTHETIC_API_KEY`)일 때만 true |
 
-탈퇴(`DELETE /users/me`, 11-03 A4 확정)는 한 트랜잭션에서 개인정보를 바로 지웁니다: `deleted_at = get_now()`, `name = '탈퇴회원'`, `phone = NULL`, `birth = '000000'`, `email = 'deleted+{user_id}@invalid'`, `password_hash`는 무작위 값의 해시로 바꿈, `marketing_agreed = false`. 예약·결제·후기는 `user_id`로 남아 통계·정산이 유지됩니다. 이용 예정(`confirmed`) 예약이 있으면 먼저 취소하라고 409 대신 안내만 하고 탈퇴는 진행합니다(예약은 남음, 초안). 탈퇴 후 옛 이메일로 로그인하면 `INVALID_CREDENTIALS`.
+탈퇴(`DELETE /users/me`, 11-03 A4 확정)는 한 트랜잭션에서 개인정보를 바로 지웁니다: `deleted_at = get_now()`, `name = '탈퇴회원'`, `phone = NULL`, `birth = '000000'`, `email = 'deleted+{user_id}@invalid'`, `password_hash`는 무작위 값의 해시로 바꿈, `marketing_agreed = false`. 예약·결제·후기는 `user_id`로 남아 통계·정산이 유지됩니다. **취소할 수 있는 예약(`confirmed`이고 아직 시작 전)이 있으면 탈퇴하지 않고 409 `HAS_UPCOMING_RESERVATION`**(`detail.count`)을 돌려줍니다(11-05 결정). 개수는 B의 `reservation_repo.count_cancellable()`로 같은 primary 세션에서 셉니다. 이용 중인 예약은 취소할 수 없으므로 막지 않고, 끝나면 배치가 `completed`로 바꿉니다. 탈퇴 후 옛 이메일로 로그인하면 `INVALID_CREDENTIALS`.
 
 `GET /users/me` 응답에 `password_hash`는 넣지 않습니다. 생년월일·성별 숫자는 이 응답에만 나옵니다.
 
@@ -242,7 +243,7 @@ user_id·venue_id·session_id는 라벨이 아니라 본문에 둡니다. MongoD
 - 목록 `{"items","page","size","total"}`, size 최대 50.
 - 시각: MariaDB는 Asia/Seoul, MongoDB는 UTC로 저장하고 응답할 때 `+09:00`으로 바꿉니다. 날짜는 `YYYY-MM-DD`.
 - 소프트 삭제된 행은 모든 조회에서 기본으로 뺍니다.
-- 가상 데이터: 헤더 `X-Synthetic: 1` → MariaDB `is_synthetic = true`, 이벤트에도 같은 값.
+- 가상 데이터: 헤더 `X-Synthetic: 1` + `X-Synthetic-Key`(= `.env` `SYNTHETIC_API_KEY`) → MariaDB `is_synthetic = true`, 이벤트에도 같은 값. 공인 주소로 열려 있어 헤더만으로는 믿지 않음(11-05 A6). 키는 크롤러용 `INTERNAL_API_KEY`와 따로 둠(부하 도구가 `/internal/venues`를 부르지 못하게).
 
 ## 7. 테스트
 
