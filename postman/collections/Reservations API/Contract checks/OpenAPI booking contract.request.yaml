@@ -1,0 +1,26 @@
+$kind: http-request
+id: 0202a4819da97649eddf21de
+name: OpenAPI booking contract
+order: 1000
+url: '{{base_url}}/openapi.json'
+method: GET
+headers:
+  - key: Accept
+    value: application/json
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('OpenAPI returns 200', () => {
+        pm.response.to.have.status(200);
+      });
+
+      pm.test('F-30 reservation operation is registered', () => {
+        const spec = pm.response.json();
+        pm.expect(spec.paths).to.have.property('/reservations');
+
+        const operation = spec.paths['/reservations'].post;
+        pm.expect(operation).to.exist;
+        pm.expect(operation.responses).to.have.property('201');
+        pm.expect(operation.responses).to.have.property('409');
+      });

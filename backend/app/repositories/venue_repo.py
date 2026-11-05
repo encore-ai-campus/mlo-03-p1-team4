@@ -16,6 +16,25 @@ _rating_view = table(
 )
 
 
+def get_booking_info(db: Session, venue_id: int) -> RowMapping | None:
+    """예약 검증에 필요한 공간 상태·시간·요금과 유형 코드를 primary에서 읽는다."""
+    query = (
+        select(
+            Venue.venue_id,
+            Venue.is_active,
+            Venue.open_hour,
+            Venue.close_hour,
+            Venue.min_hours,
+            Venue.capacity_max,
+            Venue.price_per_hour,
+            Category.code.label("category_code"),
+        )
+        .join(Category, Category.category_id == Venue.category_id)
+        .where(Venue.venue_id == venue_id)
+    )
+    return db.execute(query).mappings().one_or_none()
+
+
 def category_exists(db: Session, category_code: str) -> bool:
     """검색 유형이 기준 정보에 있는지 확인한다."""
     return bool(db.scalar(select(exists().where(Category.code == category_code))))

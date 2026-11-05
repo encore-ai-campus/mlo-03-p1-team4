@@ -1,4 +1,4 @@
-"""F-04·50: A에 제공하는 탈퇴 전 예약 수·소유권 조회. 트랜잭션은 호출자가 관리한다."""
+"""F-04·30·50 예약 생성·재시도·탈퇴 전 예약 수·소유권 조회. 트랜잭션은 서비스가 관리한다."""
 
 from datetime import date, datetime
 
@@ -6,7 +6,87 @@ from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.core.clock import get_now
-from app.models.reservation import Reservation
+from app.models.reservation import Payment, Reservation
+
+
+def create(
+    db: Session,
+    *,
+    user_id: int,
+    venue_id: int,
+    reserve_date: date,
+    start_hour: int,
+    end_hour: int,
+    headcount: int,
+    total_price: int,
+    status: str,
+    is_synthetic: bool,
+    created_at: datetime,
+) -> Reservation:
+    """예약 행을 INSERT·flush해 복합 외래키에 쓸 ID를 확보한다."""
+    reservation = Reservation(
+        user_id=user_id,
+        venue_id=venue_id,
+        reserve_date=reserve_date,
+        start_hour=start_hour,
+        end_hour=end_hour,
+        headcount=headcount,
+        total_price=total_price,
+        status=status,
+        is_synthetic=is_synthetic,
+        created_at=created_at,
+    )
+    db.add(reservation)
+    db.flush()
+    return reservation
+
+
+def find_recent_matching(
+    db: Session,
+    *,
+    user_id: int,
+    venue_id: int,
+    reserve_date: date,
+    start_hour: int,
+    end_hour: int,
+    created_after: datetime,
+    created_before: datetime,
+) -> dict | None:
+    """10분 안에 같은 이용 시간으로 만든 본인의 유효한 예약과 결제를 찾는다."""
+    row = (
+        db.execute(
+            select(
+                Reservation.reservation_id,
+                Reservation.status,
+                Reservation.venue_id,
+                Reservation.reserve_date,
+                Reservation.start_hour,
+                Reservation.end_hour,
+                Reservation.headcount,
+                Reservation.total_price,
+                Payment.method,
+                Payment.status.label("payment_status"),
+                Payment.paid_at,
+            )
+            .join(Payment, Payment.reservation_id == Reservation.reservation_id)
+            .where(
+                Reservation.user_id == user_id,
+                Reservation.status.in_(("confirmed", "completed")),
+                Payment.status == "paid",
+                Reservation.venue_id == venue_id,
+                Reservation.reserve_date == reserve_date,
+                Reservation.start_hour == start_hour,
+                Reservation.end_hour == end_hour,
+                Reservation.created_at >= created_after,
+                Reservation.created_at <= created_before,
+            )
+            .order_by(Reservation.reservation_id.asc())
+            .limit(1)
+        )
+        .mappings()
+        .one_or_none()
+    )
+    return dict(row) if row is not None else None
 
 
 def count_cancellable(db: Session, user_id: int) -> int:

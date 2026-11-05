@@ -1,0 +1,47 @@
+name: Local
+values:
+  - key: base_url
+    value: 'http://127.0.0.1:8000'
+    enabled: true
+    type: default
+    description: Local FastAPI address
+  - key: access_token
+    value: ''
+    enabled: true
+    type: secret
+    description: Local-only Bearer access token; do not commit a value
+  - key: venue_id
+    value: ''
+    enabled: true
+    type: default
+    description: Active synthetic venue in the local spacecube_test database
+  - key: synthetic_api_key
+    value: ''
+    enabled: true
+    type: secret
+    description: Local-only SYNTHETIC_API_KEY; do not commit a value
+  - key: booking_date
+    value: ''
+    enabled: true
+    type: default
+    description: Real date with a free slot in the local test database
+  - key: start_hour
+    value: ''
+    enabled: true
+    type: default
+    description: Start hour of an available local test slot
+  - key: hours
+    value: ''
+    enabled: true
+    type: default
+    description: Consecutive booking hours between the venue minimum and four
+  - key: headcount
+    value: ''
+    enabled: true
+    type: default
+    description: Number of guests within the venue capacity
+  - key: method
+    value: card
+    enabled: true
+    type: default
+    description: Mock payment method (transfer, card, or phone)
