@@ -2,7 +2,7 @@
 
 from datetime import date, datetime
 
-from sqlalchemy import Select, and_, delete, func, or_, select
+from sqlalchemy import Select, and_, delete, func, or_, select, update
 from sqlalchemy.orm import Session
 
 from app.core.clock import get_now
@@ -170,3 +170,24 @@ def delete_slots(db: Session, *, reservation_id: int) -> int:
     return db.execute(
         delete(ReservationSlot).where(ReservationSlot.reservation_id == reservation_id)
     ).rowcount
+
+
+def complete_ended(db: Session, *, today: date, now_hour: int) -> int:
+    """종료 시각이 지난 확정 예약을 한 번에 완료 처리한다.
+
+    상태 조건을 UPDATE에 포함해 취소와 경합해도 취소된 예약을 되살리지 않는다.
+    완료된 예약의 시간 칸은 점유율 분석을 위해 유지한다.
+    """
+    result = db.execute(
+        update(Reservation)
+        .where(
+            Reservation.status == "confirmed",
+            or_(
+                Reservation.reserve_date < today,
+                and_(Reservation.reserve_date == today, Reservation.end_hour <= now_hour),
+            ),
+        )
+        .values(status="completed")
+        .execution_options(synchronize_session=False)
+    )
+    return int(result.rowcount or 0)

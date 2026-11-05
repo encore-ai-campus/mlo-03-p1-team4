@@ -331,3 +331,15 @@ def cancel_reservation(
         ),
         can_cancel=False,
     )
+
+
+def complete_ended_reservations(db: Session) -> int:
+    """현재 한국 시각을 한 번 읽고 종료된 예약을 완료 처리해 커밋한다."""
+    now = get_now()
+    try:
+        completed = reservation_repo.complete_ended(db, today=now.date(), now_hour=now.hour)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    return completed

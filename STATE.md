@@ -2,7 +2,7 @@
 
 사람과 에이전트(Codex, Claude Code)가 함께 고치는 진행 기록입니다. 작업을 끝낼 때마다 해당 줄을 고치고 '최근 변경' 맨 위에 한 줄 더합니다. 설계 내용 자체는 `docs/`에, 여기는 상태와 결정만 둡니다.
 
-- 마지막 갱신: 2026-11-05
+- 마지막 갱신: 2026-11-06
 - 단계: **11-05 통합일** · 설계 11-03 확정안 + 11-05 회의(탈퇴·A6·A7 확정, A8 보류) · DB 0001·seed·로컬 compose 검증 · 프론트 7화면(목업, 다락큐브·푸터 반영) · GitHub develop 흐름·CI·Project 보드 · **1차 배포 로컬 VM 7대(노트북 4대, 11-05)** · B 조회 #31·예약 #39·내부 공간 등록 #42 develop 병합 완료. **#43 후기 목록용 B 조회 계약 구현·로컬 검증**(예약 의존성 43건·전체 pytest 303건), A 직접 import 연결은 후속
 - 디자인 캔버스(화면 설계 · 시스템 아키텍처 · 글꼴 시안): https://claude.ai/artifact/5dQciCDEaMm8uNjw6sqZpm
 - 실행 환경: Python은 conda `pro_1`(`environment.yml`), 프론트는 `frontend/`의 npm
@@ -13,7 +13,7 @@
 | --- | --- | --- | --- | --- |
 | 프론트 | 노진산(FE·PM) | FE-1~9 확정안 반영, Claude 시안 대조·FE 오류/모바일 결제/가입 UX 재검토 및 목업·화면 검증 | A·B 구현 후 실제 API 연결·오류·예약 동시성 통합 검증 | 실제 API 미구현 |
 | FastAPI A | [이름] | 이슈 #2 회원·탈퇴 구현 및 수동 확인, 로컬 전체 pytest 230건·프론트 단위 54건 통과 | 이슈 #2 PR 검토, 후기 목록 연결·테스트 | 탈퇴와 동시 예약 처리 B 협의, 이벤트 개인정보 정책 합의 대기 |
-| FastAPI B | [이름] | 최신 `origin/develop` `bdd6dea` 기반 `feat/B-F-34-cancellation`. F-34 취소·환불 구현, MariaDB pytest·실제 Uvicorn/Postman 검증 통과. F-40은 별도 Draft PR #46 | F-34 리뷰·PR. 이후 F-35 완료 배치 별도 구현. F-40 후기 연계는 #45 합의 후 | F-34 성공 응답 계약을 B 명세에 기록. Project 보드는 read:project 권한 부족으로 미확인. #45 후기 연계 협의 대기 |
+| FastAPI B | [이름] | `feat/B-F-34-35-reservations`에서 F-34 커밋 `4cb0c26` 유지, F-35 구현 완료. 백엔드 pytest 314건·Ruff 통과. 별도 테스트 VM에 배치 코드를 설치해 원격 테스트 6건·CLI 스모크 확인. F-40은 별도 Draft PR #46 | F-34·35를 #8 단일 PR로 제출. 실제 서비스 api1 배포·cron은 해당 환경 준비 후 진행. F-40 후기 연계는 #45 합의 후 | Project 보드는 read:project 권한 부족으로 미확인. #45 후기 연계 협의 대기 |
 | DB | [이름] | `0001_init.sql`·`mongo_init.js` 검증(설치형 11.8·compose 11.4 둘 다 29건 통과), seed(유형 5·시설 20·지역 230 → `seed.sql`), `infra/local` compose, 크롤러 시제품(옛 필터). 1차 수집원 2곳+부족분 생성 방향 확정 | 스페이스클라우드 새 필터·쉐어잇 파서/사이트별 robots 확인 → 속성 기반 시연용 공간 선별·`/internal/venues` 등록(B와) → 부족한 공간·과거 30일 행동 데이터 생성기 | 없음(A2 결정을 팀원에게 공유) |
 
 ## 기능 진행표
@@ -33,8 +33,8 @@
 | F-21 | 예약 가능 날짜 | B | 검증: 공개 available-dates API 구현. 빈 칸 총수·min_hours 이상 연속 빈 칸 판정, 음수 offset·days 1~31·기간 양끝·0일 설정·마지막 페이지 잘림·큰 offset·점유 분리·재조회·SQL 2회·400/404·읽기 의존성 등 48건 추가. test_venues 114건, 전체 pytest 153건, 실제 HTTP Chrome 1건 통과. FE 전체 연결은 별도 |
 | F-22 | 날짜별 시간 칸 | B | 검증: 공개 GET /venues/{venue_id}/slots?date=YYYY-MM-DD 구현. 엄격한 날짜·설정 범위 양끝·0일 설정, 공간/날짜별 점유·완료 칸·past·F-20 일치·재조회·400/404·읽기 의존성 등 38건 추가. test_venues 총 66건, 전체 pytest 105건, 실제 HTTP Chrome 1건 통과 |
 | F-30~32 | 예약+모의 결제 한 번, 중복 차단 | B | 공식 앱의 POST /reservations 등록·A 공통 가상 키 검증 사용. API 21건·경쟁 3건 포함 전체 MariaDB pytest 241건 통과. PR #39의 취소·환불 재시도 제외 및 취소 후 재예약·타인 선점 회귀 검증 반영. 동시 다른 회원 50명: 201 1건/409 49건, 같은 회원: 201 1건/200 49건. 실제 인증·Postman 4요청/8검증에서 OpenAPI 200·무인증 401·생성 201·재시도 200 확인, DB 3개 표·합성 표시·카운터 검증·테스트 데이터 정리 완료 |
-| F-34 | 예약 취소·환불 | B | 구현 완료: primary 예약 행 잠금·시작 시각 경계·예약/칸/결제 한 트랜잭션·전액 모의 환불. 소유권·경계·롤백 등 pytest 포함 72건 및 실제 Uvicorn/Postman 5요청·11검증 통과. PR 준비 전 |
-| F-35 | 이용 완료 배치 | B | F-34와 분리해 후속 구현·PR 예정 |
+| F-34 | 예약 취소·환불 | B | 커밋 `4cb0c26`: primary 예약 행 잠금·시작 시각 경계·예약/칸/결제 한 트랜잭션·전액 모의 환불. 관련 pytest 72건·전체 308건 및 Uvicorn/Postman 5요청·11검증 통과. F-35와 함께 #8 PR 예정 |
+| F-35 | 이용 완료 배치 | B | 구현 완료: primary 조건부 일괄 UPDATE, get_now() 1회 기준, 서비스 commit/rollback, `new_write_session()` CLI와 기존 JSON 로그. 완료된 칸·결제 보존. 로컬·별도 테스트 VM MariaDB 테스트 각 6건 통과, 백엔드 전체 314건 통과. 테스트 VM CLI 스모크에서 임시 완료 예약·칸/결제 보존·JSON 로그 확인 후 합성 데이터 정리. 직접 DB 연결은 호스트 제한으로 거부돼 SSH 터널로 시험, 터널 종료 및 자격 증명 제거. 테스트 VM cron과 실제 서비스 api1은 변경하지 않음. Ruff check·format 81개 파일 통과. F-34와 #8 단일 PR 예정 |
 | F-40~41 | 내 예약, 내 후기 | B / A | B F-40 조회는 Draft PR #46, 후기 ID 연계·삭제 후기 표시는 #45 합의 대기. F-41은 A 범위 |
 | F-50 지원 | A 후기 작성용 예약 소유권 조회 | B | 예약·칸·결제 모델 및 `get_owned()`를 이전 프로젝트에서 가져옴. DDL 일치·매퍼 구성 4건, 실제 MariaDB 소유권·A 후기 작성 연결 10건 통과. 예약 생성 API 구현 완료를 뜻하지 않음 |
 | F-51 지원 (#43) | A 후기 목록용 예약·공간·유형 조회식 | B / A 연계 | B review_context_query(*, active_only=True) 구현·MariaDB 계약 테스트 14건 포함 예약 의존성 43건·전체 pytest 303건 통과. 반환 4열·예약당 한 행·유형 5개·활성 필터·필터/개수/페이지 결합 검증. A 직접 import와 공개 후기 숨김·내 후기 유지 HTTP 검증은 후속 |
@@ -50,6 +50,7 @@
 
 | 날짜 | 결정 | 근거 |
 | --- | --- | --- |
+| 11-06 | #8의 F-34·35는 `feat/B-F-34-35-reservations`에서 구현하고 단일 PR로 제출한다. F-34 커밋은 유지하고 F-35를 추가하며 두 완료 조건 충족 후 `Closes #8`로 연결한다 | 사용자 지시 · #8 완료 조건 · CONTRIBUTING.md 작업 흐름 |
 | 11-05 | #43 후기 목록은 B review_context_query(*, active_only=True)의 4열 Select를 A review_repo가 직접 import해 결합한다. 공개 목록은 비활성 공간 후기 숨김, 내 후기는 False로 유지. 세션 실행·후기 조인·마스킹은 A, review_create는 프론트만 전송. B 구현·검증 완료, A 연결·통합은 후속 | #43 PM 승인 댓글 및 B 동의 · `AGENTS.md` 약속 · `백엔드_A·B` 3절 |
 | 11-05 | F-30~32에서 본인 예약 여러 건과 모두 겹치면 `SLOT_TAKEN.detail.reservation_id`는 겹친 예약 ID 중 최솟값으로 반환한다. 자동 증가 ID는 실제 커밋 순서를 보장하지 않는다고 구분한다 | 사용자 승인 · `docs/백엔드_B` 6절 · `docs/오류코드.md` |
 | 11-05 | F-21은 offset 기본 0·음수 허용, days 기본 14·1~31. 시작 범위 밖은 OUT_OF_RANGE, 마지막 페이지 뒷부분은 최대 날짜에서 자르고 응답 days는 요청값 유지. free는 빈 칸 총수, bookable은 연속 빈 칸 ≥ min_hours이며 지난 칸 포함 | 사용자 승인 계획 · 기존 FE venuesApi 목업 · `백엔드_B` 5-2절 |
@@ -167,6 +168,10 @@ A1~A4는 11-03에 확정했고, **A5~A8은 추후 확정**으로 미뤘다(11-03
 - 개인 기억(Claude 자동 메모리 등)은 팀에 공유되지 않는다. 팀이 알아야 할 것은 이 파일과 `docs/`에 쓴다.
 
 ## 최근 변경 (최신이 위)
+
+- 11-06 · B · 실제 서비스 api1이 아닌 테스트용 VM(`100.100.100.201`)에 현재 F-34·35 브랜치의 `backend/app`을 `/home/test/spacecube_backend`로 분리 배포. 기존 `/home/test/app`은 유지. Ubuntu Python 3.12에 `python3.12-venv` 설치 후 전용 `.venv`와 프로젝트 백엔드 의존성을 구성. 로컬 `spacecube_test`를 대상으로 테스트 VM `test_jobs.py` **6건 통과**(초기 실행에서 테스트 수집용 `conftest.py` 누락을 확인해 추가 배포 후 재실행). 실제 `python -m app.jobs.complete_reservations`도 테스트 예약 1건을 `completed`로 바꾸고 슬롯 1건·결제 `paid` 보존·JSON 성공 로그를 확인, 임시 행 정리. VM `127.0.0.1:3306`에는 MariaDB가 없고 호스트 DB에 대한 접속은 1130 권한 거부라 임시 SSH 역방향 터널로만 접속. 테스트 후 터널 종료, `.env` 자격 증명 비움(권한 600), 스모크 파일 삭제. 테스트 VM cron과 실제 서비스 api1은 변경하지 않음.
+- 11-06 · B · F-35 완료 배치 구현: 예약 저장소의 `confirmed` 조건부 일괄 UPDATE, 서비스가 한국 현재 시각을 한 번 읽고 commit/rollback, CLI `python -m app.jobs.complete_reservations`가 primary 세션·기존 JSON 로그·안전한 오류 종류만 사용. 시간 칸과 결제는 유지. MariaDB F-35 테스트 6건 및 백엔드 전체 **314건 통과**, Ruff check·format(81개 파일) 통과. 기존 Starlette/httpx 경고 1건. 실제 HTTP/Postman 계약 변경이 없는 배치라 Postman 요청은 추가하지 않음. F-34와 같은 브랜치에서 #8 단일 PR로 제출 예정.
+- 11-06 · B · 사용자 요청으로 `feat/B-F-34-cancellation`을 `feat/B-F-34-35-reservations`로 변경, F-34 커밋 `4cb0c26` 보존. worktree 경로는 `.worktrees/feat-B-F-34-cancellation` 유지. #8 열림·댓글 0건 및 B 명세 6절·jobs README·로컬 VM 배치 확인 후 F-35 구현 계획 작성. 예약 리포지토리 조건부 일괄 UPDATE, 서비스 트랜잭션, primary CLI 진입점·JSON 완료 건수 로그, api1 한 대의 시간별 cron 실행 안내를 예정. 고정 한국 시각으로 종료 직전/정각·날짜 경계·상태 필터·반복/중복 실행·취소 경합·칸/결제 보존·실패 롤백·CLI 종료 코드를 로컬 MariaDB에서 검증할 계획. 이번에는 브랜치명·STATE 계획만 변경, F-35 코드·테스트 실행·커밋·푸시·PR 없음.
 
 - 11-05 · B · 최신 origin/develop `bdd6dea`에서 `feat/B-F-34-cancellation` 별도 worktree 생성. F-34 `POST /reservations/{id}/cancel` 구현: primary에서 본인 예약 `FOR UPDATE`, 잠금 뒤 시작 시각 검사, 예약 `cancelled`·해당 예약 칸 삭제·결제 `refunded`를 한 트랜잭션으로 커밋. 취소 전용 200 응답(`reservation_id`, `status`, `total_price`, 결제·환불 시각, `can_cancel=false`)을 B 명세에 기록. `reserve_cancel_ok`·`reservation_total{result="cancel"}`는 커밋 후 한 번 기록. MariaDB 11.4.13 `spacecube_test`의 예약·의존성·동시성 pytest 72건 통과, 전체 pytest 308건 통과, Starlette deprecation 경고 1건. 공식 Uvicorn/Postman 5요청·11검증 통과: OpenAPI·401·생성·재시도·취소, DB 환불·칸 해제·카운터 확인 및 합성 테스트 데이터 정리. Ruff lint·format과 Postman collection lint 통과. `verify.ps1`의 Ruff·pytest 통과; 격리 worktree에 프론트 `node_modules`가 없어 `run-s`를 못 찾았으나 기존 작업 트리에서 프론트 verify(55건·빌드) 통과. 코드·문서 변경은 F-34 branch에 있으며 커밋·푸시·PR은 아직 없음.
 

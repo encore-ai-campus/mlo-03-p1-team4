@@ -13,7 +13,20 @@
 | `test_catalog.py`, `test_venues.py` | B | 기준정보 필터·캐시, 공간 검색·정렬·상세·이미지·NEW·시간 칸·예약 가능 날짜 |
 | `test_reservations.py` | B | 예약·칸·모의결제 201, 10분 재시도 200, 409 소유권·대표 ID, 기간·시간·인원·수단 검증, 지난 시간 `completed`, 키 있는 가상 요청, F-34 취소 권한·시간 경계·환불·칸 반납·재예약·실패 롤백 |
 | `test_concurrency.py` | B | **다른 회원 50명이 같은 칸을 동시 요청 → 201 1건·409 49건**, 한 회원의 같은 요청 50건은 201 1건·200 49건, 겹치는 시간 경쟁, F-34 동시 취소 200 1건·409 1건. DB 행 수·이벤트·카운터 확인 |
-| `test_jobs.py`, `test_internal.py`, `test_read_routing.py` | B | 완료 배치 멱등, upsert 201·200·400, 공개 조회만 `get_db_read` |
+| `test_jobs.py` | B | F-35 종료 정각·날짜 경계·멱등·칸/결제 보존·실패 롤백·두 배치 중복 실행·취소 경합·CLI 로그/종료 코드 |
+| `test_internal.py`, `test_read_routing.py` | B | upsert 201·200·400, 공개 조회만 `get_db_read` |
+
+## F-35 이용 완료 배치
+
+`test_jobs.py`는 고정 한국 시각과 로컬 MariaDB `spacecube_test`로 `confirmed` 예약의 조건부 일괄 완료를 검증합니다. 종료 시각 직전·정각, 과거 날짜·미래 예약, 이미 취소/완료된 상태, 반복 실행, 완료 뒤 시간 칸·결제 보존, 커밋 실패 롤백을 확인합니다. 별도 MariaDB 세션 두 개를 동시에 실행하고 F-34 취소가 먼저 잠근 예약을 배치가 완료 상태로 되살리지 않는지도 확인합니다.
+
+`CHECK_DB_URL`은 기존 DDL·seed가 적용된 로컬 `spacecube_test`로 지정합니다. 일반 테스트 데이터는 외부 트랜잭션에서 롤백합니다. 동시성 테스트는 커밋이 필요한 합성 데이터를 만들고 종료 때 삭제하며, 실행 전에 이미 있던 종료 대상 예약은 원래 `confirmed` 상태로 복구합니다.
+
+```powershell
+python -m pytest backend/tests/test_jobs.py -q -p no:cacheprovider
+```
+
+완료 배치는 HTTP API가 아니므로 Postman HTTP 요청은 추가하지 않습니다. CLI의 성공 로그·실패 로그·종료 코드는 `main()` 단위 테스트에서 확인하고, 실제 배포 실행은 api1 한 대에 시간별 cron으로 등록합니다.
 
 ## F-51 후기 목록용 B 조회 계약 (#43)
 

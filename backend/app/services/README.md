@@ -6,7 +6,7 @@
 | `user_service.py` | A | 탈퇴 = `deleted_at` 기록(예약·후기는 보존) |
 | `review_service.py` | A | 자격 4단계: 내 예약(`get_owned`) → `completed` → 기한 안(`max(이용일, 예약한 날)`부터 7일) → 아직 안 씀 |
 | `venue_service.py` | B | 검색 조건 → 공간 + 그날 칸(`slots`는 한 번에 읽어 붙임), 예약 가능 날짜(이어진 빈 칸 ≥ `min_hours`) |
-| `reservation_service.py` | B | F-30~32 예약+모의결제 한 트랜잭션, 재시도·중복 경쟁 처리; F-34 취소·칸 반납·모의 환불 한 트랜잭션 |
+| `reservation_service.py` | B | F-30~32 예약+모의결제 한 트랜잭션, 재시도·중복 경쟁 처리; F-34 취소·칸 반납·모의 환불 한 트랜잭션; F-35 종료 예약 조건부 일괄 완료와 커밋 |
 | `internal_service.py` | B | F-61 크롤러·생성 공간 등록/갱신: 신규 201·같은 출처 재전송/갱신 200, 최상위 ID·무시한 시설, 공간·시설·그림 한 트랜잭션, 모르는 지역·유형은 400 |
 
 ## 예약 + 모의 결제 트랜잭션 (B, primary)
