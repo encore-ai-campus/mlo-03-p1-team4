@@ -89,6 +89,8 @@ infra/monitoring/  alloy.config                # [A] 로그 파일 → Loki, 로
 | `is_synthetic_request(request) -> bool` | 헤더 `X-Synthetic: 1` + `X-Synthetic-Key`(= `.env` `SYNTHETIC_API_KEY`)일 때만 true. `X-Synthetic`이 있는데 키가 없거나 틀리면 `AppError("UNAUTHORIZED", …, 401)` (11-05 A6) | A 가입, B 예약 |
 | `get_session_id(request) -> str \| None` | 헤더 `X-Session-Id`(프론트가 모든 요청에 붙이는 UUID). 없거나 형식이 틀리면 `None` | B 예약 서비스가 `log_event`에 넘김 → 서버 이벤트와 프론트 이벤트를 같은 세션으로 묶음(이탈 계산에 필요) |
 
+후기 목록의 공유 계약(#43 PM 승인): B의 `reservation_repo.review_context_query(*, active_only: bool = True) -> Select`를 A의 `review_repo`가 직접 import합니다. 반환 열은 `reservation_id`, `venue_id`, `venue_name`, `category`(`categories.code`)이며, B는 조회식만 만들고 DB 실행·commit·rollback은 하지 않습니다. 공개 후기 목록은 기본값으로 비활성 공간을 숨기고, 내 후기는 `active_only=False`로 기록을 유지합니다. A가 후기·회원과 결합해 필터·정렬·페이지를 계산하며 공개 목록은 replica, 내 후기는 primary에서 실행합니다. `main.py` 등록 방식은 사용하지 않습니다. `review_create`는 후기 생성 201 뒤 프론트만 전송합니다.
+
 어느 의존성을 쓸지는 **경로 규칙표**(`산출물_02` §2)를 따릅니다. 헷갈리면 primary를 씁니다. 틀린 primary는 느릴 뿐이지만, 틀린 replica는 '방금 한 예약이 안 보이는' 버그가 됩니다.
 
 ## 4. 다른 파트에서 받는 것
@@ -97,6 +99,7 @@ infra/monitoring/  alloy.config                # [A] 로그 파일 → Loki, 로
 | --- | --- | --- |
 | `reservation_repo.get_owned(db, user_id, reservation_id)` → `(reservation_id, venue_id, reserve_date, start_hour, end_hour, status, created_at)` 또는 `None` | B | 후기 작성 자격 (primary 세션으로 호출). `created_at`은 후기 기한 `max(이용일, 예약한 날)` 계산에 씀 |
 | `reservation_repo.count_cancellable(db, user_id)` → `int` | B | 탈퇴 전 확인(primary 세션으로 호출). 0보다 크면 409 `HAS_UPCOMING_RESERVATION` (11-05) |
+| `reservation_repo.review_context_query(*, active_only: bool = True)` → `Select` | B | 후기 목록용 예약·공간·유형 조회식. 3절의 공유 계약에 따라 직접 import (#43) |
 | 뷰 `v_venue_rating(venue_id, rating_avg, review_count)` | DB | 후기 모아보기 요약 |
 | MariaDB 표·기초 데이터, MongoDB 사용자·권한 | DB | 테스트·배포 |
 

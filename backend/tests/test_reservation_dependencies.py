@@ -8,7 +8,7 @@ from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import CheckConstraint, UniqueConstraint, create_engine, text
+from sqlalchemy import CheckConstraint, Select, UniqueConstraint, create_engine, func, select, text
 from sqlalchemy.dialects.mysql import dialect
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session, configure_mappers
@@ -25,6 +25,141 @@ from app.services import review_service
 MODELS = (Reservation, ReservationSlot, Payment, Venue, VenueFacility, VenueImage)
 TODAY = date(2026, 11, 4)
 NOW = datetime.fromisoformat("2026-11-04T12:00:00")
+
+
+def test_review_context_columns():
+    """세션 없이 만든 조회식에 A가 합의한 네 열만 같은 이름으로 있어야 한다."""
+    query = reservation_repo.review_context_query()
+    assert isinstance(query, Select)
+    assert list(query.selected_columns.keys()) == [
+        "reservation_id",
+        "venue_id",
+        "venue_name",
+        "category",
+    ]
+
+
+def test_review_context_one_row_per_reservation(connection, sample):
+    """결제·후기가 없어도 모든 상태의 예약을 중복 없이 공간 정보와 연결한다."""
+    _, venue_id, create = sample
+    reservation_ids = [create(status) for status in ("confirmed", "completed", "cancelled")]
+    category = connection.scalar(
+        text("SELECT c.code FROM venues v JOIN categories c USING(category_id) WHERE venue_id=:id"),
+        {"id": venue_id},
+    )
+    context = reservation_repo.review_context_query().subquery()
+    with Session(bind=connection, join_transaction_mode="create_savepoint") as db:
+        transaction = db.begin()
+        rows = (
+            db.execute(
+                select(context)
+                .where(context.c.reservation_id.in_(reservation_ids))
+                .order_by(context.c.reservation_id)
+            )
+            .mappings()
+            .all()
+        )
+        assert [dict(row) for row in rows] == [
+            {
+                "reservation_id": reservation_id,
+                "venue_id": venue_id,
+                "venue_name": "의존성 검증 공간",
+                "category": category,
+            }
+            for reservation_id in reservation_ids
+        ]
+        assert db.get_transaction() is transaction
+
+
+@pytest.mark.parametrize("category", ["studyroom", "studio", "cafe", "lectureroom", "partyroom"])
+def test_review_context_category_code(connection, sample, category):
+    """유형의 표시 이름이나 ID 대신 API가 쓰는 영문 코드를 반환한다."""
+    _, venue_id, create = sample
+    connection.execute(
+        text(
+            "UPDATE venues SET category_id=(SELECT category_id FROM categories WHERE code=:code) "
+            "WHERE venue_id=:id"
+        ),
+        {"code": category, "id": venue_id},
+    )
+    reservation_id = create()
+    context = reservation_repo.review_context_query().subquery()
+    row = (
+        connection.execute(select(context).where(context.c.reservation_id == reservation_id))
+        .mappings()
+        .one()
+    )
+    assert row["category"] == category
+    assert row["venue_id"] == venue_id
+
+
+@pytest.mark.parametrize("is_active", [True, False])
+@pytest.mark.parametrize("active_only", [None, True, False], ids=["default", "public", "mine"])
+def test_review_context_active_visibility(connection, sample, is_active, active_only):
+    """공개 목록은 비활성 공간을 숨기고 내 후기용 조회식은 공간 기록을 유지한다."""
+    _, venue_id, create = sample
+    connection.execute(
+        text("UPDATE venues SET is_active=:active WHERE venue_id=:id"),
+        {"active": is_active, "id": venue_id},
+    )
+    reservation_id = create()
+    query = (
+        reservation_repo.review_context_query()
+        if active_only is None
+        else reservation_repo.review_context_query(active_only=active_only)
+    )
+    context = query.subquery()
+    rows = (
+        connection.execute(select(context).where(context.c.reservation_id == reservation_id))
+        .mappings()
+        .all()
+    )
+    expected = is_active or active_only is False
+    assert len(rows) == int(expected)
+    if expected:
+        assert rows[0]["venue_name"] == "의존성 검증 공간"
+
+    # 내 후기용 조회식을 만든 뒤에도 다음 공개 조회의 기본값은 유지된다.
+    public = reservation_repo.review_context_query().subquery()
+    assert connection.scalar(
+        select(func.count()).select_from(public).where(public.c.reservation_id == reservation_id)
+    ) == int(is_active)
+
+
+def test_review_context_filter_count_and_page(connection, sample):
+    """A가 서브쿼리에 공간·유형 필터, 전체 개수, 정렬·페이지를 결합할 수 있다."""
+    _, venue_id, create = sample
+    reservation_ids = [create() for _ in range(3)]
+    other_venue_id = connection.execute(
+        text(
+            "INSERT INTO venues (region_id,category_id,name,capacity_max,price_per_hour,source_site) "
+            "SELECT region_id,category_id,'다른 검증 공간',4,10000,'synthetic' "
+            "FROM venues WHERE venue_id=:id"
+        ),
+        {"id": venue_id},
+    ).lastrowid
+    connection.execute(
+        text("UPDATE reservations SET venue_id=:venue WHERE reservation_id=:id"),
+        {"venue": other_venue_id, "id": reservation_ids[2]},
+    )
+    category = connection.scalar(
+        text("SELECT c.code FROM venues v JOIN categories c USING(category_id) WHERE venue_id=:id"),
+        {"id": venue_id},
+    )
+    context = reservation_repo.review_context_query().subquery()
+    query = select(context).where(
+        context.c.reservation_id.in_(reservation_ids),
+        context.c.venue_id == venue_id,
+        context.c.category == category,
+    )
+    assert connection.scalar(select(func.count()).select_from(query.subquery())) == 2
+    page = (
+        connection.execute(query.order_by(context.c.reservation_id.desc()).offset(1).limit(1))
+        .mappings()
+        .all()
+    )
+    assert [row["reservation_id"] for row in page] == [reservation_ids[0]]
+    assert connection.execute(query.where(context.c.category == "unknown")).all() == []
 
 
 @pytest.mark.parametrize("model", MODELS)
