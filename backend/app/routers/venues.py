@@ -1,4 +1,4 @@
-"""F-12~13 검색·정렬과 F-20~22 공개 공간 조회. /venues 접두사는 앱에서 등록한다."""
+"""F-12~14 검색·NEW와 F-20~22 공개 공간 조회. /venues 접두사는 앱에서 등록한다."""
 
 from typing import Annotated
 
@@ -12,6 +12,7 @@ from app.schemas.venues import (
     BookingDate,
     SlotRead,
     VenueListItem,
+    VenueNewItem,
     VenueRead,
     VenueSort,
 )
@@ -54,6 +55,16 @@ def search_venues(
         page=page,
         size=size,
     )
+
+
+@router.get("/new", summary="NEW 공간 조회")
+def get_new_venues(
+    db: Annotated[Session, Depends(get_db_read)],
+    page: Annotated[int, Query(ge=1)] = 1,
+    size: Annotated[int, Query(ge=1, le=50)] = 10,
+) -> Page[VenueNewItem]:
+    """최근 14일 안에 등록한 활성 공간을 최신순으로 반환한다."""
+    return venue_service.get_new_venues(db, page=page, size=size)
 
 
 @router.get("/{venue_id}", summary="공간 상세 조회")

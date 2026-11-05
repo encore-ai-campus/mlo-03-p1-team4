@@ -1,4 +1,4 @@
-"""F-12~13 공간 검색·정렬과 F-20~22 상세·영업시간 SQL."""
+"""F-12~14 공간 검색·NEW와 F-20~22 상세·영업시간 SQL."""
 
 from datetime import date, datetime
 
@@ -115,6 +115,31 @@ def _search_from():
     )
 
 
+def _venue_list_query():
+    """검색·NEW 목록이 공유하는 공개 공간 항목과 평점 조회식."""
+    return (
+        select(
+            Venue.venue_id,
+            Venue.name,
+            Venue.capacity_max,
+            Venue.price_per_hour,
+            Venue.open_hour,
+            Venue.close_hour,
+            Venue.created_at,
+            Category.code.label("category_code"),
+            Category.name.label("category_name"),
+            Region.sido,
+            Region.sigungu,
+            func.coalesce(_rating_view.c.rating_avg, 0).label("rating_avg"),
+            func.coalesce(_rating_view.c.review_count, 0).label("review_count"),
+        )
+        .select_from(Venue)
+        .join(Category, Category.category_id == Venue.category_id)
+        .join(Region, Region.region_id == Venue.region_id)
+        .outerjoin(_rating_view, _rating_view.c.venue_id == Venue.venue_id)
+    )
+
+
 def count_search_venues(
     db: Session,
     *,
@@ -196,28 +221,7 @@ def list_search_venues(
             .subquery()
         )
 
-    query = (
-        select(
-            Venue.venue_id,
-            Venue.name,
-            Venue.capacity_max,
-            Venue.price_per_hour,
-            Venue.open_hour,
-            Venue.close_hour,
-            Venue.created_at,
-            Category.code.label("category_code"),
-            Category.name.label("category_name"),
-            Region.sido,
-            Region.sigungu,
-            func.coalesce(_rating_view.c.rating_avg, 0).label("rating_avg"),
-            func.coalesce(_rating_view.c.review_count, 0).label("review_count"),
-        )
-        .select_from(Venue)
-        .join(Category, Category.category_id == Venue.category_id)
-        .join(Region, Region.region_id == Venue.region_id)
-        .outerjoin(_rating_view, _rating_view.c.venue_id == Venue.venue_id)
-        .where(*conditions)
-    )
+    query = _venue_list_query().where(*conditions)
     if popularity is not None:
         query = query.outerjoin(popularity, popularity.c.venue_id == Venue.venue_id)
         popularity_count = func.coalesce(popularity.c.count, 0)
@@ -230,6 +234,39 @@ def list_search_venues(
         query = query.order_by(Venue.venue_id.asc())
 
     return list(db.execute(query.offset((page - 1) * size).limit(size)).mappings())
+
+
+def _new_venue_conditions(start_at: datetime, end_at: datetime):
+    """한국 날짜 기준 NEW 기간을 반개구간으로 제한해 created_at 인덱스를 쓴다."""
+    return (
+        Venue.is_active.is_(True),
+        Venue.created_at >= start_at,
+        Venue.created_at < end_at,
+    )
+
+
+def count_new_venues(db: Session, *, start_at: datetime, end_at: datetime) -> int:
+    """활성 상태이며 NEW 날짜 범위에 든 공간의 전체 건수를 센다."""
+    return (
+        db.scalar(
+            select(func.count(Venue.venue_id)).where(*_new_venue_conditions(start_at, end_at))
+        )
+        or 0
+    )
+
+
+def list_new_venues(
+    db: Session, *, start_at: datetime, end_at: datetime, page: int, size: int
+) -> list[RowMapping]:
+    """활성 NEW 공간을 최신순으로 페이지 조회한다."""
+    query = (
+        _venue_list_query()
+        .where(*_new_venue_conditions(start_at, end_at))
+        .order_by(Venue.created_at.desc(), Venue.venue_id.desc())
+        .offset((page - 1) * size)
+        .limit(size)
+    )
+    return list(db.execute(query).mappings())
 
 
 def list_facilities_by_venues(db: Session, venue_ids: list[int]) -> dict[int, list[str]]:

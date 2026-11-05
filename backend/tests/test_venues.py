@@ -1390,3 +1390,128 @@ def test_search_uses_bounded_queries_for_page_items(venue_client, search_catalog
     assert "venue_facilities" in statements[2]
     assert "venue_images" in statements[3]
     assert "reservation_slots" in statements[4]
+
+
+def test_new_venues_include_recent_active_rows_and_return_remaining_days(
+    venue_client, search_catalog
+):
+    data = search_catalog
+    latest = data["create"]("오늘 최신 공간")
+    day_13 = data["create"]("13일 전 공간")
+    day_14 = data["create"]("14일 전 공간")
+    future = data["create"]("미래 등록 공간")
+    inactive = data["create"]("비활성 NEW 공간")
+    connection = data["connection"]
+    today = data["today"]
+    timestamps = {
+        data["base_id"]: datetime.combine(today, time(16)),
+        latest: datetime.combine(today, time(16)),
+        day_13: datetime.combine(today - timedelta(days=13), time(23, 59, 59)),
+        day_14: datetime.combine(today - timedelta(days=14), time(23, 59, 59)),
+        future: datetime.combine(today + timedelta(days=1), time.min),
+        inactive: datetime.combine(today, time(18)),
+    }
+    for venue_id, created_at in timestamps.items():
+        connection.execute(
+            text("UPDATE venues SET created_at = :created_at WHERE venue_id = :id"),
+            {"id": venue_id, "created_at": created_at},
+        )
+    connection.execute(
+        text("UPDATE venues SET is_active = FALSE WHERE venue_id = :id"), {"id": inactive}
+    )
+
+    response = venue_client.get("/venues/new")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["page"] == 1
+    assert body["size"] == 10
+    assert body["total"] == 3
+    assert [item["venue_id"] for item in body["items"]] == [
+        latest,
+        data["base_id"],
+        day_13,
+    ]
+    assert body["items"][0]["registered_on"] == today.isoformat()
+    assert body["items"][0]["new_days_left"] == 14
+    assert body["items"][1]["new_days_left"] == 14
+    assert body["items"][2]["registered_on"] == (today - timedelta(days=13)).isoformat()
+    assert body["items"][2]["new_days_left"] == 1
+    assert all(item["is_new"] for item in body["items"])
+    assert all(item["image"] == "art:group-0" for item in body["items"])
+    assert set(body["items"][0]) == {
+        "venue_id",
+        "name",
+        "category",
+        "region",
+        "capacity_max",
+        "price_per_hour",
+        "open_hour",
+        "close_hour",
+        "rating_avg",
+        "review_count",
+        "image",
+        "facilities",
+        "is_new",
+        "slots",
+        "registered_on",
+        "new_days_left",
+    }
+
+
+def test_new_venues_paginate_after_filtering(venue_client, search_catalog):
+    data = search_catalog
+    latest = data["create"]("페이지 최신 공간")
+    oldest = data["create"]("페이지 과거 공간")
+    connection = data["connection"]
+    connection.execute(
+        text("UPDATE venues SET created_at = :created_at WHERE venue_id = :id"),
+        {"id": latest, "created_at": datetime.combine(data["today"], time(18))},
+    )
+    connection.execute(
+        text("UPDATE venues SET created_at = :created_at WHERE venue_id = :id"),
+        {
+            "id": oldest,
+            "created_at": datetime.combine(data["today"] - timedelta(days=13), time(12)),
+        },
+    )
+    first_page = venue_client.get("/venues/new", params={"page": 1, "size": 2}).json()
+    second_page = venue_client.get("/venues/new", params={"page": 2, "size": 2}).json()
+
+    assert first_page["total"] == second_page["total"] == 3
+    assert first_page["page"] == 1 and first_page["size"] == 2
+    assert second_page["page"] == 2 and second_page["size"] == 2
+    assert [item["venue_id"] for item in first_page["items"]] == [latest, data["base_id"]]
+    assert [item["venue_id"] for item in second_page["items"]] == [oldest]
+
+
+def test_new_venues_validate_page_and_size(venue_client):
+    for params, field in [({"page": 0}, "page"), ({"size": 0}, "size"), ({"size": 51}, "size")]:
+        response = venue_client.get("/venues/new", params=params)
+        assert response.status_code == 400
+        assert response.json()["code"] == "VALIDATION"
+        assert response.json()["detail"]["fields"][0]["field"] == field
+
+
+def test_new_venues_use_bounded_queries_for_page_items(venue_client, search_catalog):
+    data = search_catalog
+    statements = []
+    connection = data["connection"]
+
+    def collect_sql(conn, cursor, statement, parameters, context, executemany):
+        if statement.lstrip().upper().startswith("SELECT"):
+            statements.append(statement.lower())
+
+    event.listen(connection, "before_cursor_execute", collect_sql)
+    try:
+        response = venue_client.get("/venues/new")
+    finally:
+        event.remove(connection, "before_cursor_execute", collect_sql)
+
+    assert response.status_code == 200
+    assert response.json()["total"] == 1
+    assert len(statements) == 5
+    assert "v_venue_rating" in statements[1]
+    assert "venue_facilities" in statements[2]
+    assert "venue_images" in statements[3]
+    assert "reservation_slots" in statements[4]

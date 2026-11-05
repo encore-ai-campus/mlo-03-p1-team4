@@ -72,6 +72,13 @@ class VenueListItem(BaseModel):
     slots: list[SlotRead]
 
 
+class VenueNewItem(VenueListItem):
+    """NEW 공간 목록에 등록 날짜와 남은 표시 일수를 더한다."""
+
+    registered_on: date
+    new_days_left: int
+
+
 type VenueSort = Literal["default", "popular", "price", "rating"]
 
 

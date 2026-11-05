@@ -1,8 +1,9 @@
 """F-12~14·20~22 공간 검색·상세·예약 가능 날짜·시간 칸 업무 규칙."""
 
 from collections.abc import Sequence
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, time, timedelta
 
+from sqlalchemy.engine import RowMapping
 from sqlalchemy.orm import Session
 
 from app.core.clock import get_now, get_today
@@ -16,6 +17,7 @@ from app.schemas.venues import (
     AvailableDatesRead,
     SlotRead,
     VenueListItem,
+    VenueNewItem,
     VenueRead,
     VenueRegionRead,
     VenueSort,
@@ -118,11 +120,44 @@ def search_venues(
         size=size,
         popular_since=now - timedelta(days=7),
     )
+    items = _build_venue_list_items(db, rows, slot_date=slot_date, today=today, now=now)
+    return Page[VenueListItem].model_validate(paginate(items, page, size, total))
+
+
+def get_new_venues(db: Session, *, page: int, size: int) -> Page[VenueNewItem]:
+    """한국 오늘 포함 최근 14일의 활성 공간을 최신순으로 반환한다."""
+    today = get_today()
+    now = get_now()
+    start_at = datetime.combine(today - timedelta(days=13), time.min)
+    end_at = datetime.combine(today + timedelta(days=1), time.min)
+    total = venue_repo.count_new_venues(db, start_at=start_at, end_at=end_at)
+    rows = venue_repo.list_new_venues(db, start_at=start_at, end_at=end_at, page=page, size=size)
+    list_items = _build_venue_list_items(db, rows, slot_date=today, today=today, now=now)
+    items = [
+        VenueNewItem(
+            **item.model_dump(),
+            registered_on=row["created_at"].date(),
+            new_days_left=14 - (today - row["created_at"].date()).days,
+        )
+        for item, row in zip(list_items, rows, strict=True)
+    ]
+    return Page[VenueNewItem].model_validate(paginate(items, page, size, total))
+
+
+def _build_venue_list_items(
+    db: Session,
+    rows: Sequence[RowMapping],
+    *,
+    slot_date: date,
+    today: date,
+    now: datetime,
+) -> list[VenueListItem]:
+    """공개 공간 목록의 시설·이미지·점유 칸을 페이지 단위로 묶어 조합한다."""
     venue_ids = [row["venue_id"] for row in rows]
     facilities_by_venue = venue_repo.list_facilities_by_venues(db, venue_ids)
     images_by_venue = venue_repo.list_images_by_venues(db, venue_ids)
     taken_by_venue = slot_repo.list_taken_hours_by_venues(db, venue_ids, slot_date)
-    items = [
+    return [
         VenueListItem(
             venue_id=row["venue_id"],
             name=row["name"],
@@ -148,7 +183,6 @@ def search_venues(
         )
         for row in rows
     ]
-    return Page[VenueListItem].model_validate(paginate(items, page, size, total))
 
 
 def build_slots(

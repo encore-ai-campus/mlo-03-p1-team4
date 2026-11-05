@@ -3,7 +3,7 @@
 사람과 에이전트(Codex, Claude Code)가 함께 고치는 진행 기록입니다. 작업을 끝낼 때마다 해당 줄을 고치고 '최근 변경' 맨 위에 한 줄 더합니다. 설계 내용 자체는 `docs/`에, 여기는 상태와 결정만 둡니다.
 
 - 마지막 갱신: 2026-11-05
-- 단계: **11-03 설계 확정안** · 프론트 화면 7개 목업 동작 · DB DDL·seed 검증 기록 있음 · B F-10~13·20~22·시설 목록·`get_owned()` MariaDB 검증 완료, A 코드는 담당자에게 직접 전달받아 로컬 사용(Git 제외, 통합 전)
+- 단계: **11-03 설계 확정안** · 프론트 화면 7개 목업 동작 · DB DDL·seed 검증 기록 있음 · B F-10~14·20~22·시설 목록·`get_owned()` MariaDB 검증 완료, A 코드는 담당자에게 직접 전달받아 로컬 사용(Git 제외, 통합 전)
 - 디자인 캔버스(화면 설계 · 시스템 아키텍처 · 글꼴 시안): https://claude.ai/artifact/5dQciCDEaMm8uNjw6sqZpm
 - 실행 환경: Python은 conda `pro_1`(`environment.yml`), 프론트는 `frontend/`의 npm
 
@@ -13,7 +13,7 @@
 | --- | --- | --- | --- | --- |
 | 프론트 | 노진산(FE·PM) | FE-1~9 확정안 반영, Claude 시안 대조·FE 오류/모바일 결제/가입 UX 재검토 및 목업·화면 검증 | A·B 구현 후 실제 API 연결·오류·예약 동시성 통합 검증 | 실제 API 미구현 |
 | FastAPI A | [이름] | 문서 확정(`docs/백엔드_A`), 폴더·README | 1일차 오전 `core/`(두 DB 세션·오류·`get_current_user`·`log_event`·`get_today`)·`models/base.py` → 회원 → 후기 → 이벤트 | 없음 |
-| FastAPI B | [이름] | F-10~13·시설 목록·F-20~22 공개 조회 API 구현·MariaDB 검증. 전체 pytest 161건, Chrome API 1건, 프론트 단위 54건·린트·포맷·빌드 통과. A 공통 파일은 로컬 사용(Git 제외 유지) | F-14 NEW 조회 → 예약·동시성(#7) → 내 예약·취소·완료(#8). `/internal/venues`는 크롤러 논의 후 진행. A 통합 PR에 venues 라우터 등록, 후기 목록 연결 확인 필요 | A 공통 코드의 GitHub 통합은 A PR 필요. 실제 replica 장애·복제 지연은 DB 구성 후 검증 |
+| FastAPI B | [이름] | F-10~14·시설 목록·F-20~22 공개 조회 API 구현·MariaDB 검증. 전체 pytest 165건, Chrome API 1건, 프론트 단위 54건·린트·포맷·빌드 통과. A 공통 파일은 로컬 사용(Git 제외 유지) | 예약·동시성(#7) → 내 예약·취소·완료(#8). `/internal/venues`는 크롤러 논의 후 진행. A 통합 PR에 venues 라우터 등록, 후기 목록 연결 확인 필요 | A 공통 코드의 GitHub 통합은 A PR 필요. 실제 replica 장애·복제 지연은 DB 구성 후 검증 |
 | DB | [이름] | `0001_init.sql`·`mongo_init.js` 검증(설치형 11.8·compose 11.4 둘 다 29건 통과), seed(유형 5·시설 20·지역 230 → `seed.sql`), `infra/local` compose, 크롤러 시제품(옛 필터) | 크롤러 새 필터(유형 5·별칭) → `/internal/venues` 등록(B와) → 가상 데이터 생성기 | 없음(A2 결정을 팀원에게 공유) |
 
 ## 기능 진행표
@@ -27,7 +27,7 @@
 | F-11·기준 정보 | 지역·시설 목록 조회 | B | 검증: 활성 지역 필터·시도/시군구 응답·시설 전체 조회·공유 스냅샷·5분 캐시·공개 읽기·검증 오류. 기존 F-10 포함 test_catalog 19건 통과 |
 | F-12 | 공간 검색 | B | 검증: GET `/venues`. q·유형·지역·날짜·시간·인원·복수 시설 필터, 검색 뒤 페이지 total, replica 조회. MariaDB 전용 테스트와 실제 HTTP 검색 계약·입력 오류 확인 |
 | F-13 | 공간 정렬 | B | 검증: F-12 API의 기본·인기·가격·평점 정렬. 최근 7일 취소·과거 이용 제외, 안정적인 동률 순서. MariaDB 정렬 테스트와 실제 HTTP 정렬 요청 확인 |
-| F-14 | NEW 공간 | B | NEW 날짜 판정 함수는 구현됨. GET `/venues/new`는 미구현 / FE 계약 목업 검증 |
+| F-14 | NEW 공간 | B | 검증: GET `/venues/new`, 활성 공간의 한국 날짜 기준 오늘 포함 최근 14일 필터, 최신순·페이지 처리·`registered_on`·`new_days_left`, 기본 이미지·공통 목록 응답 |
 | F-20 | 공간 상세 | B / A·FE 연계 | B 상세 API 구현·검증: test_venues 28건, 공간 모델 DDL 3건, 실제 API Chrome 1건 통과. 공개 읽기 경로 3건·기존 목업 E2E 59건 통과. A 후기 목록·FE 실제 서버 연결은 별도 통합 항목 |
 | F-21 | 예약 가능 날짜 | B | 검증: 공개 available-dates API 구현. 빈 칸 총수·min_hours 이상 연속 빈 칸 판정, 음수 offset·days 1~31·기간 양끝·0일 설정·마지막 페이지 잘림·큰 offset·점유 분리·재조회·SQL 2회·400/404·읽기 의존성 등 48건 추가. test_venues 114건, 전체 pytest 153건, 실제 HTTP Chrome 1건 통과. FE 전체 연결은 별도 |
 | F-22 | 날짜별 시간 칸 | B | 검증: 공개 GET /venues/{venue_id}/slots?date=YYYY-MM-DD 구현. 엄격한 날짜·설정 범위 양끝·0일 설정, 공간/날짜별 점유·완료 칸·past·F-20 일치·재조회·400/404·읽기 의존성 등 38건 추가. test_venues 총 66건, 전체 pytest 105건, 실제 HTTP Chrome 1건 통과 |
@@ -154,6 +154,8 @@ A1~A4는 11-03에 확정했고, **A5~A8은 추후 확정**으로 미뤘다(11-03
 - 개인 기억(Claude 자동 메모리 등)은 팀에 공유되지 않는다. 팀이 알아야 할 것은 이 파일과 `docs/`에 쓴다.
 
 ## 최근 변경 (최신이 위)
+
+- 11-05 · B · F-14 `GET /venues/new` 구현. 한국 날짜 오늘~13일 전의 활성 공간만 DB에서 조회하고 `created_at DESC, venue_id DESC`로 정렬, page/size·전체 `total`과 `registered_on`, `new_days_left = 14 - 경과일`을 반환. 검색과 시설·이미지·오늘 점유 칸 일괄 조합을 공유하고 새 마이그레이션 없이 구현. F-14 DB API 4건 추가 후 `test_venues.py` **126건**, 전체 `verify.ps1` pytest **165건**, 프론트 단위 **54건**, Ruff·프론트 린트·색 검사·빌드 통과. 별도 임시 Uvicorn + MariaDB + Chrome 검사 **1건 통과**(NEW 목록 날짜·14일·기본 이미지 포함), 가상 공간 롤백 확인. Starlette deprecation 경고 1건. 실제 replica 장애·지연은 미검증. A 통합 `main.py` 라우터 등록은 별도 확인 필요. 구현·검증 및 문서 변경 11개 파일을 F-14 커밋으로 정리.
 
 - 11-05 · B · 진행상황 및 오늘 작업계획을 `docs/기록/진행상황_2026-11-05_백엔드B.md`에 정리. F-20 이미지 기본값 `art:group-0`, 오늘 포함 14일 NEW 기준, `reservation_repo.py`의 `get_owned()` 위치, A 전달 로컬 파일 범위와 통합 후 재검증 필요, F-14→F-30~32 우선 작업안을 기록함.
 

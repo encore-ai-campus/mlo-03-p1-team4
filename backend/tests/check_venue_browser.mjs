@@ -1,4 +1,4 @@
-// F-12·13·20~22 실제 API를 Chrome의 네트워크 경로로 호출한다. 목업 화면 E2E와는 별도 시험이다.
+// F-12~14·20~22 실제 API를 Chrome의 네트워크 경로로 호출한다. 목업 화면 E2E와는 별도 시험이다.
 import assert from 'node:assert/strict';
 import { chromium } from '../../frontend/node_modules/@playwright/test/index.mjs';
 
@@ -58,6 +58,20 @@ try {
   })}`);
   assert.equal(nowSearch.status(), 200);
   assert.equal((await nowSearch.json()).total, 1);
+
+  const newVenuesResponse = await page.goto(`${baseUrl}/venues/new?page=1&size=50`);
+  assert.equal(newVenuesResponse.status(), 200);
+  const newVenues = await newVenuesResponse.json();
+  assert.equal(newVenues.page, 1);
+  assert.equal(newVenues.size, 50);
+  assert.ok(newVenues.total >= 1);
+  const newVenue = newVenues.items.find(item => item.venue_id === Number(venueId));
+  assert.ok(newVenue, '오늘 등록한 가상 공간이 NEW 목록에 있어야 합니다.');
+  assert.equal(newVenue.registered_on, today);
+  assert.equal(newVenue.new_days_left, 14);
+  assert.equal(newVenue.is_new, true);
+  assert.equal(newVenue.image, 'art:group-0');
+
   for (const [query, field] of [
     ['sort=invalid', 'sort'],
     ['category=unknown', 'category'],
@@ -158,7 +172,7 @@ try {
   assert.deepEqual(await missingDates.json(), {
     code: 'VENUE_NOT_FOUND', message: '공간을 찾을 수 없어요.', detail: null,
   });
-  process.stdout.write('F-12~13·20~22 Chrome: 검색·정렬·검증, 실제 상세·시간 칸·날짜 응답 통과\n');
+  process.stdout.write('F-12~14·20~22 Chrome: 검색·정렬·NEW·상세·시간 칸·날짜 응답 통과\n');
 } finally {
   await browser.close();
 }

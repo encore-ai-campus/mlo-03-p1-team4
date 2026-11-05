@@ -107,6 +107,39 @@ infra/nginx/       spacecube.conf         # [B] upstream 2대, /health
 | sort | `default`·`popular`·`price`·`rating` | popular = 최근 7일(`created_at`, 실제 결제 시각) 동안 결제된 예약 수. 취소·지난 날짜 예약(`reserve_date < DATE(created_at)`)은 빼고 셈 |
 | page, size | `1`, `10` | 기본 `1`, `10`; size는 1~50. '더 보기'로 다음 page |
 
+F-14 `GET /venues/new?page=1&size=10`:
+
+- 인증 없이 `get_db_read()`로 조회합니다. 활성 공간 중 `created_at`이 한국 날짜 기준 13일 전 00:00 이상, 내일 00:00 미만인 항목을 반환합니다. 따라서 오늘 포함 14개 날짜이고, 14일 전과 미래 등록은 제외합니다.
+- 최신 등록순(`created_at DESC`, 동률은 `venue_id DESC`)으로 정렬한 뒤 페이지를 자릅니다. `total`은 필터 적용 후 페이지를 자르기 전 전체 건수입니다. 기본 page/size는 `1`/`10`, size는 1~50입니다.
+- 각 항목은 F-12 검색 항목에 `registered_on`(한국 날짜의 `created_at.date()`)과 `new_days_left`(`14 - (get_today() - created_at.date()).days`)를 더합니다. 오늘은 14, 13일 전은 1일 남음으로 표시합니다.
+- 시설·이미지·오늘 시간 칸은 검색과 같은 페이지 단위 묶음 조회를 사용합니다. 이미지가 없으면 `art:group-0`을 반환합니다.
+
+```json
+{
+  "items": [{
+    "venue_id": 7,
+    "name": "서대문구 스터디룸 3호",
+    "category": {"code": "studyroom", "name": "스터디룸"},
+    "region": {"sido": "서울", "sigungu": "서대문구"},
+    "capacity_max": 6,
+    "price_per_hour": 10000,
+    "open_hour": 9,
+    "close_hour": 23,
+    "rating_avg": 4.8,
+    "review_count": 31,
+    "image": "art:group-0",
+    "facilities": ["화이트보드"],
+    "is_new": true,
+    "slots": [{"hour": 9, "taken": false, "past": true}],
+    "registered_on": "2026-11-05",
+    "new_days_left": 14
+  }],
+  "page": 1,
+  "size": 10,
+  "total": 1
+}
+```
+
 F-12·13 검색·정렬 구현 기준:
 
 - 활성 공간만 검색합니다. `q`는 공간명·시도·시군구·시설명에 포함되는지 찾습니다. `category=all`, `sido=전국`, `sigungu=전체`는 해당 필터를 적용하지 않습니다. 지정한 시설 ID는 모두 가진 공간을 찾습니다.
