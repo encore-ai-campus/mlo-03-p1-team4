@@ -64,19 +64,20 @@ Pro_1/
 │  ├─ public/fonts/           웹용 글꼴 (Noto Sans KR 서브셋)
 │  └─ scripts/check-colors.mjs  tokens.css 밖 색 코드 검사
 │
-├─ backend/                   [A·B] FastAPI 한 앱 (코드 시작 전)
+├─ backend/                   [A·B] FastAPI 한 앱 (B F-10~13·20~22·시설·get_owned 구현, A 코드는 로컬 전달본 사용)
 │  ├─ AGENTS.md · README.md · .env.example
 │  ├─ app/
-│  │  ├─ main.py              [A] (예정)
+│  │  ├─ main.py              [A] 공식 앱 통합, [B] catalog·venues 라우터 등록
 │  │  ├─ core/                [A] config, db, mongo, security, deps, errors, pagination, events, metrics, logging, clock, synthetic (예정)
-│  │  ├─ models/              [A] base, user, review / [B] catalog, venue, reservation — SQLAlchemy 모델, DDL과 같게 (예정)
-│  │  ├─ routers/             [A] auth, users, reviews, events, health / [B] catalog, venues, reservations, internal (예정)
-│  │  ├─ schemas/             라우터와 같은 이름 (예정)
-│  │  ├─ services/            [A] auth_service, user_service, review_service / [B] venue_service, reservation_service, internal_service (예정)
-│  │  ├─ repositories/        [A] user_repo, review_repo / [B] catalog_repo, venue_repo, slot_repo, reservation_repo, payment_repo (예정)
+│  │  ├─ models/              [A] base, user, review / [B] catalog·reservation·venue 구현 — DDL 대응 모델
+│  │  ├─ routers/             [A] auth, users, reviews, events, health / [B] catalog·venues(검색·정렬·NEW·상세·예약 가능 날짜·시간 칸) 구현, reservations·internal 예정
+│  │  ├─ schemas/             라우터와 같은 이름 ([B] catalog·venues 검색·NEW·상세·날짜 목록·시간 칸 계약 구현)
+│  │  ├─ services/            [A] auth_service, user_service, review_service / [B] catalog_service·venue_service(검색·정렬·NEW·상세·예약 가능 날짜·시간 칸) 구현, reservation_service·internal_service 예정
+│  │  ├─ repositories/        [A] user_repo, review_repo / [B] catalog_repo·reservation_repo(get_owned·count_cancellable)·venue_repo(검색·정렬·NEW)·slot_repo(공간·일자별 점유 조회) 구현, payment_repo 예정
 │  │  └─ jobs/                [B] complete_reservations (예정)
 │  ├─ scripts/                [A] replay_events (예정)
-│  └─ tests/                  [A] test_auth … / [B] test_concurrency … (예정)
+│  └─ tests/                  [B] test_catalog·test_reservation_dependencies·test_venues·test_read_routing 구현
+│     └─ check_venue_browser.py·mjs  [B] 별도 실행: 임시 실제 API + Chrome 검색·정렬·NEW·오류·상세·날짜 목록·시간 칸 검증
 │
 ├─ db/                        [DB] (스키마는 docs/db, 검증 후 여기로)
 │  ├─ migrations/             0001_init.sql (11-04 검증, 표 12 + 뷰)

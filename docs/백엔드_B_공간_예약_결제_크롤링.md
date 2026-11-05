@@ -101,12 +101,55 @@ infra/nginx/       spacecube.conf         # [B] upstream 2대, /health
 | category | `studio` | categories.code |
 | sido, sigungu | `서울`, `마포구` | regions |
 | date | `2026-11-05` | 예약 가능 범위(오늘 −365일 ~ +365일) 안. 없으면 오늘 |
-| start_hour, hours | `13`, `2` | 둘 다 있으면 그 칸이 모두 비고 영업시간 안인 공간만 |
+| start_hour, hours | `13`, `2` | 둘 다 입력. 이용시간 1~4시간, 최소 이용시간 이상이며 영업시간 안의 모든 칸이 비어 있는 공간만 |
 | people | `4` | `capacity_max >= people` |
 | facilities | `1,4` | 시설 id를 모두 가진 공간 (`GROUP BY … HAVING COUNT = 2`) |
 | now | `true` | 오늘, 지금 시 이후 빈 칸이 있는 곳만 |
 | sort | `default`·`popular`·`price`·`rating` | popular = 최근 7일(`created_at`, 실제 결제 시각) 동안 결제된 예약 수. 취소·지난 날짜 예약(`reserve_date < DATE(created_at)`)은 빼고 셈 |
-| page, size | `1`, `10` | '더 보기'로 다음 page |
+| page, size | `1`, `10` | 기본 `1`, `10`; size는 1~50. '더 보기'로 다음 page |
+
+F-14 `GET /venues/new?page=1&size=10`:
+
+- 인증 없이 `get_db_read()`로 조회합니다. 활성 공간 중 `created_at`이 한국 날짜 기준 13일 전 00:00 이상, 내일 00:00 미만인 항목을 반환합니다. 따라서 오늘 포함 14개 날짜이고, 14일 전과 미래 등록은 제외합니다.
+- 최신 등록순(`created_at DESC`, 동률은 `venue_id DESC`)으로 정렬한 뒤 페이지를 자릅니다. `total`은 필터 적용 후 페이지를 자르기 전 전체 건수입니다. 기본 page/size는 `1`/`10`, size는 1~50입니다.
+- 각 항목은 F-12 검색 항목에 `registered_on`(한국 날짜의 `created_at.date()`)과 `new_days_left`(`14 - (get_today() - created_at.date()).days`)를 더합니다. 오늘은 14, 13일 전은 1일 남음으로 표시합니다.
+- 시설·이미지·오늘 시간 칸은 검색과 같은 페이지 단위 묶음 조회를 사용합니다. 이미지가 없으면 `art:group-0`을 반환합니다.
+
+```json
+{
+  "items": [{
+    "venue_id": 7,
+    "name": "서대문구 스터디룸 3호",
+    "category": {"code": "studyroom", "name": "스터디룸"},
+    "region": {"sido": "서울", "sigungu": "서대문구"},
+    "capacity_max": 6,
+    "price_per_hour": 10000,
+    "open_hour": 9,
+    "close_hour": 23,
+    "rating_avg": 4.8,
+    "review_count": 31,
+    "image": "art:group-0",
+    "facilities": ["화이트보드"],
+    "is_new": true,
+    "slots": [{"hour": 9, "taken": false, "past": true}],
+    "registered_on": "2026-11-05",
+    "new_days_left": 14
+  }],
+  "page": 1,
+  "size": 10,
+  "total": 1
+}
+```
+
+F-12·13 검색·정렬 구현 기준:
+
+- 활성 공간만 검색합니다. `q`는 공간명·시도·시군구·시설명에 포함되는지 찾습니다. `category=all`, `sido=전국`, `sigungu=전체`는 해당 필터를 적용하지 않습니다. 지정한 시설 ID는 모두 가진 공간을 찾습니다.
+- `date`는 선택이며 없으면 한국 오늘입니다. `now=true`면 선택 날짜가 있어도 오늘로 조회하고 현재 시각보다 뒤인 빈 시간 칸이 하나 이상 있는 공간만 남깁니다.
+- `start_hour`와 `hours`는 함께 입력해야 합니다. 이용시간은 1~4시간이며, 공간의 `min_hours` 이상이어야 합니다. 시작 시각부터 요청한 모든 칸이 영업시간 안이고 비어 있는 공간만 결과에 포함합니다. 지정한 날짜는 설정된 예약 범위 안이어야 합니다.
+- 응답은 `{"items": [...], "page": 1, "size": 10, "total": 132}`입니다. `total`은 모든 검색 조건을 적용한 전체 결과 수이며 페이지를 자르기 전에 계산합니다. 기본 정렬은 공간 ID 오름차순으로 유지합니다.
+- F-13 정렬은 가격 낮은 순·평점 높은 순·인기 높은 순입니다. 인기 수는 최근 7일 안에 생성된 예약 중 취소되지 않았고 `reserve_date >= DATE(created_at)`인 예약을 셉니다. 동률은 공간 ID 오름차순으로 고정합니다.
+- 날짜 형식·정렬·유형·시설 ID·인원·시각 입력 오류는 400 `VALIDATION`, 예약 범위 밖 날짜는 400 `OUT_OF_RANGE`입니다. 잘못된 검색값은 새 오류 코드를 추가하지 않습니다.
+- 검색 결과의 `slots`·시설명·대표 그림은 현재 페이지 공간 ID를 모아 일괄 조회합니다. 이미지 누락 기본값, NEW 날짜 기준, 평점은 F-20과 같습니다.
 
 검색 항목:
 
@@ -126,7 +169,26 @@ infra/nginx/       spacecube.conf         # [B] upstream 2대, /health
 - `past`: 그 칸이 이미 지났는지(날짜가 오늘 이전, 또는 오늘이고 시 ≤ 지금 시). **표시용이고 막지 않습니다**(11-03 날짜 결정). 지난 칸도 비어 있으면 예약할 수 있습니다.
 - replica에서 읽으므로 방금 찬 칸이 잠깐 비어 보일 수 있습니다. 예약은 primary가 판정하니 중복은 생기지 않습니다(6절).
 
-상세는 검색 항목에 `description`, `notice`, `images`(정렬 순), `facilities`(id·이름)를 더합니다. `is_active = false`면 404입니다. `/venues/new`는 `registered_on`, `new_days_left`를 더합니다.
+상세는 검색 항목에 `min_hours`, `description`, `notice`, `images`(정렬 순), `facilities`(id·이름)를 더합니다. `slots`는 오늘의 영업시간 칸이고 날짜별 조회는 F-22의 별도 API입니다. `is_active = false`면 404입니다. 평점은 `v_venue_rating`을 읽고 후기가 없는 공간은 `rating_avg = 0`, `review_count = 0`으로 반환합니다. DB에서 NULL인 설명·안내는 JSON에서도 null입니다. `/venues/new`는 `registered_on`, `new_days_left`를 더합니다.
+
+11-05 확정한 응답 기준:
+
+- 이미지가 없거나 빈 값뿐이면 대표 `image`는 `"art:group-0"`, 상세 `images`는 `["art:group-0"]`를 반환합니다. 기존 `RoomArt`의 `kind="group"`, `tone=0` 기본 동작과 같으며 갤러리를 빈 상태로 두지 않습니다. 별도의 `lounge-0` 대체값은 추가하지 않습니다.
+- 실제 이미지가 있으면 정렬된 첫 그림을 대표 이미지로 쓰고 갤러리는 그 순서를 유지합니다.
+- `is_new`는 DB의 한국 시각 `created_at`을 날짜로 바꿔 `0 <= (get_today() - created_at.date()).days < 14`로 계산합니다. 오늘과 13일 전은 포함하고 14일 전·미래 날짜는 제외합니다. 경과 336시간이 아니라 한국 달력 날짜 14개가 기준입니다.
+
+F-22 `GET /venues/{venue_id}/slots?date=YYYY-MM-DD`:
+
+```json
+[{"hour": 9, "taken": false, "past": true}, {"hour": 10, "taken": true, "past": true}]
+```
+
+- 인증 없이 `get_db_read()`로 조회하며 `date`는 필수입니다. `YYYY-MM-DD` 형식의 실제 날짜만 허용합니다. 누락·잘못된 형식·존재하지 않는 날짜·잘못된 공간 ID는 공통 400 `VALIDATION`입니다.
+- 날짜는 한국 `get_today()` 기준 `BOOKING_PAST_DAYS`일 전부터 `BOOKING_FUTURE_DAYS`일 후까지 양끝을 포함합니다(기본 각각 365). 범위 밖은 400 `OUT_OF_RANGE`, 문구는 “예약할 수 없는 날짜나 시간이에요.”, `detail`은 `{"reason":"date","min_date":"YYYY-MM-DD","max_date":"YYYY-MM-DD"}`입니다.
+- 범위를 확인한 뒤 활성 공간을 읽으며 없는 공간·비활성 공간은 같은 404 `VENUE_NOT_FOUND`입니다.
+- 응답은 배열입니다. `open_hour`부터 `close_hour` 직전까지 1시간 칸을 오름차순으로 모두 반환합니다. 최소 예약시간·연속 빈 칸 여부로 표시 칸을 제외하지 않습니다.
+- `taken`은 해당 공간·날짜의 `reservation_slots` 존재 여부입니다. 완료 예약의 칸도 점유로 표시하고 다른 공간·날짜는 섞지 않습니다. `past`는 위의 표시 규칙을 따르며 지난 빈 칸도 유지합니다.
+- 오늘 조회 결과는 F-20의 `slots`와 같습니다. 점유 상태는 캐시하지 않으며 매 요청 다시 읽습니다. replica 복제 지연 가능성과 예약 시 primary 최종 판정 원칙은 동일합니다.
 
 `/available-dates`:
 
@@ -136,6 +198,15 @@ infra/nginx/       spacecube.conf         # [B] upstream 2대, /health
 ```
 
 `bookable`은 **이어진 빈 칸이 그 공간의 `min_hours` 이상**인 날입니다(지난 칸도 포함). `offset`은 오늘 기준 일 수로 음수도 됩니다(`-14`면 2주 전부터). 범위는 설정값 `BOOKING_PAST_DAYS`·`BOOKING_FUTURE_DAYS`(기본 각 365)이고 응답의 `min_date`·`max_date`로 알려 줍니다.
+
+F-21 구현 기준(기존 프론트 목업과 동일):
+
+- 인증 없이 `get_db_read()`로 조회합니다. `offset`은 정수 기본 0, `days`는 1~31 정수 기본 14입니다. 잘못된 값·공간 ID는 400 `VALIDATION`입니다.
+- 시작 날짜는 한국 `get_today() + offset`입니다. 시작 날짜가 설정 범위 밖이면 F-22와 같은 400 `OUT_OF_RANGE` 및 `reason="date"`·`min_date`·`max_date` detail을 반환합니다. 큰 정수 offset도 날짜 연산 전에 범위를 확인합니다.
+- 시작 날짜가 허용되면 `days`일을 조회하되 최대 날짜를 넘는 뒷부분은 자릅니다. 응답 `days`는 요청값을 유지하고 `dates` 길이는 더 짧을 수 있습니다. `min_date`·`max_date`는 조회 페이지가 아닌 전체 예약 가능 범위입니다.
+- `dates`는 조회 구간의 모든 날짜를 오름차순으로 포함합니다. 예약 불가능한 날도 `bookable=false`로 남깁니다. `free`는 `[open_hour, close_hour)` 안의 빈 칸 총수이며 연속 길이와 다릅니다. 예를 들어 최소 2시간에 빈 칸 2개가 떨어져 있으면 `free=2`, `bookable=false`입니다.
+- 지난 칸은 제외하지 않고 완료 예약의 칸도 점유로 셉니다. 다른 공간·날짜 및 영업시간 밖 점유는 섞지 않습니다. 없는 공간·비활성 공간은 404 `VENUE_NOT_FOUND`입니다.
+- 공간의 영업시간·최소 이용시간과 요청 기간의 점유 칸을 각각 한 번씩 조회합니다. 날짜별 SQL 반복·이미지·평점 조회·점유 캐시는 없습니다. replica 복제 지연 가능성과 예약 시 primary 최종 판정 원칙은 F-22와 같습니다.
 
 ### 5-3. 예약·결제 (W)
 
@@ -258,7 +329,8 @@ UPDATE reservations SET status = 'completed'
 | 파일 | 확인할 것 |
 | --- | --- |
 | test_catalog.py | 유형 5개, 시·도 → 시·군·구, 시설 목록 |
-| test_venues.py | 필터 조합, 정렬 4종, 칸 상태(taken·past), NEW 14일 경계, 비활성 404, 날짜 더보기(offset) |
+| test_reservation_dependencies.py | 모델 DDL·`get_owned()`·A 후기 작성 연결, `count_cancellable()`의 회원·상태·시작 정각·날짜 경계·0건·복수 예약 집계 및 호출자 트랜잭션 유지 |
+| test_venues.py | 필터 조합, 정렬 4종, 칸 상태(taken·past), 이미지 누락 시 대표·갤러리 group-0, 실제 이미지 순서, NEW 오늘·13일 전 포함 및 14일 전·미래 제외, 비활성 404, 날짜 더보기(offset) |
 | test_reservations.py | 성공 201(3개 표 모두 생김), **같은 요청 다시 보내면 200 + 같은 reservation_id(표에 새 행 없음)**, 내 예약과 일부 겹치면 409 + `mine`, 범위 밖 400(±365일 밖·영업시간 밖·5칸·`min_hours` 미만), 지난 시간 예약은 201 + 바로 completed, 인원 초과, 결제수단 오류, 남의 예약 404, 취소 후 칸 반납·환불, 지난 예약 취소 409, **예약 직후 `/reservations/me`에 보임** |
 | test_concurrency.py | **같은 칸 동시 50건 → 201 정확히 1건, 409 49건.** 겹치는 범위(13~15 vs 14~16)도 1건만. 409의 `detail.slots`가 정확함 |
 | test_jobs.py | 끝나는 시각이 지난 confirmed만 completed(오늘 끝난 것 포함), 두 번 돌려도 같음 |

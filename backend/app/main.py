@@ -18,7 +18,7 @@ from app.core.logging import setup_logging
 from app.core.metrics import setup_metrics
 from app.core.middleware import RequestContextMiddleware
 from app.core.mongo import close_mongo, get_mongo_client
-from app.routers import auth, events, health, reviews, users
+from app.routers import auth, catalog, events, health, reviews, users, venues
 from app.services.health_service import stop_health_checks
 
 
@@ -79,7 +79,9 @@ def create_app() -> FastAPI:
     app.include_router(users.router, prefix="/users", tags=["users"])
     app.include_router(reviews.router, tags=["reviews"])
     app.include_router(events.router, prefix="/events", tags=["events"])
-    # B의 catalog·venues·reservations·internal은 해당 파트 구현 후 등록한다.
+    app.include_router(catalog.router, tags=["catalog"])
+    app.include_router(venues.router, prefix="/venues", tags=["venues"])
+    # B의 reservations·internal은 해당 파트 구현 후 등록한다.
     setup_metrics(app)
     configure_openapi(app)
     app.add_middleware(RequestContextMiddleware)

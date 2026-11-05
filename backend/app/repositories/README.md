@@ -19,5 +19,6 @@
 | 함수 | 제공 | 사용 | 반환 |
 | --- | --- | --- | --- |
 | `reservation_repo.get_owned(db, user_id, reservation_id)` | B | A (후기 작성 자격, primary 세션) | `Reservation(reservation_id, venue_id, reserve_date, start_hour, end_hour, status, created_at)` 또는 `None` |
+| `reservation_repo.count_cancellable(db, user_id)` | B | A (탈퇴 전 확인, 같은 primary 세션) | 시작 전 `confirmed` 예약 수(`int`), 시작 정각·이용 중·완료·취소 제외. 커밋은 호출자가 관리 |
 
 표·컬럼 이름은 `docs/산출물_04_DB명세서.md`(검증 후 `db/migrations`)가 기준입니다. 바꾸고 싶으면 DB 담당에게 요청합니다.
