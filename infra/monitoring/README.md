@@ -1,5 +1,7 @@
 # monitoring — 로그·지표·대시보드 (담당: A)
 
+> **11-05 결정:** 모니터링은 노트북 2의 VM `mon`(192.168.0.22)에서 Prometheus·Loki·Grafana를 **apt·systemd로**(Docker 없이) 돌리고, 모든 VM의 Alloy가 로그·지표를 보냅니다([로컬 VM 구성](../../docs/로컬_VM_구성.md)). 아래의 모니터링 EC2·Docker Compose 내용은 AWS 참고안입니다. (A 담당 파일: 안내 한 줄만 더함)
+
 모니터링 EC2(public-a, 10.1n.1.31, t4g.small) 한 대에 Docker Compose로 Prometheus·Loki·Grafana를 띄우고, 각 EC2의 Grafana Alloy가 로그와 exporter 지표를 보냅니다. 기준: [산출물_02 4-3](../../docs/산출물_02_시스템아키텍처_흐름도.md), [DB 명세 9절](../../docs/산출물_04_DB명세서.md).
 
 ## 흐름

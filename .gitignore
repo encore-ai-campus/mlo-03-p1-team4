@@ -35,3 +35,6 @@ Thumbs.db
 
 # 크롤링 표본 원본(업체 이름 포함) — 공개 저장소에 올리지 않는다. 가공값은 MongoDB crawl_raw에
 crawler/data/
+
+# 각자 PC의 Claude Code 미리보기 설정
+.claude/launch.json

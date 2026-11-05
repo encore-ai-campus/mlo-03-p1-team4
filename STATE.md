@@ -3,7 +3,7 @@
 사람과 에이전트(Codex, Claude Code)가 함께 고치는 진행 기록입니다. 작업을 끝낼 때마다 해당 줄을 고치고 '최근 변경' 맨 위에 한 줄 더합니다. 설계 내용 자체는 `docs/`에, 여기는 상태와 결정만 둡니다.
 
 - 마지막 갱신: 2026-11-05
-- 단계: **11-05 통합일** · 설계 11-03 확정안 + 11-05 회의(탈퇴·A6·A7 확정, A8 보류) · DB 0001·seed·로컬 compose 검증 · 프론트 7화면(목업, 다락큐브·푸터 반영) · GitHub develop 흐름·CI·Project 보드 · 백엔드 A·B 코드 합치기 전
+- 단계: **11-05 통합일** · 설계 11-03 확정안 + 11-05 회의(탈퇴·A6·A7 확정, A8 보류) · DB 0001·seed·로컬 compose 검증 · 프론트 7화면(목업, 다락큐브·푸터 반영) · GitHub develop 흐름·CI·Project 보드 · **1차 배포 로컬 VM 7대(노트북 4대, 11-05)** · 백엔드 A·B 코드 합치기 전
 - 디자인 캔버스(화면 설계 · 시스템 아키텍처 · 글꼴 시안): https://claude.ai/artifact/5dQciCDEaMm8uNjw6sqZpm
 - 실행 환경: Python은 conda `pro_1`(`environment.yml`), 프론트는 `frontend/`의 npm
 
@@ -83,6 +83,7 @@
 | 11-05 | 취소할 수 있는 예약(`confirmed`·시작 전)이 남은 회원은 탈퇴를 막는다: 409 `HAS_UPCOMING_RESERVATION` + `detail.count`, 이용 중인 예약은 막지 않음. B가 `reservation_repo.count_cancellable(db, user_id)` 제공(A·B 확인 필요), FE는 탈퇴 창에서 버튼을 끄고 예약 내역 링크 | 11-05 회의(이슈 #12) |
 | 11-05 | A6 배포 확정: ① `X-Synthetic: 1`은 `X-Synthetic-Key`(= `SYNTHETIC_API_KEY`, `INTERNAL_API_KEY`와 따로)와 함께일 때만 인정, 키 없음·틀림은 401 `UNAUTHORIZED`(새 코드 없음) ② RDS 자동 백업 7일·삭제 보호·파라미터 그룹 ③ `limit_req`는 넣지 않음(Locust가 IP 하나라 부하 시험을 막음, B8 조건 그대로) ④ Nginx `max_fails=2`·`proxy_connect_timeout 2s`·GET만 다시 보내기. HTTPS는 11-04대로 나중. A는 새 설정 키 확인 필요 | 11-05 회의(이슈 #18) |
 | 11-05 | A7 측정 기준 확정: 동시 50명에서 판정(조회 p95 300ms·예약 p95 500ms·로그인/가입 p95 800ms 미만, 오류율 1% 미만), 200명은 한계 찾기(기록만). Locust 쪽 p95로 판정, 단계 10분(첫 1분 뺌). 오류 = 5xx·연결 실패·시간 초과(시나리오가 일부러 만드는 409·401·400은 뺌). 서버 1대 끄기는 끈 뒤 1분 오류 1% 미만·중복 0. 불합격이어도 5일 안에 서버를 늘리지 않고 원인을 발표 | 11-05 회의 |
+| 11-05 | **1차 배포를 AWS 대신 팀 노트북 4대(16코어·32GB)의 VM 7대로**: 노트북 1(DB) `gw`·`db1`·`mongo`, 노트북 2(A) `api1`·`mon`, 노트북 3(B) `api2`·`db2`, 노트북 4(FE·PM) Locust·생성기·E2E·시연. VirtualBox 브리지, 팀 공유기, Ubuntu Server 24.04, apt·systemd(Docker 없음), `ufw`. replica 계속 켬, 모니터링은 `mon` VM, 백업은 cron, 삭제 보호 대신 VM 스냅샷. A6·A7 나머지는 그대로(A7은 유선 기준). AWS C안·확장안은 참고안 | PM(노진산), `docs/로컬_VM_구성.md` |
 
 ## 열린 질문 — 한 번에 검토할 목록
 
@@ -140,6 +141,8 @@ A1~A4는 11-03에 확정했고, **A5~A8은 추후 확정**으로 미뤘다(11-03
 - 개인 기억(Claude 자동 메모리 등)은 팀에 공유되지 않는다. 팀이 알아야 할 것은 이 파일과 `docs/`에 쓴다.
 
 ## 최근 변경 (최신이 위)
+
+- 11-05 · 공동 · 1차 배포를 로컬 VM으로 바꿈: `docs/로컬_VM_구성.md`·`infra/vm/README.md` 추가, 아키텍처 그림을 노트북 4대 · VM 7대로 새로 그림(AWS C안 그림은 `architecture_aws.png`로 보관). README·산출물 01·02·04·05·AGENTS·STRUCTURE·infra·simulator 반영, AWS 문서·`infra/monitoring`·`db/README`에는 맨 위 안내만
 
 - 11-05 · 공동 · PM 회의(노진산): ① 탈퇴 — 시작 전 예약이 있으면 409 `HAS_UPCOMING_RESERVATION`, B가 `reservation_repo.count_cancellable()` 제공(A·B 확인 필요) ② A6 — `X-Synthetic` + `X-Synthetic-Key`(`SYNTHETIC_API_KEY`), RDS 백업 7일·삭제 보호, `limit_req` 안 넣음, Nginx `max_fails=2` ③ A7 — 동시 50명에서 조회 300ms·예약 500ms·로그인 800ms·오류 1% 미만, 200명은 한계 찾기 ④ A8 보류. 반영: `오류코드.md`, `백엔드_A·B`, `산출물_01·02·05`, `인프라_트래픽_안정성_검토`, `AGENTS.md`, `backend/.env.example`, `backend/app/core/README.md`, `simulator/`, `infra/aws·nginx`, `프론트_변경목록` 4-1절, README, CI 환경 변수
 

@@ -40,7 +40,9 @@ Pro_1/
 │  ├─ 인프라_트래픽_안정성_검토.md       [공동] 정문·용량·AWS 안정성·팀별 검토 (권장안)
 │  ├─ 프론트_변경목록_11-03.md           [FE] 확정안에 맞춰 고칠 것
 │  ├─ 공간대여_04_UI패턴_글꼴.md · 공간대여_05_프론트_현황.md · 공간대여_06_크롤링_사이트조사.md
-│  ├─ AWS_프리티어_구성.md               [공동] 1차 AWS 구성(프리 티어, 11-04)
+│  ├─ 로컬_VM_구성.md                    [공동] 1차 배포: 노트북 4대 · VM 7대 배치·주소·방화벽 (11-05)
+│  ├─ 데이터_수집_명세.md                [공동] 크롤링 3곳·약관·무료 사진·섞는 비율 (11-05 초안)
+│  ├─ AWS_프리티어_구성.md               [공동] AWS C안(프리 티어, 11-04) — 참고안
 │  ├─ AWS_네트워크_설계.md · MVP_시뮬레이션_크롤링_수치.md   (10-30 기준, 맨 위 안내 참고)
 │  ├─ db/                     [DB] mongo_init.js (검증 끝). spacecube_mariadb.sql은 0001로 옮겼다는 안내만
 │  ├─ figures/                [공동] 그림 PNG·SVG, src/ 원본, tools/ 렌더 스크립트
@@ -94,7 +96,8 @@ Pro_1/
 │  ├─ local/                  [DB] docker compose: MariaDB 11.4(3308) + MongoDB 7, 첫 실행 때 0001·seed·mongo_init 자동 (11-04)
 │  ├─ nginx/                  [B] spacecube.conf (README에 초안)
 │  ├─ monitoring/             [A] docker-compose, alloy.config, grafana/dashboards (예정)
-│  └─ aws/                    [공동] 팀원별 AWS 체크리스트
+│  ├─ vm/                     [공동] 로컬 VM 7대 설치 체크리스트 (11-05, 1차 배포)
+│  └─ aws/                    [공동] 팀원별 AWS 체크리스트 (참고안)
 │
 └─ design/
    └─ fonts/                  글꼴 원본(original/, 압축본에서 뺌)·서브셋 스크립트

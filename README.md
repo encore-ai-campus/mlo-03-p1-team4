@@ -56,21 +56,21 @@
 | --- | --- | --- |
 | 프론트엔드 | Vue 3.5, Vite 8, JavaScript, Pinia, Vue Router, reka-ui | 화면 7개, 접근성 있는 UI 부품 |
 | 백엔드 | Python 3.12, FastAPI, SQLAlchemy 2.1(동기) + PyMySQL, pymongo | API, 업무 규칙, 트랜잭션 |
-| 관계형 DB | MariaDB 11.4 (AWS RDS primary + read replica, Replication) | 회원·공간·예약·결제·후기 |
+| 관계형 DB | MariaDB 11.4 (primary + read replica VM, GTID Replication) | 회원·공간·예약·결제·후기 |
 | 비정형 DB | MongoDB 7 | 사용자 이벤트, 크롤링 원본, 일별 집계 |
-| 관측 | Grafana Alloy, Loki, Prometheus, Grafana Cloud, 서비스별 exporter | 로그 검색, 지표, 대시보드 |
-| 서버 | AWS EC2 3대(Nginx + MongoDB, FastAPI 2), RDS, 서울 리전 | 프리 티어(크레딧) 안에서 측정·시연 때만 켬 |
+| 관측 | Grafana Alloy, Loki, Prometheus, Grafana(모니터링 VM), 서비스별 exporter | 로그 검색, 지표, 대시보드 4장 |
+| 서버 | 팀 노트북 4대 · VirtualBox VM 7대(정문 Nginx, FastAPI 2, MariaDB 2, MongoDB, 모니터링), Ubuntu Server 24.04, systemd | 같은 공유기에 브리지로 연결, 비용 0. AWS 구성은 참고안 |
 | 테스트·품질 | Vitest, Playwright, axe, pytest, Ruff, Locust | 단위·화면 흐름·접근성·부하 |
 | AI 개발 도구 | Codex, Claude Code + `AGENTS.md` 지침, 디자인·보안 점검 스킬 | 파트별 구현·리뷰([산출물 05](docs/산출물_05_구현_운영_계획.md) 1절) |
 | 개발 환경 | conda `pro_1`, Node.js/npm, Docker Compose(로컬 DB) | 팀원 모두 같은 버전 |
 
 ### 시스템 구성 (System Architecture)
 
-1차는 AWS 프리 티어(크레딧) 안에서 **EC2 3대 + RDS**로 올립니다. 브라우저는 Nginx만 부르고, FastAPI는 밖에서 직접 부를 수 없습니다. EC2에는 Docker 없이 직접 설치합니다. 기준: [AWS 프리 티어 구성](docs/AWS_프리티어_구성.md), [시스템 아키텍처](docs/산출물_02_시스템아키텍처_흐름도.md)
+1차는 **팀 노트북 4대에 VM 7대**를 만들어 같은 공유기에 브리지로 붙입니다(11-05). 브라우저는 정문 Nginx만 부르고, FastAPI는 밖에서 직접 부를 수 없습니다. VM에는 Docker 없이 apt·systemd로 설치합니다. FastAPI 두 대와 MariaDB primary·replica를 서로 다른 노트북에 둬서, 노트북 한 대를 꺼도 서비스가 버팁니다. 기준: [로컬 VM 구성](docs/로컬_VM_구성.md), [시스템 아키텍처](docs/산출물_02_시스템아키텍처_흐름도.md)
 
-![다락큐브 시스템 아키텍처 1차 구성(C안)](docs/figures/architecture.png)
+![다락큐브 시스템 아키텍처 1차 구성(로컬 VM)](docs/figures/architecture.png)
 
-확장안(EC2 5대 + RDS 2대 + 모니터링 EC2)은 [그림](docs/figures/architecture_expanded.png)으로 남기고, 측정에서 조건을 넘으면 ALB·Auto Scaling을 더합니다.
+AWS 참고안: [C안 그림](docs/figures/architecture_aws.png)(EC2 3대 + RDS, 11-04), [확장안 그림](docs/figures/architecture_expanded.png)(EC2 5대 + RDS 2대 + 모니터링 EC2, 11-03).
 
 ## 4. WBS
 
@@ -82,7 +82,7 @@
 | ~11-03 | 화면 | 화면 7개 시안, UI 패턴·글꼴, 목업으로 동작하는 Vue 화면 | 프론트 | [UI 패턴](docs/공간대여_04_UI패턴_글꼴.md), `frontend/` | 완료(목업) |
 | 11-04(수) | 로컬 개발 | 각자 가상환경 세팅·로컬 테스트 / DB 검증·0001·기초 데이터·로컬 compose / 구현·운영 계획 / GitHub 규칙·이슈·마일스톤 | 전원 | `db/`, `infra/local`, [산출물 05](docs/산출물_05_구현_운영_계획.md), [CONTRIBUTING](CONTRIBUTING.md) | 진행 중 |
 | 11-05(목) | 통합 | 각자 한 것 합치기(A core·회원·후기·이벤트, B 조회·예약·결제), 프론트 실제 API 연결, **회원가입부터 후기까지 전체 기능 점검** | 전원 | 통합 PR, 점검 체크리스트 | 예정 |
-| 11-06(금) | 피드백·검토 | 피드백과 검토, 디테일 다듬기, AWS 배포(EC2 3대·RDS)·모니터링, Locust 부하·신뢰성 측정 | 전원 | 측정 결과, 검토 이슈 | 예정 |
+| 11-06(금) | 피드백·검토 | 피드백과 검토, 디테일 다듬기, 로컬 VM 7대 배포(노트북 3대)·모니터링, Locust 부하·신뢰성 측정 | 전원 | 측정 결과, 검토 이슈 | 예정 |
 | 11-07(토) | 피드백 반영 | 검토 이슈 반영, 가상 데이터(90일 백필·페르소나 자동 실행) | 전원 | 반영 PR | 예정 |
 | 11-08(일) | 발표 준비 | 발표 자료, 시연 시나리오·계정, README 수행결과·회고 | 전원 | 발표 자료 | 예정 |
 | 11-09(월) | 발표 | 시연·발표 | 전원 | — | 예정 |
@@ -210,7 +210,7 @@ http://localhost:5173 · 목업 로그인 `study@example.com` + 8자 이상 아�
 | `db/` | 마이그레이션, 기초 데이터, 적재·제약 시험 스크립트 |
 | `crawler/` | 공간 데이터 수집 코드 |
 | `simulator/` | 가상 데이터 생성, Locust 부하 |
-| `infra/` | 로컬 compose, Nginx, 모니터링, AWS 체크리스트 |
+| `infra/` | 로컬 compose, VM 설치 체크리스트, Nginx, 모니터링, AWS 참고안 |
 | `docs/` | 산출물·설계 문서, 그림, 회의·검토 기록 |
 
 - 폴더별 담당과 기준 문서: [STRUCTURE.md](STRUCTURE.md) · AI 에이전트 지침: [AGENTS.md](AGENTS.md) · 진행 상태: [STATE.md](STATE.md)
