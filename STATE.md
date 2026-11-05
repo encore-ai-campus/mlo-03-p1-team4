@@ -3,7 +3,7 @@
 사람과 에이전트(Codex, Claude Code)가 함께 고치는 진행 기록입니다. 작업을 끝낼 때마다 해당 줄을 고치고 '최근 변경' 맨 위에 한 줄 더합니다. 설계 내용 자체는 `docs/`에, 여기는 상태와 결정만 둡니다.
 
 - 마지막 갱신: 2026-11-05
-- 단계: **11-05 통합일** · 설계 11-03 확정안 + 11-05 회의(탈퇴·A6·A7 확정, A8 보류) · DB 0001·seed·로컬 compose 검증 · 프론트 7화면(목업, 다락큐브·푸터 반영) · GitHub develop 흐름·CI·Project 보드 · **1차 배포 로컬 VM 7대(노트북 4대, 11-05)** · B F-10~14·20~22·시설 목록·get_owned() MariaDB 검증 완료, A 전달본 로컬 사용(Git 제외), GitHub A·B 통합 전
+- 단계: **11-05 통합일** · 설계 11-03 확정안 + 11-05 회의(탈퇴·A6·A7 확정, A8 보류) · DB 0001·seed·로컬 compose 검증 · 프론트 7화면(목업, 다락큐브·푸터 반영) · GitHub develop 흐름·CI·Project 보드 · **1차 배포 로컬 VM 7대(노트북 4대, 11-05)** · B F-10~14·20~22·시설 목록·get_owned() MariaDB 검증 완료, A core #34·최신 develop(c007470)을 #31 작업 트리에 통합, 공개 조회 라우터·탈퇴 지원 함수 연결 및 통합 검증 완료
 - 디자인 캔버스(화면 설계 · 시스템 아키텍처 · 글꼴 시안): https://claude.ai/artifact/5dQciCDEaMm8uNjw6sqZpm
 - 실행 환경: Python은 conda `pro_1`(`environment.yml`), 프론트는 `frontend/`의 npm
 
@@ -12,8 +12,8 @@
 | 파트 | 담당자 | 지금 | 다음 할 일 | 막힌 것 |
 | --- | --- | --- | --- | --- |
 | 프론트 | 노진산(FE·PM) | FE-1~9 확정안 반영, Claude 시안 대조·FE 오류/모바일 결제/가입 UX 재검토 및 목업·화면 검증 | A·B 구현 후 실제 API 연결·오류·예약 동시성 통합 검증 | 실제 API 미구현 |
-| FastAPI A | [이름] | 문서 확정(`docs/백엔드_A`), 폴더·README | 1일차 오전 `core/`(두 DB 세션·오류·`get_current_user`·`log_event`·`get_today`)·`models/base.py` → 회원 → 후기 → 이벤트 | 없음 |
-| FastAPI B | [이름] | F-10~14·시설 목록·F-20~22 공개 조회 API 구현·MariaDB 검증, PR #31 리뷰 중·develop 동기화. 전체 pytest 165건, Chrome API 1건, 프론트 단위 54건·린트·포맷·빌드 통과. A 공통 파일은 로컬 사용(Git 제외 유지) | 예약·동시성(#7) → 내 예약·취소·완료(#8). `/internal/venues`는 크롤러 논의 후 진행. A 통합 PR에 venues 라우터 등록, 후기 목록 연결 확인 필요 | A 공통 코드의 GitHub 통합은 A PR 필요. 실제 replica 장애·복제 지연은 DB 구성 후 검증 |
+| FastAPI A | [이름] | 이슈 #1 코드·테스트를 현재 클론에 반영, 로컬 MariaDB로 pytest 40개 통과 | B 공용 함수 확인, 이벤트 자유 문자열 개인정보 정책을 팀과 합의, PR 검토 | 후기·탈퇴 B 연동 및 이벤트 개인정보 합의 대기 |
+| FastAPI B | [이름] | #31에 develop(c007470) 통합·catalog/venues 등록·count_cancellable 구현. 공식 A 코드와 MariaDB pytest 217건, FE 단위 54건·Ruff·FE 린트·색 검사·빌드 통과 | #31 리뷰·CI 확인 → 별도 예약 브랜치 F-30~32 통합·PR → 내 예약·취소·완료. 검색 개선 권고는 후속 PR | A 탈퇴 API의 함수 호출 연결은 A 담당. 실제 replica 장애·복제 지연 미검증 |
 | DB | [이름] | `0001_init.sql`·`mongo_init.js` 검증(설치형 11.8·compose 11.4 둘 다 29건 통과), seed(유형 5·시설 20·지역 230 → `seed.sql`), `infra/local` compose, 크롤러 시제품(옛 필터) | 크롤러 새 필터(유형 5·별칭) → `/internal/venues` 등록(B와) → 가상 데이터 생성기 | 없음(A2 결정을 팀원에게 공유) |
 
 ## 기능 진행표
@@ -22,7 +22,8 @@
 
 | F-ID | 기능 | 담당 | 상태 |
 | --- | --- | --- | --- |
-| F-01~04 | 회원가입·로그인·내 정보·탈퇴 | A | 서버 설계 확정 / FE 가입·로그인·내 정보 조회·탈퇴 목업 검증 |
+| F-01~04 | 회원가입·로그인·내 정보·로그아웃·탈퇴 | A | 회원·로그아웃 pytest 통과. 탈퇴는 B 예약 확인 연결 전 503 |
+| F-04 지원 | 탈퇴 전 취소 가능 예약 수 | B / A 연계 | count_cancellable(db, user_id) → int 구현. 시작 전 confirmed만 포함, 시작 정각·날짜 경계·상태·회원·0건·복수 집계 12건 통과. A 탈퇴 서비스의 503 해제·호출 연결은 A 후속 작업 |
 | F-10 | 공간 유형 목록 조회 | B | 검증: 11-05 로컬 MariaDB `localhost:3306/spacecube_test`에서 pytest 5건 통과(공개 읽기·실제 DB 응답·5분 캐시·오류 처리) |
 | F-11·기준 정보 | 지역·시설 목록 조회 | B | 검증: 활성 지역 필터·시도/시군구 응답·시설 전체 조회·공유 스냅샷·5분 캐시·공개 읽기·검증 오류. 기존 F-10 포함 test_catalog 19건 통과 |
 | F-12 | 공간 검색 | B | 검증: GET `/venues`. q·유형·지역·날짜·시간·인원·복수 시설 필터, 검색 뒤 페이지 total, replica 조회. MariaDB 전용 테스트와 실제 HTTP 검색 계약·입력 오류 확인 |
@@ -35,8 +36,8 @@
 | F-34~35 | 취소, 이용 완료 배치 | B | 설계 확정 |
 | F-40~41 | 내 예약, 내 후기 | B / A | 서버 설계 확정 / FE 내 예약 3상태·내 후기 목업 검증 |
 | F-50 지원 | A 후기 작성용 예약 소유권 조회 | B | 예약·칸·결제 모델 및 `get_owned()`를 이전 프로젝트에서 가져옴. DDL 일치·매퍼 구성 4건, 실제 MariaDB 소유권·A 후기 작성 연결 10건 통과. 예약 생성 API 구현 완료를 뜻하지 않음 |
-| F-50~51 | 후기 작성·조회(후기 모아보기) | A | 서버 설계 확정 / FE 후기 작성·모아보기 목업 검증 |
-| F-60, F-62~65 | 이벤트(로그 파일 + MongoDB), 가상 데이터, `get_today`, 서버 로그, 지표 | A | 설계 확정 |
+| F-50~51 | 후기 작성·조회(후기 모아보기) | A | B 소유권 조회·공간 정보 연결 전 503 경로 존재, 미검증 |
+| F-60, F-62~65 | 이벤트(로그 파일 + MongoDB), 가상 데이터, `get_today`, 서버 로그, 지표 | A | 공통 계약·이벤트 pytest 통과. 자유 문자열 개인정보 처리 팀 합의 대기 |
 | F-61 | 크롤링 신규 등록 | DB / B | 진행 (크롤러 동작, 필터가 옛 스터디룸 기준, `crawl_raw`·`/internal/venues` 연결 전) |
 | F-70 | 헬스체크 3단계 | A | 설계 확정 |
 | — | 같은 칸 동시 50건 중 1건만 성공 | B / DB | 설계 확정 (MVP 통과 조건) |
@@ -49,6 +50,7 @@
 | 11-05 | F-21은 offset 기본 0·음수 허용, days 기본 14·1~31. 시작 범위 밖은 OUT_OF_RANGE, 마지막 페이지 뒷부분은 최대 날짜에서 자르고 응답 days는 요청값 유지. free는 빈 칸 총수, bookable은 연속 빈 칸 ≥ min_hours이며 지난 칸 포함 | 사용자 승인 계획 · 기존 FE venuesApi 목업 · `백엔드_B` 5-2절 |
 | 11-05 | F-22 날짜는 필수 `YYYY-MM-DD` 실제 날짜. 형식·누락은 `VALIDATION`, 설정 범위 밖은 `OUT_OF_RANGE`와 날짜 양끝 detail 반환. 지난 칸·완료 점유 유지, F-20과 시간 칸 조합 함수 공유 | 사용자 승인 구현 계획 · `백엔드_B` 5-2절 · `오류코드` |
 | 11-05 | F-20 이미지 누락은 RoomArt 기본값 `art:group-0`으로 대표 이미지·상세 갤러리를 통일하고 별도 lounge 대체값은 추가하지 않음. NEW는 한국 날짜 기준 오늘 포함 최근 14일(`0 <= 날짜 차이 < 14`), 미래 날짜 제외 | 사용자 지시 · `산출물_01` F-14·20, `백엔드_B` 5-2절 |
+| 11-05 | 로그아웃: 프론트가 헤더 사용자 메뉴·내 메뉴에서 토큰을 지우고, 서버 `POST /auth/logout`(유효 토큰 확인 → 204)도 둠(11-03 "로그아웃 API 없음"을 바꿈). 토큰 폐기 목록은 없음 | PM 결정 · #32·#33·#34, `산출물_01` F-02 |
 | 10-30 | 스터디룸 → 공간대여로 확장, 유형 5개(스터디룸·스튜디오·카페·영화관·파티룸, 11-03에 영화관 → 강의실), 전국 | 회의 · `docs/공간대여_01` |
 | 10-30 | 결제는 '확정 = 결제 완료'인 모의 결제 | 회의 |
 | 10-30 | 예약은 1시간 칸, 중복은 `reservation_slots` 기본키로 DB가 차단 | `docs/공간대여_02` |
@@ -159,6 +161,8 @@ A1~A4는 11-03에 확정했고, **A5~A8은 추후 확정**으로 미뤘다(11-03
 
 ## 최근 변경 (최신이 위)
 
+- 11-05 · B · #31 브랜치 전용 작업 트리에서 origin/develop(c007470, A #34 포함)을 통합. STATE.md는 A 진행·로그아웃 결정과 B 조회 검증 기록을 함께 보존하고 backend/tests/README.md는 양쪽 검증 안내를 보존해 충돌 해결. 공식 main.py에 catalog·venues만 등록. A 탈퇴용 count_cancellable(db, user_id) → int 제공: 한국 시각 한 번을 기준으로 시작 전 confirmed 예약만 primary에서 집계하며 시작 정각은 제외, 커밋하지 않음. 기존 205건 + 경계·집계 12건 = MariaDB pytest 217건 통과(Starlette 경고 1건), Ruff 린트·포맷과 FE verify(단위 54건·린트·색 검사·빌드) 통과. FE 기존 E2E 파일의 조건문 린트 경고 1건. A 탈퇴 서비스는 503 유지, 실제 호출 연결·동시 탈퇴/예약 통합은 A와 후속 확인. 예약·Postman 커밋은 별도 예약 브랜치에 보존. 그 브랜치의 로컬 A 전달본 제외 설정은 공식 A 통합 때 정리하며 이 작업 트리는 모든 A 파일을 Git 추적 상태로 사용. 검색 개선 권고·실제 replica 장애 시험·브라우저 E2E는 이번에 진행하지 않음.
+
 - 11-05 · B · PR #31 브랜치에 origin/develop(1cc11a8)을 머지. STATE.md 충돌 2곳은 B 구현·검증 기록과 공동의 11-05 통합일·로컬 VM 배포·회의 결정을 함께 보존해 해결. STRUCTURE·B API 명세·요구사항은 양쪽 변경을 자동 병합. A 전달본의 로컬 Git 제외는 유지하며, 새 공유 계약 count_cancellable()과 X-Synthetic-Key 반영 여부는 A 통합 및 후속 구현에서 확인해야 함. 머지 후 verify.ps1 전체 통과: pytest 165건·프론트 단위 54건·Ruff 린트/포맷·프론트 린트/색 검사/빌드. Starlette 경고 1건. A 전달본을 사용한 로컬 검증이며 실제 replica 장애·복제 지연과 GitHub A 통합 후 재검증은 후속 항목.
 
 - 11-05 · B · F-14 `GET /venues/new` 구현. 한국 날짜 오늘~13일 전의 활성 공간만 DB에서 조회하고 `created_at DESC, venue_id DESC`로 정렬, page/size·전체 `total`과 `registered_on`, `new_days_left = 14 - 경과일`을 반환. 검색과 시설·이미지·오늘 점유 칸 일괄 조합을 공유하고 새 마이그레이션 없이 구현. F-14 DB API 4건 추가 후 `test_venues.py` **126건**, 전체 `verify.ps1` pytest **165건**, 프론트 단위 **54건**, Ruff·프론트 린트·색 검사·빌드 통과. 별도 임시 Uvicorn + MariaDB + Chrome 검사 **1건 통과**(NEW 목록 날짜·14일·기본 이미지 포함), 가상 공간 롤백 확인. Starlette deprecation 경고 1건. 실제 replica 장애·지연은 미검증. A 통합 `main.py` 라우터 등록은 별도 확인 필요. 구현·검증 및 문서 변경 11개 파일을 F-14 커밋으로 정리.
@@ -195,6 +199,8 @@ A1~A4는 11-03에 확정했고, **A5~A8은 추후 확정**으로 미뤘다(11-03
 
 - 11-05 · B · 현재 브랜치·직접 전달받은 A 파일·기준 문서·GitHub 이슈를 대조해 남은 구현 순서를 검토. 다음 작업은 A 후기 작성을 여는 `get_owned()` 연결(#3), 이어 지역·시설 조회(#6)와 공간 데이터 공급용 `/internal/venues`를 제안(설계 결정 변경 없음). `pro_1`에서 Ruff 린트·포맷 통과, pytest 1건 통과·4건 준비 오류(`CHECK_DB_URL` 없음). 프론트는 설치된 Node 24.22.0을 직접 사용해 verify 통과(단위 테스트 54건·빌드 포함). E2E·DDL·실제 API 통합 시험은 이번에 실행하지 않음. A 파일과 Git 제외 설정은 수정하지 않음.
 
+- 11-05 · 공동 · 로그아웃 서버 API 유지(PM 승인)에 맞춰 `산출물_01` F-02와 결정 기록을 고침. 이슈 #2 댓글도 수정
+- 11-05 · A · 이슈 #1 변경을 `C:\mlo-03-p1-team4` 클론에 반영하고 경로 독립 테스트 실행 스크립트를 추가. 인증된 `POST /auth/logout` 204 및 Swagger Bearer 계약을 문서·테스트에 반영. 로컬 MariaDB `spacecube_test`에서 pytest 40개, Ruff 검사·포맷 확인 통과. DB 세션 시간대·STRICT 모드와 replica 대체도 로컬 확인 통과. 이벤트 자유 문자열 개인정보 정책은 팀 합의 대기. 후기·탈퇴 B 연동 전 제한은 유지.
 - 11-05 · 공동 · 1차 배포를 로컬 VM으로 바꿈: `docs/로컬_VM_구성.md`·`infra/vm/README.md` 추가, 아키텍처 그림을 노트북 4대 · VM 7대로 새로 그림(AWS C안 그림은 `architecture_aws.png`로 보관). README·산출물 01·02·04·05·AGENTS·STRUCTURE·infra·simulator 반영, AWS 문서·`infra/monitoring`·`db/README`에는 맨 위 안내만
 
 - 11-05 · 공동 · PM 회의(노진산): ① 탈퇴 — 시작 전 예약이 있으면 409 `HAS_UPCOMING_RESERVATION`, B가 `reservation_repo.count_cancellable()` 제공(A·B 확인 필요) ② A6 — `X-Synthetic` + `X-Synthetic-Key`(`SYNTHETIC_API_KEY`), RDS 백업 7일·삭제 보호, `limit_req` 안 넣음, Nginx `max_fails=2` ③ A7 — 동시 50명에서 조회 300ms·예약 500ms·로그인 800ms·오류 1% 미만, 200명은 한계 찾기 ④ A8 보류. 반영: `오류코드.md`, `백엔드_A·B`, `산출물_01·02·05`, `인프라_트래픽_안정성_검토`, `AGENTS.md`, `backend/.env.example`, `backend/app/core/README.md`, `simulator/`, `infra/aws·nginx`, `프론트_변경목록` 4-1절, README, CI 환경 변수

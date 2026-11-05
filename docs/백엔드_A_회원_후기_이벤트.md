@@ -111,6 +111,7 @@ infra/monitoring/  alloy.config                # [A] 로그 파일 → Loki, 로
 | GET | /auth/email-check?email= | - | W | F-01 | 200 `{"available": true}` | 400 |
 | POST | /auth/signup | - | W | F-01 | 201 `{"user_id": 42}` | 409 `EMAIL_TAKEN`, 400 `VALIDATION` |
 | POST | /auth/login | - | W | F-02 | 200 `{"access_token","token_type":"bearer","expires_in":3600}` | 401 `INVALID_CREDENTIALS` |
+| POST | /auth/logout | 회원 | W | F-02 | 204 (프론트가 저장한 토큰 삭제) | 401 |
 | GET | /users/me | 회원 | W | F-03 | 200 내 정보 | 401 |
 | PATCH | /users/me | 회원 | W | F-03 | 200 | 400 |
 | PATCH | /users/me/password | 회원 | W | F-03 | 204 | 400 `WRONG_PASSWORD` |
@@ -149,7 +150,7 @@ infra/monitoring/  alloy.config                # [A] 로그 파일 → Loki, 로
 | 수명 | `JWT_EXPIRE_MINUTES` 60분. 리프레시 토큰 없음, 연장 없음 |
 | 전달 | 로그인 응답 본문 → 프론트가 `Authorization: Bearer <토큰>`. 쿠키 안 씀(CORS·CSRF 설정 불필요) |
 | 확인 | `get_current_user()`: `jwt.decode(…, algorithms=["HS256"])` → primary에서 `users` 행이 있고 `deleted_at IS NULL`인지 → 아니면 401 `UNAUTHORIZED`. 만료·서명 오류도 401 |
-| 로그아웃 | 서버 API 없음. 프론트가 토큰을 지움. 서버 쪽 폐기 목록 없음 |
+| 로그아웃 | `POST /auth/logout`은 유효한 Bearer 토큰을 확인하고 204 반환. JWT 폐기 목록은 두지 않으므로 프론트가 토큰을 지워야 하며, 이미 복사된 토큰은 만료(기본 60분)까지 유효 |
 | 알고 넘어가는 것 | 비밀번호를 바꿔도 이미 발급된 토큰은 만료까지 유효(1차 범위 밖). 탈퇴는 `deleted_at` 확인으로 바로 막힘 |
 | 프론트 | 회원 API가 401이면 로그아웃 후 `/login?next=<지금 주소>`로, 고르던 칸은 유지(`프론트_변경목록_11-03.md`) |
 

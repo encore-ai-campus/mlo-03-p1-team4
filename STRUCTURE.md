@@ -67,13 +67,13 @@ Pro_1/
 ├─ backend/                   [A·B] FastAPI 한 앱 (B F-10~13·20~22·시설·get_owned 구현, A 코드는 로컬 전달본 사용)
 │  ├─ AGENTS.md · README.md · .env.example
 │  ├─ app/
-│  │  ├─ main.py              [A] (예정)
+│  │  ├─ main.py              [A] 공식 앱 통합, [B] catalog·venues 라우터 등록
 │  │  ├─ core/                [A] config, db, mongo, security, deps, errors, pagination, events, metrics, logging, clock, synthetic (예정)
 │  │  ├─ models/              [A] base, user, review / [B] catalog·reservation·venue 구현 — DDL 대응 모델
 │  │  ├─ routers/             [A] auth, users, reviews, events, health / [B] catalog·venues(검색·정렬·NEW·상세·예약 가능 날짜·시간 칸) 구현, reservations·internal 예정
 │  │  ├─ schemas/             라우터와 같은 이름 ([B] catalog·venues 검색·NEW·상세·날짜 목록·시간 칸 계약 구현)
 │  │  ├─ services/            [A] auth_service, user_service, review_service / [B] catalog_service·venue_service(검색·정렬·NEW·상세·예약 가능 날짜·시간 칸) 구현, reservation_service·internal_service 예정
-│  │  ├─ repositories/        [A] user_repo, review_repo / [B] catalog_repo·reservation_repo(get_owned)·venue_repo(검색·정렬·NEW)·slot_repo(공간·일자별 점유 조회) 구현, payment_repo 예정
+│  │  ├─ repositories/        [A] user_repo, review_repo / [B] catalog_repo·reservation_repo(get_owned·count_cancellable)·venue_repo(검색·정렬·NEW)·slot_repo(공간·일자별 점유 조회) 구현, payment_repo 예정
 │  │  └─ jobs/                [B] complete_reservations (예정)
 │  ├─ scripts/                [A] replay_events (예정)
 │  └─ tests/                  [B] test_catalog·test_reservation_dependencies·test_venues·test_read_routing 구현

@@ -329,6 +329,7 @@ UPDATE reservations SET status = 'completed'
 | 파일 | 확인할 것 |
 | --- | --- |
 | test_catalog.py | 유형 5개, 시·도 → 시·군·구, 시설 목록 |
+| test_reservation_dependencies.py | 모델 DDL·`get_owned()`·A 후기 작성 연결, `count_cancellable()`의 회원·상태·시작 정각·날짜 경계·0건·복수 예약 집계 및 호출자 트랜잭션 유지 |
 | test_venues.py | 필터 조합, 정렬 4종, 칸 상태(taken·past), 이미지 누락 시 대표·갤러리 group-0, 실제 이미지 순서, NEW 오늘·13일 전 포함 및 14일 전·미래 제외, 비활성 404, 날짜 더보기(offset) |
 | test_reservations.py | 성공 201(3개 표 모두 생김), **같은 요청 다시 보내면 200 + 같은 reservation_id(표에 새 행 없음)**, 내 예약과 일부 겹치면 409 + `mine`, 범위 밖 400(±365일 밖·영업시간 밖·5칸·`min_hours` 미만), 지난 시간 예약은 201 + 바로 completed, 인원 초과, 결제수단 오류, 남의 예약 404, 취소 후 칸 반납·환불, 지난 예약 취소 409, **예약 직후 `/reservations/me`에 보임** |
 | test_concurrency.py | **같은 칸 동시 50건 → 201 정확히 1건, 409 49건.** 겹치는 범위(13~15 vs 14~16)도 1건만. 409의 `detail.slots`가 정확함 |

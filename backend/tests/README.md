@@ -4,7 +4,7 @@
 
 | 파일 | 담당 | 꼭 확인할 것 |
 | --- | --- | --- |
-| `test_auth.py` | A | 이메일 중복 409 `EMAIL_TAKEN`, 가입 직후 로그인 성공, 토큰 없이 회원 전용 API 401 |
+| `test_auth.py` | A | 이메일 중복 409 `EMAIL_TAKEN`, 가입·로그인·프로필, 인증된 로그아웃 204, Swagger Bearer 계약, 토큰 없이 회원 전용 API 401 |
 | `test_users.py`, `test_reviews.py` | A | `password_hash` 없음, 후기 자격 404·403·403·409, 작성 직후 내 후기에 보임 |
 | `test_events.py` | A | 51건 400, MongoDB가 꺼져도 202이고 `events.log`에는 남음, replay해도 중복 없음 |
 | `test_models_match_db.py` | A | `app/models`의 표·컬럼 이름·NULL 여부가 `spacecube_test`의 실제 표와 같은지 (SQLAlchemy `inspect`) |
@@ -67,11 +67,12 @@ F-12·13 검색 검증 8건 추가 뒤 `test_venues.py`는 122건이었고, F-14
 `verify.ps1` 전체도 통과했습니다: pytest **165건**, 프론트 단위 **54건**, Ruff 린트·포맷,
 프론트 린트·색 검사·빌드. Starlette TestClient 사용 중단 예정 경고 1건이며 실패는 없습니다.
 
-현재 A 앱은 로컬 전달본이므로 `main.py`의 Git 제외는 유지했습니다. A 통합 PR에는 다음 import·등록이 필요합니다.
+기존 검증은 A 로컬 전달본을 사용했습니다. 이번 #31 통합에서는 develop의 공식 A 앱을 사용하며 `main.py`에 `catalog`·`venues` 라우터를 등록했습니다.
 
 ```python
-from app.routers import venues
+from app.routers import catalog, venues
 
+app.include_router(catalog.router, tags=["catalog"])
 app.include_router(venues.router, prefix="/venues", tags=["venues"])
 ```
 
@@ -154,3 +155,19 @@ python -m pytest backend/tests/test_reservation_dependencies.py -q
 11-05 현재 프로젝트의 `localhost:3306/spacecube_test`에서 **17건 통과**했습니다(기존 예약 의존성 14건 + 공간 모델 3건).
 F-12·13까지 추가한 전체 pytest는 **161건 통과**, Starlette TestClient 사용 중단 예정
 경고 1건입니다. 비밀번호는 테스트 프로세스에만 전달했고 파일이나 영구 환경변수에 저장하지 않았습니다.
+- `test_core_contracts.py`, `test_core_events.py`, `test_auth.py`는 이슈 #1 공통 계약·이벤트·회원 흐름 확인용입니다. 회원 테스트는 로컬 `spacecube_test`의 `CHECK_DB_URL`이 필요합니다.
+- 프로젝트 어디서 실행해도 테스트 파일 위치를 기준으로 경로를 잡는 PowerShell 실행 파일은 `run_auth_tests.ps1`입니다. 로컬 사용자 설정에서 `CHECK_DB_URL`을 찾고, 못 찾으면 현재 PowerShell 세션의 `CHECK_DB_URL`을 사용합니다.
+- 확인한 명령: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\run_auth_tests.ps1` (backend 폴더에서 실행). 결과: 40 passed. 테스트 데이터는 MariaDB 트랜잭션 롤백으로 보존하지 않습니다.
+
+## #31 A 공통 코드 통합·F-04 탈퇴 지원
+
+develop(c007470)의 공식 A 코드와 B 조회를 통합하고 main.py에 catalog·venues를 등록했습니다.
+test_reservation_dependencies.py는 count_cancellable의 시작 직전·정각·직후, 날짜 경계,
+confirmed·completed·cancelled, 타인 예약·0건·복수 예약 수와 호출자 트랜잭션 유지를 12건 추가 검증합니다.
+함수는 primary 세션을 전달받으며 커밋하지 않습니다. A의 탈퇴 서비스 호출 연결은 별도 후속 작업입니다.
+
+11-05 로컬 MariaDB spacecube_test에서 전체 pytest **217건 통과**, Starlette TestClient 경고 1건입니다.
+Ruff 린트·포맷과 프론트 verify(단위 **54건**, 린트·색 검사·빌드)도 통과했습니다.
+프론트 기존 e2e/account.spec.js의 조건문 린트 경고 1건은 남아 있습니다.
+pro_1은 Miniforge 경로의 실행기를 사용했고, DB 접속 정보는 테스트 프로세스에만 전달했습니다.
+예약 생성·Postman 산출물은 별도 예약 브랜치에 보존했으며, 이번 브랜치에는 포함하지 않습니다.
