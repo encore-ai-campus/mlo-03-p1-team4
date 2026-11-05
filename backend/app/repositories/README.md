@@ -8,9 +8,9 @@
 | `review_repo.py` | A | reviews, `v_venue_rating`(읽기) |
 | `catalog_repo.py` | B | categories, regions, facilities |
 | `venue_repo.py` | B | venues, venue_facilities, venue_images, `v_venue_rating`(읽기) |
-| `slot_repo.py` | B | reservation_slots |
-| `reservation_repo.py` | B | reservations |
-| `payment_repo.py` | B | payments |
+| `slot_repo.py` | B | reservation_slots (조회·예약 INSERT·충돌 조회) |
+| `reservation_repo.py` | B | reservations (생성·10분 재시도 조회·`get_owned`) |
+| `payment_repo.py` | B | payments (모의 결제 INSERT) |
 
 - 사용자 이벤트는 표가 아니라 `core/events.py`(로그 파일 + MongoDB)가 씁니다. `crawl_jobs`·MongoDB `crawl_raw`는 크롤러(DB 담당)가 씁니다.
 

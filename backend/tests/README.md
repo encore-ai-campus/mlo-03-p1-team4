@@ -10,8 +10,8 @@
 | `test_models_match_db.py` | A | `app/models`의 표·컬럼 이름·NULL 여부가 `spacecube_test`의 실제 표와 같은지 (SQLAlchemy `inspect`) |
 | `test_health.py`, `test_db_routing.py`, `test_metrics.py` | A | primary 끊김 503 / replica·MongoDB 끊김 200 degraded, replica 주소가 틀려도 공개 조회 성공 |
 | `test_catalog.py`, `test_venues.py` | B | 기준정보 필터·캐시, 공간 검색·정렬·상세·이미지·NEW·시간 칸·예약 가능 날짜 |
-| `test_reservations.py` | B | 성공 201(표 3개 모두 생김), 범위 밖 400, 취소 후 칸 반납·환불, 예약 직후 `/reservations/me`에 보임 |
-| `test_concurrency.py` | B | **같은 칸 동시 50건 → 201 정확히 1건, 409 49건** (MVP 통과 조건), `detail.slots` 정확 |
+| `test_reservations.py` | B | 예약·칸·모의결제 201, 10분 재시도 200, 409 소유권·대표 ID, 기간·시간·인원·수단 검증, 지난 시간 `completed`, 키 있는 가상 요청, 결제 실패 시 전체 롤백 |
+| `test_concurrency.py` | B | **다른 회원 50명이 같은 칸을 동시 요청 → 201 1건·409 49건**, 한 회원의 같은 요청 50건은 201 1건·200 49건, 겹치는 시간 범위 경쟁. DB 행 수·이벤트·카운터 확인 |
 | `test_jobs.py`, `test_internal.py`, `test_read_routing.py` | B | 완료 배치 멱등, upsert 201·200·400, 공개 조회만 `get_db_read` |
 
 ## F-12 검색·F-13 정렬·F-14 NEW 목록

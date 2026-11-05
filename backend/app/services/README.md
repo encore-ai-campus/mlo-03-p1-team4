@@ -6,7 +6,7 @@
 | `user_service.py` | A | 탈퇴 = `deleted_at` 기록(예약·후기는 보존) |
 | `review_service.py` | A | 자격 4단계: 내 예약(`get_owned`) → `completed` → 기한 안(`max(이용일, 예약한 날)`부터 7일) → 아직 안 씀 |
 | `venue_service.py` | B | 검색 조건 → 공간 + 그날 칸(`slots`는 한 번에 읽어 붙임), 예약 가능 날짜(이어진 빈 칸 ≥ `min_hours`) |
-| `reservation_service.py` | B | 예약+결제·취소 트랜잭션 (아래) |
+| `reservation_service.py` | B | F-30~32 예약+모의결제 한 트랜잭션, 재시도·중복 경쟁 처리; F-34 취소 예정 |
 | `internal_service.py` | B | 크롤러 결과 upsert `(source_site, source_id)`, 모르는 시설은 버리고 알림, 모르는 지역·유형은 400 |
 
 ## 예약 + 모의 결제 트랜잭션 (B, primary)
@@ -19,8 +19,10 @@
 4. reservation_slots INSERT × hours   ← 중복 키(1062)면 IntegrityError
 5. payments INSERT (status = paid, paid_at = NOW())
 6. COMMIT → 201, log_event(reserve_ok), reservation_total{result="ok"} +1
-   IntegrityError → ROLLBACK → primary에서 겹친 칸 읽기 → AppError("SLOT_TAKEN", 409, detail={"slots": [...]})
-                   → log_event(reserve_conflict), reservation_total{result="conflict"} +1
+   슬롯 1062 → ROLLBACK → primary에서 재시도 예약·겹친 칸 확인
+      같은 요청 10분 안: 200 + 기존 예약(추가 이벤트·카운터 없음)
+      모두 본인 예약과 충돌: 409 + mine, reservation_id는 겹친 예약 ID 최솟값
+      그 밖의 충돌: 409 + 슬롯 목록, reserve_conflict 이벤트·충돌 카운터 +1
 ```
 
 - 결제 화면에 들어올 때는 아무것도 잡지 않습니다. 먼저 커밋한 요청이 이깁니다.
