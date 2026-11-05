@@ -73,18 +73,12 @@ const userMenu = [
 </template>
 
 <style scoped>
-/* 스티키 헤더: 스크롤하면 그림자를 단다 (높이는 움직이지 않음) */
+/* 스티키 헤더: 반투명·흐림·그림자 없이 평평한 바탕 (높이는 움직이지 않음) */
 .header {
   position: sticky;
   top: 0;
   z-index: 40;
-  background: rgba(255, 255, 255, 0.92);
-  backdrop-filter: saturate(1.4) blur(8px);
-  border-bottom: 1px solid var(--c-line);
-  transition: box-shadow var(--t-base);
-}
-.header.is-compact {
-  box-shadow: 0 2px 12px rgba(23, 22, 29, 0.06);
+  background: var(--c-paper);
 }
 .header__inner {
   display: flex;
@@ -151,16 +145,15 @@ const userMenu = [
   min-width: var(--tap);
   justify-content: center;
   padding: 0 var(--sp-12);
-  border: 1px solid var(--c-line-strong);
+  border: 0;
   border-radius: var(--r-md);
-  background: var(--c-surface);
+  background: var(--c-fill);
   font-weight: 500;
   cursor: pointer;
 }
 .user-btn:hover,
 .menu-btn:hover {
-  border-color: var(--c-brand);
-  color: var(--c-brand-ink);
+  background: var(--c-line-strong);
 }
 .menu-btn {
   padding: 0;
@@ -173,7 +166,6 @@ const userMenu = [
   display: flex;
   align-items: center;
   min-height: 52px;
-  border-bottom: 1px solid var(--c-line);
   color: var(--c-ink);
   font-size: var(--fs-16);
   font-weight: 700;

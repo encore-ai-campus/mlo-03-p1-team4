@@ -18,24 +18,18 @@ defineProps({
   overflow: hidden;
   background: var(--c-fill);
 }
-/* 빛 띠는 transform으로만 움직인다(GPU). 계속 도는 움직임이라 linear */
-.sk::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(90deg, transparent, var(--c-fill-shine), transparent);
-  transform: translateX(-100%);
-  animation: shimmer 1.4s linear infinite;
+/* 그라데이션 빛 띠 대신 불투명도만 천천히 바꾼다 */
+.sk {
+  animation: pulse 1.4s ease-in-out infinite;
 }
-@keyframes shimmer {
-  to {
-    transform: translateX(100%);
+@keyframes pulse {
+  50% {
+    opacity: 0.55;
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .sk::after {
+  .sk {
     animation: none;
-    opacity: 0;
   }
 }
 </style>

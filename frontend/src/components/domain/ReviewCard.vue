@@ -12,7 +12,7 @@ defineProps({
   <article class="review">
     <RouterLink v-if="showRoom" :to="`/venues/${review.venue_id}`" class="review__room"><strong>{{ review.venue_name }}</strong></RouterLink>
     <div class="review__meta">
-      <span class="review__stars" :aria-label="`별점 ${review.rating}점`">{{ '★'.repeat(review.rating) }}<span class="review__off">{{ '★'.repeat(5 - review.rating) }}</span></span>
+      <span class="review__stars">별점 {{ review.rating }}</span>
       <span class="review__by num">{{ review.author }} · {{ review.created_at?.slice(0, 10) }}</span>
     </div>
     <p class="review__text">{{ review.content }}</p>
@@ -55,11 +55,8 @@ defineProps({
   font-size: var(--fs-13);
 }
 .review__stars {
-  color: var(--c-star-ink);
-  letter-spacing: 1px;
-}
-.review__off {
-  color: var(--c-star-off);
+  color: var(--c-ink);
+  font-weight: 700;
 }
 .review__by {
   color: var(--c-subtle);

@@ -9,7 +9,7 @@ const props = defineProps({
   tone: { type: Number, default: 0 },
 })
 
-const ALT_WALLS = { booth: '#DCEBF3', duo: '#F3E1E1', group: '#E1ECF7', seminar: '#EDE6DA', meeting: '#E6EDE4', lounge: '#E3E9F5', studio: '#E3E7EE', cafe: '#E6E9DA', partyroom: '#E3E1FA' }
+const ALT_WALLS = { booth: '#DCEBF3', duo: '#F3E1E1', group: '#E1ECF7', seminar: '#EDE6DA', meeting: '#E6EDE4', lounge: '#E3E9F5', studio: '#E3E7EE', cafe: '#E6E9DA', partyroom: '#E6E9DA' }
 
 function build(kind) {
   const s = []
@@ -22,7 +22,7 @@ function build(kind) {
   const backChair = (cx, c) => R(cx - 4.5, 48, 9, 14, c, 'border-radius:7px 7px 2px 2px')
   const frontChair = (cx, c) => {
     R(cx - 0.6, 84, 1.2, 9, '#2B2A33')
-    R(cx - 6, 66, 12, 20, c, 'border-radius:10px 10px 4px 4px;box-shadow:inset 0 -6px 0 rgba(0,0,0,.14)')
+    R(cx - 6, 66, 12, 20, c, 'border-radius:10px 10px 4px 4px;box-shadow:inset 0 -6px 0 rgba(0,0,0,.14)') // taste-skill-ignore 그림 재료(그늘)
   }
   const table = (cx, w, c) => {
     R(cx - w / 2 + 2, 63, 1.4, 24, '#3B3A44')
@@ -31,8 +31,8 @@ function build(kind) {
     R(cx - w / 2, 59.5, w, 3.8, c, 'border-radius:3px')
   }
   const whiteboard = (l, t, w, h) => {
-    R(l, t, w, h, '#FFFFFF', 'box-shadow:0 0 0 2px #B8B6C4;border-radius:2px')
-    R(l + w * 0.1, t + h * 0.22, w * 0.45, 1.2, '#5638E8')
+    R(l, t, w, h, '#FFFFFF', 'box-shadow:0 0 0 2px #B8B6C4;border-radius:2px') // taste-skill-ignore 그림 재료(그늘)
+    R(l + w * 0.1, t + h * 0.22, w * 0.45, 1.2, '#38450F')
     R(l + w * 0.1, t + h * 0.42, w * 0.32, 1, '#9A98A8')
     R(l + w * 0.1, t + h * 0.6, w * 0.55, 1, '#9A98A8')
     R(l + w * 0.68, t + h * 0.3, w * 0.18, h * 0.42, 'transparent', 'border:2px solid #E0794A;border-radius:50%;box-sizing:border-box')
@@ -43,15 +43,15 @@ function build(kind) {
     R(l + 1, t + 2, w - 2, h - 4, '#2F2A5C', 'border-radius:2px')
     R(l + 4, t + h * 0.3, w * 0.4, 1.4, '#FFFFFF')
     R(l + 4, t + h * 0.5, w * 0.25, 1, '#B9AEF5')
-    R(l + w * 0.6, t + h * 0.3, w * 0.25, h * 0.4, '#5638E8', 'border-radius:2px')
+    R(l + w * 0.6, t + h * 0.3, w * 0.25, h * 0.4, '#38450F', 'border-radius:2px')
   }
   const screen = (l, t, w, h) => {
     R(l - 1, t, w + 2, 2.4, '#3B3A44', 'border-radius:2px')
-    R(l, t + 2.4, w, h, '#F6F6F8', 'box-shadow:0 2px 0 rgba(0,0,0,.08)')
-    ;[0.35, 0.6, 0.45, 0.8].forEach((v, i) => R(l + w * (0.18 + i * 0.12), t + 2.4 + h * (0.85 - v * 0.7), w * 0.07, h * v * 0.7, i === 3 ? '#5638E8' : '#C9C0F7'))
+    R(l, t + 2.4, w, h, '#F6F6F8', 'box-shadow:0 2px 0 rgba(0,0,0,.08)') // taste-skill-ignore 그림 재료(그늘)
+    ;[0.35, 0.6, 0.45, 0.8].forEach((v, i) => R(l + w * (0.18 + i * 0.12), t + 2.4 + h * (0.85 - v * 0.7), w * 0.07, h * v * 0.7, i === 3 ? '#38450F' : '#C9C0F7'))
   }
   const windowPane = (l, t, w, h) => {
-    R(l, t, w, h, '#CFE3F2', 'box-shadow:0 0 0 4px #FFFFFF')
+    R(l, t, w, h, '#CFE3F2', 'box-shadow:0 0 0 4px #FFFFFF') // taste-skill-ignore 그림 재료(그늘)
     R(l, t + h * 0.62, w, h * 0.38, '#B7D3B4')
     R(l + w * 0.08, t + h * 0.38, w * 0.16, h * 0.4, '#7FB07E', 'border-radius:50% 50% 40% 40%')
     R(l + w * 0.62, t + h * 0.3, w * 0.2, h * 0.5, '#6FA16F', 'border-radius:50% 50% 40% 40%')
@@ -70,12 +70,12 @@ function build(kind) {
     R(x - 2.5, 16.6, 5, 1.6, '#FFE7A3', 'border-radius:50%')
   }
   const clock = (x, y) => {
-    R(x, y, 5, 7.7, '#FFFFFF', 'border-radius:50%;box-shadow:0 0 0 2px #3B3A44')
+    R(x, y, 5, 7.7, '#FFFFFF', 'border-radius:50%;box-shadow:0 0 0 2px #3B3A44') // taste-skill-ignore 그림 재료(그늘)
     R(x + 2.3, y + 1.6, 0.5, 3, '#3B3A44')
   }
   const shelf = (l, t, w, h) => {
     R(l, t, w, h, '#E9E1D3', 'border-radius:2px')
-    const cols = ['#5638E8', '#E0794A', '#2F7D5B', '#E8B44C', '#3F5BA9']
+    const cols = ['#38450F', '#E0794A', '#2F7D5B', '#E8B44C', '#3F5BA9']
     for (let row = 0; row < 3; row++) {
       R(l, t + ((row + 1) * h) / 3 - 1, w, 1, '#C9BEA9')
       for (let i = 0; i < 4; i++) R(l + 1.5 + (i * (w - 3)) / 4, t + (row * h) / 3 + 3, (w - 3) / 4 - 1, h / 3 - 4.5, cols[(row + i) % 5], 'border-radius:1px')
@@ -85,17 +85,17 @@ function build(kind) {
   const scenes = {
     booth: { wall: '#E6E1F6', label: '칸막이 책상과 개별 조명이 있는 1인 부스', draw() {
       floor('#CDBB98')
-      R(22, 24, 40, 38, '#D3CAF0', 'border-radius:4px 4px 0 0')
-      R(19, 20, 4, 50, '#B9AEDF', 'border-radius:3px 3px 0 0')
-      R(61, 20, 4, 50, '#B9AEDF', 'border-radius:3px 3px 0 0')
-      R(86, 20, 4, 50, '#B9AEDF', 'border-radius:3px 3px 0 0')
-      R(90, 24, 12, 38, '#D3CAF0')
+      R(22, 24, 40, 38, '#D5D9C2', 'border-radius:4px 4px 0 0')
+      R(19, 20, 4, 50, '#B7BE98', 'border-radius:3px 3px 0 0')
+      R(61, 20, 4, 50, '#B7BE98', 'border-radius:3px 3px 0 0')
+      R(86, 20, 4, 50, '#B7BE98', 'border-radius:3px 3px 0 0')
+      R(90, 24, 12, 38, '#D5D9C2')
       R(40, 36, 20, 22, 'rgba(255,224,140,.45)', 'border-radius:50%')
       R(52, 40, 0.9, 18, '#2B2A33')
       R(47.5, 37, 9, 4, '#2B2A33', 'border-radius:4px')
       R(29, 52, 14, 7, '#3B3A44', 'border-radius:2px 2px 0 0')
       table(42, 42, '#F6F1E7')
-      frontChair(42, '#5638E8')
+      frontChair(42, '#38450F')
       plant(72)
       clock(70, 16)
     } },
@@ -155,18 +155,18 @@ function build(kind) {
       ;[[8, 14], [79, 82]].forEach(([bx, sx]) => {
         R(sx, 30, 0.8, 52, '#2B2A33')
         R(sx - 3.5, 82, 8, 0.8, '#2B2A33')
-        R(bx, 16, 13, 16, '#FFFFFF', 'box-shadow:0 0 0 2px #2B2A33;border-radius:3px')
+        R(bx, 16, 13, 16, '#FFFFFF', 'box-shadow:0 0 0 2px #2B2A33;border-radius:3px') // taste-skill-ignore 그림 재료(그늘)
         R(bx + 2, 18, 9, 12, '#FFF6D8')
       })
       R(49.6, 58, 0.8, 30, '#2B2A33')
       R(45.5, 87, 9, 0.8, '#2B2A33')
       R(44, 49, 12, 9, '#2B2A33', 'border-radius:2px')
-      R(47.5, 51, 5, 6.5, '#5638E8', 'border-radius:50%')
+      R(47.5, 51, 5, 6.5, '#38450F', 'border-radius:50%')
       R(30, 60, 8, 14, '#E8B44C', 'border-radius:6px 6px 2px 2px')
     } },
     cafe: { wall: '#F1E3CF', label: '카운터와 메뉴판, 원형 테이블이 있는 카페', draw() {
       floor('#A8825A')
-      R(10, 12, 26, 24, '#2E3B33', 'border-radius:3px;box-shadow:0 0 0 3px #7A5638')
+      R(10, 12, 26, 24, '#2E3B33', 'border-radius:3px;box-shadow:0 0 0 3px #7A5638') // taste-skill-ignore 그림 재료(그늘)
       ;[0.25, 0.45, 0.65].forEach((v) => R(13, 12 + 24 * v, 14 + v * 6, 1, '#E9E3D8'))
       R(14, 40, 9, 12, '#3B3A44', 'border-radius:2px')
       R(26, 45, 4, 7, '#F6F1E7', 'border-radius:1px 1px 3px 3px')
@@ -181,14 +181,14 @@ function build(kind) {
     } },
     partyroom: { wall: '#FBE3E8', label: '풍선과 가랜드, 긴 테이블이 있는 파티룸', draw() {
       floor('#C7A77A')
-      const flags = ['#E5484D', '#FFC23D', '#5638E8', '#2F7D5B', '#E0794A']
+      const flags = ['#E5484D', '#FFC23D', '#38450F', '#2F7D5B', '#E0794A']
       for (let i = 0; i < 9; i++) R(22 + i * 6.5, 8 + (i % 2) * 1.5, 3.4, 5.2, flags[i % 5], 'transform:rotate(45deg)')
       R(20, 9, 60, 0.5, '#8A8896')
-      ;[[6, 14, '#E5484D'], [12, 20, '#FFC23D'], [86, 12, '#5638E8'], [91, 19, '#2F7D5B']].forEach(([bx, by, c]) => {
+      ;[[6, 14, '#E5484D'], [12, 20, '#FFC23D'], [86, 12, '#38450F'], [91, 19, '#2F7D5B']].forEach(([bx, by, c]) => {
         R(bx + 3.3, by + 10, 0.4, 16, '#8A8896')
         R(bx, by, 7, 10.8, c, 'border-radius:50%')
       })
-      R(0, 32, 100, 1, '#FF7AB6', 'box-shadow:0 0 8px #FF7AB6')
+      R(0, 32, 100, 1, '#FF7AB6', 'box-shadow:0 0 8px #FF7AB6') // taste-skill-ignore 그림 재료(그늘)
       ;[32, 44, 56, 68].forEach((x) => backChair(x, '#F2A0B6'))
       table(50, 56, '#F6F1E7')
       R(46, 52.5, 8, 7, '#FFFFFF', 'border-radius:2px 2px 0 0')

@@ -52,7 +52,7 @@ const id = useId()
   min-width: 0;
   min-height: 48px;
   padding: 0 var(--sp-12);
-  border: 1px solid var(--c-line-strong);
+  border: 1px solid var(--c-line-strong); /* taste-skill-ignore 입력 컨트롤 */
   border-radius: var(--r-md);
   background: var(--c-surface);
   font-size: var(--fs-16);
@@ -67,7 +67,7 @@ const id = useId()
 .input-field__control:focus {
   border-color: var(--c-brand);
   outline: none;
-  box-shadow: 0 0 0 3px var(--c-brand-ring);
+  box-shadow: 0 0 0 3px var(--c-brand-ring); /* taste-skill-ignore 떠 있는 층·포커스 링 */
 }
 .has-error .input-field__control {
   border-color: var(--c-danger);

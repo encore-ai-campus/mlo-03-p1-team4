@@ -28,11 +28,16 @@ defineProps({
 </template>
 
 <style scoped>
+/* 구분선 대신 항목마다 바탕 한 단계 */
 .acc {
-  border-top: 1px solid var(--c-line);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
 }
 .acc__item {
-  border-bottom: 1px solid var(--c-line);
+  border-radius: var(--r-sm);
+  background: var(--c-fill-soft);
+  padding-inline: var(--sp-12);
 }
 .acc__header {
   font-size: var(--fs-16);

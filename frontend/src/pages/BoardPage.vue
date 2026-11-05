@@ -143,7 +143,7 @@ load()
 }
 .grid__card {
   padding: var(--sp-16);
-  border: 1px solid var(--c-line);
+  border: 0;
   border-radius: var(--r-lg);
   background: var(--c-surface);
 }

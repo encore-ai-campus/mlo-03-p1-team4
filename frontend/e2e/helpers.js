@@ -17,7 +17,9 @@ export async function pickTwoFreeSlots(page) {
   const card = page.locator('#booking')
   const free = card.getByRole('button', { name: /^\d{2}:00부터 1시간$/ })
   await expect(free.first()).toBeVisible()
-  const hours = (await free.allTextContents()).map((t) => Number(t.slice(0, 2)))
+  // 보이는 글자('9시'·'9')는 디자인에 따라 바뀌므로 aria-label('09:00부터 1시간')에서 시를 읽는다
+  const labels = await free.evaluateAll((els) => els.map((el) => el.getAttribute('aria-label')))
+  const hours = labels.map((t) => Number(t.slice(0, 2)))
   const h = hours.find((x) => hours.includes(x + 1))
   if (h === undefined) return null
   for (const x of [h, h + 1]) await slot(page, x).click()

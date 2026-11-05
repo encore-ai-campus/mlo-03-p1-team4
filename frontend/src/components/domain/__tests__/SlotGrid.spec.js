@@ -23,7 +23,8 @@ function setup(modelValue = [], max = 4) {
     props: { slots, label: '시간 칸', max, modelValue, 'onUpdate:modelValue': (v) => wrapper.setProps({ modelValue: v }) },
     global: { stubs: { UiTooltip: { template: '<slot />' } } },
   })
-  const btn = (h) => wrapper.findAll('button').find((b) => b.text().startsWith(String(h).padStart(2, '0')))
+  // 화면 글자(9, 10…)가 아니라 접근성 이름(09:00부터 1시간)으로 칸을 찾는다
+  const btn = (h) => wrapper.findAll('button').find((b) => (b.attributes('aria-label') ?? '').startsWith(`${String(h).padStart(2, '0')}:00`))
   return { wrapper, btn, value: () => wrapper.props('modelValue') }
 }
 

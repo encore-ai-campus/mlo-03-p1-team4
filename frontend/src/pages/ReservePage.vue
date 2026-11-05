@@ -189,7 +189,7 @@ async function pay() {
   gap: var(--sp-16);
   margin: 0;
   padding: var(--sp-24);
-  border: 1px solid var(--c-line);
+  border: 0;
   border-radius: var(--r-lg);
   background: var(--c-surface);
 }
@@ -269,10 +269,9 @@ async function pay() {
   flex-direction: column;
   gap: var(--sp-16);
   padding: var(--sp-24);
-  border: 1px solid var(--c-line-strong);
+  border: 0;
   border-radius: var(--r-lg);
   background: var(--c-surface);
-  box-shadow: var(--shadow-lift);
 }
 .sum__room {
   display: flex;
@@ -324,8 +323,10 @@ async function pay() {
 .sum__total {
   display: flex;
   justify-content: space-between;
-  padding-top: var(--sp-12);
-  border-top: 1px dashed var(--c-line-strong);
+  margin-top: var(--sp-8);
+  padding: var(--sp-12);
+  border-radius: var(--r-sm);
+  background: var(--c-fill);
   font-size: var(--fs-20);
 }
 .sum__total strong {
@@ -364,7 +365,7 @@ async function pay() {
 .receipt {
   width: 100%;
   padding: var(--sp-16) var(--sp-24);
-  border: 1px solid var(--c-line);
+  border: 0;
   border-radius: var(--r-lg);
   background: var(--c-surface);
 }

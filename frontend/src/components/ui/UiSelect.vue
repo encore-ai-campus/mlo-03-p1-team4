@@ -55,7 +55,7 @@ const items = () => props.options.map((o) => (typeof o === 'string' ? { value: o
   gap: 4px;
   min-height: 48px;
   padding: 0 10px 0 var(--sp-12);
-  border: 1px solid var(--c-line-strong);
+  border: 1px solid var(--c-line-strong); /* taste-skill-ignore 입력 컨트롤 */
   border-radius: var(--r-md);
   background: var(--c-surface);
   font-size: var(--fs-16);
@@ -82,7 +82,7 @@ const items = () => props.options.map((o) => (typeof o === 'string' ? { value: o
   border: 1px solid var(--c-line);
   border-radius: var(--r-md);
   background: var(--c-surface);
-  box-shadow: var(--shadow-pop);
+  box-shadow: var(--shadow-pop); /* taste-skill-ignore 떠 있는 층·포커스 링 */
 }
 .select__item {
   display: flex;
