@@ -1,0 +1,36 @@
+$kind: http-request
+id: 4caa6a9dc5eec56c1b001295
+name: Reservation requires authentication
+order: 2000
+url: '{{base_url}}/reservations'
+method: POST
+headers:
+  - key: Accept
+    value: application/json
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "venue_id": 1,
+      "date": "2026-11-06",
+      "start_hour": 13,
+      "hours": 1,
+      "headcount": 1,
+      "method": "card"
+    }
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('Reservation creation requires authentication', () => {
+        pm.response.to.have.status(401);
+      });
+
+      pm.test('Unauthenticated response uses the shared error envelope', () => {
+        const body = pm.response.json();
+        pm.expect(body).to.have.property('code', 'UNAUTHORIZED');
+        pm.expect(body).to.have.property('message').that.is.a('string');
+        pm.expect(body).to.have.property('detail');
+      });

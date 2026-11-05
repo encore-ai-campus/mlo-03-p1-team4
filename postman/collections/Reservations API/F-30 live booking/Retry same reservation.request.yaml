@@ -1,0 +1,53 @@
+$kind: http-request
+id: 2c4aea4f7b7b71b91c4fb0b2
+name: Retry same reservation
+order: 2000
+url: '{{base_url}}/reservations'
+method: POST
+headers:
+  - key: Accept
+    value: application/json
+  - key: Content-Type
+    value: application/json
+auth:
+  type: bearer
+  credentials:
+    - key: token
+      value: '{{access_token}}'
+body:
+  type: json
+  content: |-
+    {
+      "venue_id": {{venue_id}},
+      "date": "{{booking_date}}",
+      "start_hour": {{start_hour}},
+      "hours": {{hours}},
+      "headcount": {{headcount}},
+      "method": "{{method}}"
+    }
+scripts:
+  - type: beforeRequest
+    language: text/javascript
+    code: |-
+      const required = [
+        'access_token', 'venue_id', 'booking_date', 'start_hour',
+        'hours', 'headcount', 'method', 'reservation_id'
+      ];
+      const missing = required.filter((key) => !pm.environment.get(key));
+
+      if (missing.length > 0) {
+        console.warn(`Skipping retry; set values or run Create reservation first: ${missing.join(', ')}`);
+        pm.execution.skipRequest();
+      }
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('Same booking retry returns 200', () => {
+        pm.response.to.have.status(200);
+      });
+
+      pm.test('Retry returns the original reservation', () => {
+        const body = pm.response.json();
+        pm.expect(body.reservation_id).to.equal(Number(pm.environment.get('reservation_id')));
+        pm.expect(body.payment.status).to.equal('paid');
+      });

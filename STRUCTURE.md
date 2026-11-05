@@ -79,6 +79,11 @@ Pro_1/
 │  └─ tests/                  [B] test_catalog·test_reservation_dependencies·test_venues·test_reservations·test_concurrency·test_read_routing 구현
 │     └─ check_venue_browser.py·mjs  [B] 별도 실행: 임시 실제 API + Chrome 검색·정렬·NEW·오류·상세·날짜 목록·시간 칸 검증
 │
+├─ postman/                   [B] Git-native v3 예약 API 컬렉션·로컬 환경 (CLI 테스트)
+│  ├─ README.md               안전한 실행 방법과 F-30 쓰기 요청 안내
+│  ├─ collections/            OpenAPI·인증 확인 및 F-30 예약 생성 요청
+│  └─ environments/           로컬 API 주소·비밀값 없는 테스트 변수
+│
 ├─ db/                        [DB] (스키마는 docs/db, 검증 후 여기로)
 │  ├─ migrations/             0001_init.sql (11-04 검증, 표 12 + 뷰)
 │  ├─ seed/                   categories·facilities·regions(230)·sido/sigungu 별칭·category_map.csv → seed.sql (11-04)

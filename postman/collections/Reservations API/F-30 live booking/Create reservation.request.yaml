@@ -1,0 +1,60 @@
+$kind: http-request
+id: f623f6fd33db7216647c5219
+name: Create reservation
+order: 1000
+url: '{{base_url}}/reservations'
+method: POST
+headers:
+  - key: Accept
+    value: application/json
+  - key: Content-Type
+    value: application/json
+auth:
+  type: bearer
+  credentials:
+    - key: token
+      value: '{{access_token}}'
+body:
+  type: json
+  content: |-
+    {
+      "venue_id": {{venue_id}},
+      "date": "{{booking_date}}",
+      "start_hour": {{start_hour}},
+      "hours": {{hours}},
+      "headcount": {{headcount}},
+      "method": "{{method}}"
+    }
+scripts:
+  - type: beforeRequest
+    language: text/javascript
+    code: |-
+      const required = [
+        'access_token', 'venue_id', 'booking_date', 'start_hour',
+        'hours', 'headcount', 'method'
+      ];
+      const missing = required.filter((key) => !pm.environment.get(key));
+
+      if (missing.length > 0) {
+        console.warn(`Skipping live booking; set environment values: ${missing.join(', ')}`);
+        pm.execution.skipRequest();
+      }
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('Reservation is created or returned as a 10-minute retry', () => {
+        pm.expect([200, 201]).to.include(pm.response.code);
+      });
+
+      pm.test('Reservation response contains the paid mock payment', () => {
+        const body = pm.response.json();
+        pm.expect(body.reservation_id).to.be.a('number').and.above(0);
+        pm.expect(body.status).to.be.oneOf(['confirmed', 'completed']);
+        pm.expect(body.payment.status).to.equal('paid');
+        pm.expect(body.payment.method).to.equal(pm.environment.get('method'));
+      });
+
+      if ([200, 201].includes(pm.response.code)) {
+        const body = pm.response.json();
+        pm.environment.set('reservation_id', String(body.reservation_id));
+      }

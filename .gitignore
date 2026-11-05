@@ -12,6 +12,7 @@ __pycache__/
 
 # 프론트 (frontend/.gitignore에도 있음)
 node_modules/
+postman/environments/Local.private.environment.yaml
 dist/
 coverage/
 playwright-report/
