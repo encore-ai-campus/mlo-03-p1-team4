@@ -1,12 +1,36 @@
-"""F-04·30·50 예약 생성·재시도·탈퇴 전 예약 수·소유권 조회. 트랜잭션은 서비스가 관리한다."""
+"""F-04·30·50·51 예약 생성·재시도·탈퇴·후기 조회 지원. 트랜잭션은 서비스가 관리한다."""
 
 from datetime import date, datetime
 
-from sqlalchemy import and_, func, or_, select
+from sqlalchemy import Select, and_, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.core.clock import get_now
+from app.models.catalog import Category
 from app.models.reservation import Payment, Reservation
+from app.models.venue import Venue
+
+
+def review_context_query(*, active_only: bool = True) -> Select:
+    """A가 후기·회원과 결합할 예약당 한 행의 조회식만 만든다(#43).
+
+    공개 후기는 기본값, 내 후기는 False로 비활성 공간 기록도 포함한다.
+    세션 선택·실행·트랜잭션과 후기 필터·정렬·페이지 처리는 A가 담당한다.
+    """
+    query = (
+        select(
+            Reservation.reservation_id.label("reservation_id"),
+            Venue.venue_id.label("venue_id"),
+            Venue.name.label("venue_name"),
+            Category.code.label("category"),
+        )
+        .select_from(Reservation)
+        .join(Venue, Venue.venue_id == Reservation.venue_id)
+        .join(Category, Category.category_id == Venue.category_id)
+    )
+    if active_only:
+        query = query.where(Venue.is_active.is_(True))
+    return query
 
 
 def create(

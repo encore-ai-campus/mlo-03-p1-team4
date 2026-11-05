@@ -73,7 +73,7 @@ Pro_1/
 │  │  ├─ routers/             [A] auth, users, reviews, events, health / [B] catalog·venues(조회), reservations(F-30~32), internal(F-61) 구현
 │  │  ├─ schemas/             라우터와 같은 이름 ([B] catalog·venues 조회, reservations 생성, internal 등록/갱신 계약 구현)
 │  │  ├─ services/            [A] auth_service, user_service, review_service / [B] catalog_service·venue_service 조회, reservation_service(F-30~32)·internal_service(F-61) 구현
-│  │  ├─ repositories/        [A] user_repo, review_repo / [B] catalog_repo·reservation_repo(생성·재시도·get_owned·count_cancellable)·venue_repo·slot_repo·payment_repo 구현
+│  │  ├─ repositories/        [A] user_repo, review_repo / [B] catalog_repo·reservation_repo(생성·재시도·get_owned·count_cancellable·후기 목록 review_context_query)·venue_repo·slot_repo·payment_repo 구현
 │  │  └─ jobs/                [B] complete_reservations (예정)
 │  ├─ scripts/                [A] replay_events (예정)
 │  └─ tests/                  [B] test_catalog·test_reservation_dependencies·test_venues·test_reservations·test_concurrency·test_read_routing·test_internal 구현

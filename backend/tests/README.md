@@ -15,6 +15,12 @@
 | `test_concurrency.py` | B | **다른 회원 50명이 같은 칸을 동시 요청 → 201 1건·409 49건**, 한 회원의 같은 요청 50건은 201 1건·200 49건, 겹치는 시간 범위 경쟁. DB 행 수·이벤트·카운터 확인 |
 | `test_jobs.py`, `test_internal.py`, `test_read_routing.py` | B | 완료 배치 멱등, upsert 201·200·400, 공개 조회만 `get_db_read` |
 
+## F-51 후기 목록용 B 조회 계약 (#43)
+
+`test_reservation_dependencies.py`는 `reservation_repo.review_context_query(*, active_only=True)`의 반환 열(`reservation_id`·`venue_id`·`venue_name`·`category`), 예약당 한 행, 유형 5개의 영문 코드, 기본·명시적 활성 공간 필터와 `active_only=False`의 비활성 공간 포함을 검증합니다. A가 서브쿼리에 공간·유형 필터, 전체 개수, 정렬·페이지를 결합할 수 있고 호출자의 트랜잭션을 종료하지 않는지도 확인합니다.
+
+테스트는 기존 `connection`·`sample` fixture를 사용해 로컬 MariaDB `spacecube_test`에만 가상 데이터를 넣고 종료 시 롤백합니다. `CHECK_DB_URL`에 기존 0001·seed가 적용된 로컬 DB를 지정하고 conda `pro_1`에서 `python -m pytest backend/tests/test_reservation_dependencies.py -q`로 기존 테스트까지 전부 실행합니다. A의 직접 import 연결·공개 후기 숨김·내 후기 유지에 대한 HTTP 통합 검증은 A 후속 작업입니다.
+
 ## F-12 검색·F-13 정렬·F-14 NEW 목록
 
 `test_venues.py`는 실제 MariaDB `spacecube_test`와 연결한 `GET /venues` 검색 API 테스트를 포함합니다.
