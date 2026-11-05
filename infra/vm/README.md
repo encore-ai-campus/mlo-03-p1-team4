@@ -24,7 +24,8 @@
 ## 2. 노트북 2 (A 이자연)
 
 - [ ] `api1`: Python 3.12 venv + `environment.yml`의 pip 버전, `backend/.env`(`DB_WRITE_URL=…@db1`, `DB_READ_URL=…@db2`, `MONGO_URL=…@mongo`, `SERVER_NAME=api-1`, `SYNTHETIC_API_KEY` 등), uvicorn systemd(`--workers 2`, 8000)
-- [ ] `api1`: cron — 이용 완료 배치(1시간), 크롤러(주 1회, `crawler/AGENTS.md` 규칙), `replay_events.py`
+- [ ] `api1`: cron — 이용 완료 배치(1시간), 크롤러(주 1회, `crawler/AGENTS.md` 규칙), `replay_events.py`, `event_daily` 집계(매일 새벽)
+- [ ] `api1`: 크롤러·생성기 실행 환경과 키(`INTERNAL_API_KEY`, DB·MongoDB 접속 정보)는 A가 설치(11-05 #38). 생성기 과거 30일 백필은 수동으로 한 번, 먼저 회원 100명으로 검증
 - [ ] `mon`: Prometheus(15일, 원격 쓰기 받기 켬), Loki(14일), Grafana(3000) + 대시보드 4장(서비스·예약·DB·이벤트) + 경보(복제 지연 5초, 오류율)
 - [ ] 두 VM 모두 Alloy, `ufw` 규칙
 
@@ -37,7 +38,6 @@
 ## 4. 노트북 4 (FE·PM 노진산)
 
 - [ ] Locust(conda `pro_1`), 대상 `http://gw`, `X-Synthetic`·`X-Synthetic-Key`
-- [ ] 데이터 생성기(`simulator/generator`) 90일 백필
 - [ ] Playwright E2E를 실제 API로(`VITE_USE_MOCK=false`, `baseURL=http://gw`)
 
 ## 5. 다 켠 뒤 확인

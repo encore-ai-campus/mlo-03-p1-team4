@@ -33,7 +33,7 @@
 | NEW | `new_until` | `created_at`이 오늘 기준 14일 안 | ERD |
 | DB 연결 | 하나 | **primary + replica** | 11-03 팀원 의견 |
 | 오늘 | `get_sim_today()`(11-02) | **`get_today()`**(기본 실제 날짜) | 11-03 제안 2의 ③ |
-| 공간 등록 | 크롤러 → `/internal/venues` | **그대로**(크롤러 → MongoDB `crawl_raw` → 전처리 → `/internal/venues`). 크롤링 3곳(스페이스클라우드·쉐어잇·루북), 영화관 유형은 강의실로 바뀜(11-03 A3) | 크롤링 유지 결정 |
+| 공간 등록 | 크롤러 → `/internal/venues` | **그대로**(크롤러 → MongoDB `crawl_raw` → 전처리 → `/internal/venues`). 1차 수집원은 스페이스클라우드·쉐어잇 2곳, 30개 목표에서 부족한 시연용 공간은 생성기로 보충. 영화관 유형은 강의실로 바뀜 | 11-05 수집 방향 |
 | 서버 쪽 이벤트 | 로그 파일 | 로그 파일 + MongoDB (A의 `log_event`) | 11-03 결정 1 |
 
 ## 2. 파일
@@ -324,7 +324,7 @@ UPDATE reservations SET status = 'completed'
 
 - 이름·소개·이용 안내는 크롤러가 **생성한 값**을 보냅니다. 업체 실명·소개 원문은 받지 않습니다.
 - 값 검증은 DDL의 CHECK와 같게 합니다(가격 > 0, 인원 ≥ 1, 영업시간 open 9~22·close 10~23, `min_hours` 1~4). 크롤러는 영업시간을 9~23으로 잘라 보냅니다(11-03 A2).
-- 생성기로 만든 공간이 필요하면 같은 API로 넣습니다(`source_site = "synthetic"`). `source_site`는 `spacecloud`·`shareit`·`roovook`·`synthetic`.
+- 생성기로 만든 공간도 같은 API로 넣습니다(`source_site = "synthetic"`). 1차 등록의 `source_site`는 `spacecloud`·`shareit`·`synthetic`입니다. 앞의 두 값은 속성 출처이며 실제 업체의 예약 가능 여부를 뜻하지 않습니다.
 
 ## 8. 테스트
 
@@ -369,6 +369,6 @@ replica를 넣은 이유(읽기 분산)가 실제로 효과가 있었는지 이 
 | 3 | 예약 가능 범위 | **결정(11-03)**: 실제 날짜, 과거·미래 모두 `BOOKING_PAST_DAYS`·`BOOKING_FUTURE_DAYS` 기본 365 |
 | 4 | API 경로 `/venues` | 프론트 `/rooms`·`room_id` 수정 |
 | 5 | `reservations` UNIQUE `(reservation_id, venue_id, reserve_date)` | 복합 외래키에 필요 |
-| 6 | 공간 등록 | **결정(11-03 A3)**: 크롤러(3곳) → `/internal/venues`. 영화관 없음, 강의실 유형 추가 |
+| 6 | 공간 등록 | **11-05 수집 방향**: 스페이스클라우드·쉐어잇 2곳의 속성 기반 시연용 공간과 생성기 공간 → `/internal/venues`. 영화관 없음, 강의실 유형 사용 |
 | 7 | 취소 기한·환불 | 시작 전까지, 전액 |
 | 8 | 결제수단 ENUM | 영문 코드로 저장 (DB 담당 동의 필요) |

@@ -22,11 +22,11 @@
 | **1** (DB 전희정) | `gw` 정문 | 1c / 1GB / 10GB | Nginx(Vue 빌드 정적 파일, `/api` → api1·api2 라운드로빈), `stub_status` + nginx exporter, Alloy | 80 ← 공유기 전체 |
 | | `db1` MariaDB primary | 2c / 4GB / 20GB | MariaDB 11.4(STRICT `sql_mode`, `+09:00`, utf8mb4), 백업 cron, mysqld exporter, Alloy | 3306 ← api1·api2·db2 |
 | | `mongo` | 2c / 3GB / 20GB | MongoDB 7(인증 켬, `docs/db/mongo_init.js`), 백업 cron, mongodb exporter, Alloy | 27017 ← api1·api2 |
-| **2** (A 이자연) | `api1` FastAPI #1 | 2c / 2GB / 15GB | FastAPI(uvicorn 워커 2), cron: 이용 완료 배치(1시간)·크롤러(주 1회)·`replay_events.py`, `app.log`·`events.log`, `/metrics`, Alloy | 8000 ← gw·mon |
+| **2** (A 이자연) | `api1` FastAPI #1 | 2c / 2GB / 15GB | FastAPI(uvicorn 워커 2), cron: 이용 완료 배치(1시간)·크롤러(주 1회)·`replay_events.py`·`event_daily` 집계(매일 새벽), 데이터 생성기(과거 30일 백필, 수동 실행), `app.log`·`events.log`, `/metrics`, Alloy | 8000 ← gw·mon |
 | | `mon` 모니터링 | 2c / 4GB / 30GB | Prometheus(15일), Loki(14일), Grafana(대시보드 4장 + 경보) | 3000·9090 ← 공유기, 3100·지표 받기 ← 모든 VM |
 | **3** (B 이세훈) | `api2` FastAPI #2 | 2c / 2GB / 15GB | api1과 같은 코드(cron 없음), `/metrics`, Alloy | 8000 ← gw·mon |
 | | `db2` MariaDB replica | 2c / 4GB / 20GB | MariaDB replica(`read_only`, GTID 복제), mysqld exporter, Alloy | 3306 ← api1·api2 |
-| **4** (FE·PM 노진산) | VM 없음 | — | Locust(부하·`SameSlotRush`·서버 끄기 시험), 데이터 생성기(90일 백필 → API), Playwright E2E(실제 API), 발표 브라우저·녹화 | Locust 웹 8089 ← 노트북 4 안에서만 |
+| **4** (FE·PM 노진산) | VM 없음 | — | Locust(부하·`SameSlotRush`·서버 끄기 시험), Playwright E2E(실제 API), 발표 브라우저·녹화 | Locust 웹 8089 ← 노트북 4 안에서만 |
 
 | 노트북 | VM 수 | 쓰는 자원 | 남는 자원 |
 | --- | --- | --- | --- |
