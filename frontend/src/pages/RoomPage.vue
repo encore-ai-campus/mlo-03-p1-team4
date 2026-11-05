@@ -187,12 +187,9 @@ function scrollToBooking() {
 
     <header class="head">
       <div>
-        <div class="badges">
-          <span class="badge">{{ room.category.name }} · 최대 {{ room.capacity_max }}명</span>
-          <span v-if="room.is_new" class="badge badge--new">NEW</span>
-        </div>
         <h1 class="head__title">{{ room.name }}</h1>
-        <p class="head__meta"><Star :size="16" class="star" fill="currentColor" aria-hidden="true" /><strong class="num">{{ avg }}</strong> 후기 {{ room.review_count }}개 · {{ room.region.sido }} {{ room.region.sigungu }}</p>
+        <p class="head__meta">{{ room.category.name }} · 최대 {{ room.capacity_max }}명 · {{ room.region.sido }} {{ room.region.sigungu }}<template v-if="room.is_new"> · 새로 연 공간</template></p>
+        <p class="head__meta"><Star :size="16" class="star" fill="currentColor" aria-hidden="true" /><strong class="num">{{ avg }}</strong> 후기 {{ room.review_count }}개</p>
       </div>
       <button type="button" class="save" :class="{ 'is-on': saved }" :aria-pressed="saved" :aria-label="saved ? '찜 해제' : '찜하기'" @click="toggleSave"><Heart :size="22" aria-hidden="true" /></button>
     </header>
@@ -321,21 +318,6 @@ function scrollToBooking() {
   gap: var(--sp-16);
   margin-top: var(--sp-12);
 }
-.badges {
-  display: flex;
-  gap: 6px;
-}
-.badge {
-  padding: 3px 10px;
-  border-radius: 6px;
-  background: var(--c-ink);
-  color: var(--c-on-dark);
-  font-size: var(--fs-13);
-  font-weight: 700;
-}
-.badge--new {
-  background: var(--c-danger);
-}
 .skip-booking {
   position: absolute;
   left: var(--sp-16);
@@ -381,7 +363,7 @@ function scrollToBooking() {
   place-items: center;
   width: var(--tap);
   height: var(--tap);
-  border: 1px solid var(--c-line-strong);
+  border: 0;
   border-radius: 50%;
   background: var(--c-surface);
   color: var(--c-muted);
@@ -407,7 +389,7 @@ function scrollToBooking() {
   padding: var(--sp-16) var(--sp-24);
   border-radius: var(--r-lg);
   background: var(--c-brand-soft);
-  border: 1px solid var(--c-line-strong);
+  border: 0;
   color: var(--c-brand-ink);
   font-weight: 700;
 }
@@ -442,7 +424,7 @@ function scrollToBooking() {
   column-gap: var(--sp-8);
   align-items: center;
   padding: var(--sp-12) var(--sp-16);
-  border: 1px solid var(--c-line);
+  border: 0;
   border-radius: var(--r-md);
   background: var(--c-surface);
 }
@@ -465,7 +447,7 @@ function scrollToBooking() {
   gap: var(--sp-4);
   margin-top: var(--sp-24);
   padding: var(--sp-4) 0;
-  border-bottom: 1px solid var(--c-line);
+  border: 0;
   background: var(--c-paper);
   overflow-x: auto;
 }
@@ -515,7 +497,7 @@ function scrollToBooking() {
   width: 100%;
   min-height: 56px;
   padding: var(--sp-8) var(--sp-12);
-  border: 1px solid var(--c-line);
+  border: 0;
   border-radius: var(--r-md);
   background: var(--c-surface);
   font-weight: 700;
@@ -539,7 +521,7 @@ function scrollToBooking() {
 }
 .reviews > * + * {
   padding-top: var(--sp-16);
-  border-top: 1px solid var(--c-line);
+
 }
 .more {
   display: inline-flex;
@@ -560,10 +542,9 @@ function scrollToBooking() {
   flex-direction: column;
   gap: var(--sp-16);
   padding: var(--sp-24);
-  border: 1px solid var(--c-line-strong);
+  border: 0;
   border-radius: var(--r-lg);
   background: var(--c-surface);
-  box-shadow: var(--shadow-lift);
   scroll-margin-top: calc(var(--header-h) + 16px);
 }
 .booking__price {
@@ -593,8 +574,9 @@ function scrollToBooking() {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  padding-top: var(--sp-12);
-  border-top: 1px dashed var(--c-line-strong);
+  padding: var(--sp-12);
+  border-radius: var(--r-sm);
+  background: var(--c-fill);
 }
 .booking__sum p {
   display: flex;
@@ -624,7 +606,7 @@ function scrollToBooking() {
   gap: var(--sp-12);
   margin: var(--sp-24) calc(-1 * var(--sp-16)) 0;
   padding: var(--sp-12) var(--sp-16);
-  border-top: 1px solid var(--c-line);
+  border: 0;
   background: var(--c-surface);
 }
 .mbar strong {

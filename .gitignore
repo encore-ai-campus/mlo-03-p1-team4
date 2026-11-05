@@ -38,3 +38,6 @@ crawler/data/
 
 # 각자 PC의 Claude Code 미리보기 설정
 .claude/launch.json
+
+# 디자인 점검 스킬(design-taste-frontend) 측정·스크린샷 출력
+.taste-skill/
