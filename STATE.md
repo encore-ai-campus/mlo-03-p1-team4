@@ -13,7 +13,7 @@
 | --- | --- | --- | --- | --- |
 | 프론트 | 노진산(FE·PM) | FE-1~9 확정안 반영, Claude 시안 대조·FE 오류/모바일 결제/가입 UX 재검토 및 목업·화면 검증 | A·B 구현 후 실제 API 연결·오류·예약 동시성 통합 검증 | 실제 API 미구현 |
 | FastAPI A | [이름] | 이슈 #1 코드·테스트를 현재 클론에 반영, 로컬 MariaDB로 pytest 40개 통과 | B 공용 함수 확인, 이벤트 자유 문자열 개인정보 정책을 팀과 합의, PR 검토 | 후기·탈퇴 B 연동 및 이벤트 개인정보 합의 대기 |
-| FastAPI B | [이름] | develop(eae5068) 통합, 공식 main.py에 reservations 등록·A 공통 가상 요청 키 검증 사용. MariaDB 11.4.13 pytest 236건, Postman 실제 HTTP 4요청·8검증, FE 단위 54건·Ruff·린트·빌드 통과 | 예약 PR 본문 확인·리뷰 → 내 예약 목록·상세(F-40, #8) → 취소(F-34) → 완료 배치(F-35). 검색 개선 권고는 별도 후속 PR | A 탈퇴 함수 호출·동시 예약/탈퇴 계약은 A 후속 연계. 실제 replica 장애·복제 지연과 FE 실제 예약 화면 연결은 별도 검증 |
+| FastAPI B | [이름] | develop(eae5068) 통합, 공식 main.py에 reservations 등록·A 공통 가상 요청 키 검증 사용. MariaDB 11.4.13 pytest 236건, Postman 실제 HTTP 4요청·8검증, FE 단위 54건·Ruff·린트·빌드 통과 | 예약 PR #39 리뷰·CI 확인 → 내 예약 목록·상세(F-40, #8) → 취소(F-34) → 완료 배치(F-35). 검색 개선 권고는 별도 후속 PR | A 탈퇴 함수 호출·동시 예약/탈퇴 계약은 A 후속 연계. 실제 replica 장애·복제 지연과 FE 실제 예약 화면 연결은 별도 검증 |
 | DB | [이름] | `0001_init.sql`·`mongo_init.js` 검증(설치형 11.8·compose 11.4 둘 다 29건 통과), seed(유형 5·시설 20·지역 230 → `seed.sql`), `infra/local` compose, 크롤러 시제품(옛 필터) | 크롤러 새 필터(유형 5·별칭) → `/internal/venues` 등록(B와) → 가상 데이터 생성기 | 없음(A2 결정을 팀원에게 공유) |
 
 ## 기능 진행표
@@ -161,6 +161,8 @@ A1~A4는 11-03에 확정했고, **A5~A8은 추후 확정**으로 미뤘다(11-03
 - 개인 기억(Claude 자동 메모리 등)은 팀에 공유되지 않는다. 팀이 알아야 할 것은 이 파일과 `docs/`에 쓴다.
 
 ## 최근 변경 (최신이 위)
+
+- 11-05 · B · feat/FastAPI-B-reservation을 푸시하고 develop 대상 PR #39 생성: F-30~32 예약·모의 결제 API, 공식 A 통합·예약 라우터 연결, Postman 실제 HTTP 검증 포함. 리뷰어 jinsan02·naturedevworks 지정, 충돌 없음 확인. 로컬 pytest 236건·Postman 4요청/8검증·FE 단위 54건 및 린트·빌드 통과 기록 유지, GitHub CI 실행 중. 검색 개선 권고는 후속 PR로 분리.
 
 - 11-05 · B · 예약 브랜치에 develop(eae5068, #31 병합본) 통합. 로컬 A 전달본 42개를 해시 검증 백업하고 backup/B-reservation-before-A-integration-fec14e6 참조 보존, 공식 A 파일로 전환·전달본 제외 설정 제거. 구형 cookies.py는 백업으로 보존. 예약 생성·재시도·get_owned와 count_cancellable 및 A·B 문서 기록을 함께 보존해 충돌 해결. 공식 main.py에 /reservations 등록, 별도 SyntheticSettings 제거 후 A is_synthetic_request 재사용. API 테스트를 공식 create_app으로 전환하고 등록·인증·공통 키 미설정 차단 검증 추가. pro_1·로컬 MariaDB 11.4.13 spacecube_test 전체 pytest 236건 통과(Starlette 경고 1건), FE 단위 54건·린트·색 검사·빌드 통과(기존 조건문 경고 1건). 별도 check_reservation_http.py로 임시 Uvicorn·실제 가상 회원가입/로그인·Postman 4요청/8검증 통과: OpenAPI 200, 무인증 401, 생성 201, 재시도 200. 예약 1건·칸 2개·결제 1건·is_synthetic·성공 카운터 1회를 확인하고 생성 ID의 데이터·임시 서버·비밀 환경 정리. Postman 컬렉션 4파일·공유 환경 lint 오류/경고 0건. 검증 구성요소는 Miniforge pro_1·설치된 Node를 지정해 실행. 프론트 실제 API 화면 연결·실제 replica 장애 시험은 후속 항목. A 탈퇴 서비스의 503 해제·호출 연결과 동시 예약/탈퇴 잠금 계약은 A와 후속 확인. PR 본문 확인 전이며 아직 푸시하지 않음.
 
