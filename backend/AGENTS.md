@@ -68,4 +68,4 @@ conda run -n pro_1 --no-capture-output pytest
 - 설정은 `backend/.env`(값)와 `backend/.env.example`(이름만). `.env`는 커밋하지 않는다.
 - 테스트 DB는 로컬 MariaDB의 `spacecube_test`(`infra/local`). SQLite로 대신하지 않는다.
 - 패키지와 버전은 `../environment.yml`에 고정돼 있다. 새 패키지가 필요하면 묻고, 더하면 버전을 고정한다.
-- 토큰은 액세스 토큰만(11-03 결정): JWT HS256 60분, `sub`는 `str(user_id)`, 리프레시·쿠키·로그아웃 API 없음. `get_current_user()`는 primary에서 탈퇴 여부까지 확인. 자세한 표는 `docs/백엔드_A` 5-1.
+- 토큰은 액세스 토큰만(11-03 결정): JWT HS256 60분, `sub`는 `str(user_id)`, 리프레시·쿠키 없음. `POST /auth/logout`은 유효 토큰을 확인하고 204를 반환하며 클라이언트가 토큰을 지운다. 서버 폐기 목록은 없어 복사된 토큰은 만료까지 유효하다. `get_current_user()`는 primary에서 탈퇴 여부까지 확인. 자세한 표는 `docs/백엔드_A` 5-1.
