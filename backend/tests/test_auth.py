@@ -1,90 +1,10 @@
 """F-01~04: 로컬 MariaDB에서 회원 API와 실제 인증 흐름을 검사한다."""
 
 import os
-import secrets
-from uuid import uuid4
 
 import bcrypt
 import pytest
-from fastapi.testclient import TestClient
-from sqlalchemy import create_engine, text
-from sqlalchemy.engine import make_url
-from sqlalchemy.orm import Session
-from sqlalchemy.pool import NullPool
-
-from app.core.config import get_settings
-from app.core.db import get_db_write
-from app.main import create_app
-
-
-@pytest.fixture
-def client(monkeypatch, tmp_path):
-    """로컬 테스트 DB만 연결하고 테스트 뒤 외부 트랜잭션을 되돌린다."""
-    raw = os.environ.get("CHECK_DB_URL")
-    if not raw:
-        pytest.fail("CHECK_DB_URL에 로컬 MariaDB spacecube_test 주소를 지정하세요.")
-    try:
-        url = make_url(raw)
-    except Exception:
-        pytest.fail("CHECK_DB_URL 형식을 확인하세요.", pytrace=False)
-    if (
-        url.drivername != "mysql+pymysql"
-        or url.database != "spacecube_test"
-        or url.host not in {"localhost", "127.0.0.1", "::1"}
-    ):
-        pytest.fail("회원 테스트는 로컬 MariaDB spacecube_test에서만 실행합니다.")
-
-    monkeypatch.setenv("DB_WRITE_URL", raw)
-    monkeypatch.setenv("DB_READ_URL", raw)
-    monkeypatch.setenv("MONGO_URL", "mongodb://127.0.0.1:1")
-    monkeypatch.setenv("JWT_SECRET", secrets.token_urlsafe(48))
-    monkeypatch.setenv("SYNTHETIC_API_KEY", secrets.token_urlsafe(32))
-    monkeypatch.setenv("CORS_ORIGINS", "https://testserver")
-    monkeypatch.setenv("LOG_DIR", str(tmp_path))
-    get_settings.cache_clear()
-    engine = create_engine(url, poolclass=NullPool, hide_parameters=True)
-    try:
-        with engine.connect() as connection:
-            if connection.scalar(text("SELECT DATABASE()")) != "spacecube_test":
-                pytest.fail("연결된 DB 이름이 spacecube_test가 아닙니다.")
-            if "MariaDB" not in connection.scalar(text("SELECT VERSION()")):
-                pytest.fail("MariaDB 테스트 DB가 필요합니다.")
-            connection.execute(text("SET time_zone = '+09:00'"))
-            connection.commit()
-            transaction = connection.begin()
-            app = create_app()
-
-            def test_db():
-                with Session(bind=connection, join_transaction_mode="create_savepoint") as db:
-                    yield db
-
-            app.dependency_overrides[get_db_write] = test_db
-            try:
-                with TestClient(
-                    app, base_url="https://testserver", headers={"Origin": "https://testserver"}
-                ) as test_client:
-                    yield test_client, connection
-            finally:
-                app.dependency_overrides.clear()
-                transaction.rollback()
-    finally:
-        engine.dispose()
-        get_settings.cache_clear()
-
-
-@pytest.fixture
-def member():
-    return {
-        "email": f"{uuid4().hex}@example.invalid",
-        "password": "TestPassword123!",
-        "name": "테스트 회원",
-        "phone": "01000010001",
-        "birth": "000101",
-        "gender_digit": "3",
-        "marketing_agreed": False,
-        "terms_agreed": True,
-        "privacy_agreed": True,
-    }
+from sqlalchemy import text
 
 
 def signup(client, member):
@@ -150,6 +70,8 @@ def test_signup_rejects_synthetic_header_without_valid_key(client, member, suppl
         ("email", "not-an-email"),
         ("phone", ""),
         ("phone", None),
+        ("phone", "01012-3456"),
+        ("phone", "012-1234-5678"),
     ],
 )
 def test_signup_rejects_invalid_input(client, member, field, value):
@@ -158,6 +80,30 @@ def test_signup_rejects_invalid_input(client, member, field, value):
     result = signup(http, member)
     assert result.status_code == 400
     assert result.json()["code"] == "VALIDATION"
+
+
+@pytest.mark.parametrize("phone", ["010-0001-0001", "01000010001"])
+def test_signup_accepts_mobile_formats_used_by_frontend(client, member, phone):
+    http, db = client
+    member["phone"] = phone
+    result = signup(http, member)
+    assert result.status_code == 201
+    stored_phone = db.scalar(
+        text("SELECT phone FROM users WHERE user_id = :id"), {"id": result.json()["user_id"]}
+    )
+    assert stored_phone == phone
+
+
+def test_signup_rejects_under_fourteen_with_documented_detail(client, member):
+    http, _ = client
+    member["birth"] = "130101"
+    result = signup(http, member)
+    assert result.status_code == 400
+    assert result.json() == {
+        "code": "VALIDATION",
+        "message": "입력한 내용을 다시 확인해 주세요.",
+        "detail": {"fields": [{"field": "birth", "reason": "under_14"}]},
+    }
 
 
 def test_email_availability(client, member):
@@ -266,29 +212,6 @@ def test_login_returns_bearer_token_without_cookie(client, member):
     assert http.get("/users/me").status_code == 401
 
 
-def test_update_profile(client, member):
-    http, _ = client
-    assert signup(http, member).status_code == 201
-    assert login(http, member).status_code == 200
-    result = http.patch("/users/me", json={"name": "변경한 이름", "marketing_agreed": True})
-    assert result.status_code == 200
-    assert result.json()["name"] == "변경한 이름"
-    assert http.get("/users/me").json()["marketing_agreed"] is True
-
-
-@pytest.mark.parametrize(
-    "body", [{}, {"name": "  "}, {"user_id": 99}, {"marketing_agreed": "true"}]
-)
-def test_update_profile_rejects_invalid_fields(client, member, body):
-    http, _ = client
-    assert signup(http, member).status_code == 201
-    assert login(http, member).status_code == 200
-    response = http.patch("/users/me", json=body)
-    assert response.status_code == 400
-    assert response.json()["code"] == "VALIDATION"
-    assert http.get("/users/me").json()["name"] == member["name"]
-
-
 def test_profile_write_rejects_invalid_bearer_token(client, member):
     http, _ = client
     assert signup(http, member).status_code == 201
@@ -299,33 +222,3 @@ def test_profile_write_rejects_invalid_bearer_token(client, member):
     assert response.status_code == 401
     assert response.json()["code"] == "UNAUTHORIZED"
     assert http.get("/users/me").json()["name"] == member["name"]
-
-
-def test_change_password(client, member):
-    http, _ = client
-    assert signup(http, member).status_code == 201
-    assert login(http, member).status_code == 200
-    wrong = http.patch(
-        "/users/me/password",
-        json={"current_password": "WrongPassword123!", "new_password": "NewPassword123!"},
-    )
-    assert wrong.status_code == 400
-    assert wrong.json()["code"] == "WRONG_PASSWORD"
-    changed = http.patch(
-        "/users/me/password",
-        json={"current_password": member["password"], "new_password": "NewPassword123!"},
-    )
-    assert changed.status_code == 204
-    http.headers.pop("Authorization")
-    assert login(http, member).status_code == 401
-    assert login(http, member, "NewPassword123!").status_code == 200
-
-
-def test_withdraw_is_unavailable_until_reservation_integration(client, member):
-    http, _ = client
-    assert signup(http, member).status_code == 201
-    assert login(http, member).status_code == 200
-    result = http.delete("/users/me")
-    assert result.status_code == 503
-    assert result.json()["code"] == "SERVICE_UNAVAILABLE"
-    assert http.get("/users/me").status_code == 200
