@@ -30,3 +30,18 @@ def list_active_regions(db: Session) -> list[Region]:
 def list_facilities(db: Session) -> list[Facility]:
     """시설을 기본키 순으로 읽는다. 공간 연결 여부로 시설을 숨기지 않는다."""
     return list(db.scalars(select(Facility).order_by(Facility.facility_id)))
+
+
+def get_category_id(db: Session, code: str) -> int | None:
+    """내부 등록에서는 활성 공간 유무와 관계없이 seed 유형을 찾는다."""
+    return db.scalar(select(Category.category_id).where(Category.code == code))
+
+
+def get_region_id(db: Session, sido: str, sigungu: str) -> int | None:
+    """시·도와 시·군·구를 함께 비교해 등록된 지역만 사용한다."""
+    return db.scalar(select(Region.region_id).where(Region.sido == sido, Region.sigungu == sigungu))
+
+
+def get_facility_id(db: Session, name: str) -> int | None:
+    """대소문자 비교 등은 실제 MariaDB 컬럼 collation을 따른다."""
+    return db.scalar(select(Facility.facility_id).where(Facility.name == name))

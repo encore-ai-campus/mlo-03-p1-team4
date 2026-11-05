@@ -1,6 +1,6 @@
 # Postman CLI 테스트
 
-이 폴더는 B의 예약 API를 Postman CLI로 반복 검증하기 위한 로컬 컬렉션과 환경 파일을 둡니다. Postman 계정이나 공유 워크스페이스 없이 실행할 수 있습니다.
+이 폴더는 B의 예약·내부 공간 등록 API를 Postman CLI로 반복 검증하기 위한 로컬 컬렉션과 환경 파일을 둡니다. Postman 계정이나 공유 워크스페이스 없이 실행할 수 있습니다.
 
 Windows에서 `postman`이 데스크톱 앱 별칭으로 잡히면 NVM 설치 폴더의 npm shim을 직접 부릅니다. 아래 코드는 Postman CLI가 설치된 Node 버전 폴더를 찾습니다.
 
@@ -22,6 +22,12 @@ $PostmanCli = Get-ChildItem (Join-Path $env:NVM_HOME 'installs') -Directory |
 - 컬렉션 기본 실행 시 예약 환경값이 비어 있으면 쓰기 요청은 건너뜁니다.
 
 ## 검증
+
+F-61 내부 공간 등록은 `collections/Internal venues API`와
+`environments/Internal.environment.yaml`을 사용합니다. 기본 환경에서는 쓰기 요청을 건너뜁니다.
+실제 등록·재전송·갱신·출처 오류 확인은 로컬 `spacecube_test`의 `CHECK_DB_URL`을 설정한 뒤
+`pro_1`에서 `python backend/tests/check_internal_http.py`로 실행합니다.
+내부 키·고유 출처·임시 서버는 검증기가 준비하고 종료 시 이번 실행 데이터를 정리합니다.
 
 ```powershell
 & $PostmanCli collection lint 'postman/collections/Reservations API'

@@ -303,11 +303,13 @@ UPDATE reservations SET status = 'completed'
 
 | 항목 | 내용 |
 | --- | --- |
-| 부르는 곳 | 크롤러(DB 담당, FastAPI #1의 cron). 처음에는 표본 200개 중 후보, 이후 주 1회 신규 |
-| 보호 | 헤더 `X-Internal-Key` = `.env` `INTERNAL_API_KEY` + Nginx에서 VPC 대역만 |
-| 동작 | `(source_site, source_id)` UNIQUE로 upsert(`INSERT … ON DUPLICATE KEY UPDATE`). 신규 201, 갱신 200 |
-| 시설·그림 | 시설은 이름으로 찾고 없는 이름은 버린 뒤 `detail.ignored_facilities`로 알림. 시설·그림은 요청 값으로 통째로 바꿈 |
+| 부르는 곳 | api1의 크롤러·생성기(DB 담당). 크롤러는 유형별 후보를 선별해 주 1회 보충하고 생성기는 시연용 공간 부족분을 등록 |
+| 호출·보호 | `http://api1:8000/internal/venues`로 직접 호출. 헤더 `X-Internal-Key` = `.env` `INTERNAL_API_KEY`. gw의 `/api/internal/` 차단은 유지하며, 직접 접근 범위는 VM 방화벽 정책을 따름 |
+| 동작 | `(source_site, source_id)` UNIQUE로 upsert. 신규 201, 동일 내용 재전송을 포함한 기존 출처 갱신 200. `created_at`과 `is_active`는 갱신 시 보존 |
+| 응답 | 신규 201·갱신 200 모두 최상위 `venue_id`·`ignored_facilities`. 무시한 시설이 없으면 빈 배열 |
+| 시설·그림 | 시설은 이름으로 찾고 없는 이름은 `ignored_facilities`로 알림(동일 이름은 한 번). 시설·그림은 요청 값으로 통째로 바꾸며 생략하거나 빈 배열이면 기존 목록을 비움. 시설은 ID 기준 중복 제거, 그림은 요청 순서 저장 |
 | 지역·유형 | 모르는 값이면 400 `UNKNOWN_REGION`·`UNKNOWN_CATEGORY`. B가 지역을 새로 만들지 않음 |
+| 출처 | `spacecloud`·`shareit`·`synthetic`만 허용. 다른 출처는 400 `VALIDATION` |
 | 원본 | 추출값은 크롤러가 MongoDB `crawl_raw`에 둠. B는 정리된 값만 받음. 응답의 `venue_id`를 크롤러가 `crawl_raw`에 기록 |
 
 ```json
@@ -322,8 +324,17 @@ UPDATE reservations SET status = 'completed'
 }
 ```
 
-- 이름·소개·이용 안내는 크롤러가 **생성한 값**을 보냅니다. 업체 실명·소개 원문은 받지 않습니다.
+신규 201·갱신 200의 응답은 같은 모양입니다. 아래 예시는 모르는 시설 이름을 무시한 경우입니다.
+
+```json
+{"venue_id": 123, "ignored_facilities": ["미등록 시설"]}
+```
+
+- 이름·소개·이용 안내는 크롤러·생성기가 **생성한 값**을 보냅니다. 업체 실명·소개 원문을 보내지 않을 책임은 호출 측에 있으며 API가 이름·본문의 출처를 자동 판별하지는 않습니다.
 - 값 검증은 DDL의 CHECK와 같게 합니다(가격 > 0, 인원 ≥ 1, 영업시간 open 9~22·close 10~23, `min_hours` 1~4). 크롤러는 영업시간을 9~23으로 잘라 보냅니다(11-03 A2).
+- 가격은 INT, 최대 인원은 SMALLINT의 저장 범위까지 검증합니다. 출처 ID는 빈 값 불가·50자 이내, 이름은 100자 이내, 설명·안내는 각각 UTF-8 65,535바이트 이내입니다. 그림은 `art:<영문 종류>-<0 또는 1>` 코드만 받고, 목록은 `sort_order` TINYINT에 맞춰 최대 128개입니다. 알 수 없는 본문 필드는 400 `VALIDATION`입니다.
+- `min_hours`·영업시간 생략 시 기본값은 1·9·23, 설명·안내는 null입니다. 이 API는 전체 등록·교체 요청이므로 생략한 기존 값을 부분 유지하지 않습니다.
+- 서비스에서 신규 INSERT를 시도하고 출처 UNIQUE의 1062면 롤백한 뒤 `INSERT … ON DUPLICATE KEY UPDATE`로 갱신합니다. 같은 요청을 그대로 다시 보내도 갱신 200을 반환하도록 `rowcount`로 신규 여부를 판단하지 않습니다. 공간·시설·그림은 최종 한 트랜잭션이며 어느 저장 단계가 실패해도 전부 롤백합니다.
 - 생성기로 만든 공간도 같은 API로 넣습니다(`source_site = "synthetic"`). 1차 등록의 `source_site`는 `spacecloud`·`shareit`·`synthetic`입니다. 앞의 두 값은 속성 출처이며 실제 업체의 예약 가능 여부를 뜻하지 않습니다.
 
 ## 8. 테스트
@@ -337,7 +348,8 @@ UPDATE reservations SET status = 'completed'
 | test_concurrency.py | **다른 회원 50명이 같은 칸을 동시에 요청하면 201 1건·409 49건**, 한 회원의 같은 요청 50건은 201 1건·200 49건, 겹치는 시간 범위는 한 요청만 성공. 409 `detail.slots`·이벤트·카운터와 DB 행 수를 확인 |
 | check_reservation_http.py (별도 실행) | 공식 앱·실제 가상 회원가입/로그인·Postman 컬렉션으로 OpenAPI 200·무인증 401·생성 201·동일 요청 200, 예약/칸/결제·가상 표시·성공 카운터·가상 데이터 정리 확인 |
 | test_jobs.py | 끝나는 시각이 지난 confirmed만 completed(오늘 끝난 것 포함), 두 번 돌려도 같음 |
-| test_internal.py | 키 없음 401, 신규 201·같은 출처 200(갱신), 모르는 시설 무시, 모르는 지역 400, CHECK 위반 값 400 |
+| test_internal.py | 키 없음·오류·미설정 401 및 DB 접근 차단, 출처 3종 신규 201·동일 재전송/갱신 200, 같은 ID와 최상위 응답, 시설 무시·중복 제거·목록 교체/비우기, 원래 등록 시각 보존, 입력 오류 400, 신규/갱신 저장 실패 전체 롤백, 같은 출처 동시 8건의 201 1건·200 7건과 시설·그림 정합성 |
+| check_internal_http.py (별도 실행) | 공식 앱·실제 내부 키·Postman으로 OpenAPI 200·키 없음 401·신규 201·재전송 200·갱신 200·출처 오류 400, DB 한 공간·목록 교체·검증 데이터 정리 확인 |
 | test_read_routing.py | 공개 조회 라우터는 `get_db_read`, 예약·내 예약은 `get_db_write`를 쓰는지(의존성 목록 검사) |
 
 동시성 테스트는 실제 MariaDB(`spacecube_test`)에서 스레드 50개로 돌립니다. SQLite로 대신하지 않습니다.

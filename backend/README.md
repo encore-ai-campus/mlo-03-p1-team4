@@ -13,6 +13,12 @@
 
 ## 계층
 
+F-61 `POST /internal/venues`는 크롤러·생성기에서 `X-Internal-Key`로 호출합니다.
+`INTERNAL_API_KEY`와 primary `DB_WRITE_URL`, 기존 0001·seed가 필요합니다.
+같은 `(source_site, source_id)`의 신규는 201, 재전송·갱신은 200이며 응답은
+최상위 `venue_id`·`ignored_facilities`입니다. 공간·시설·그림을 한 트랜잭션에 저장합니다.
+api1 호출 주소·검증 명령은 B 명세 7절과 `tests/README.md`를 따릅니다.
+
 ```
 routers   →   services   →   repositories   →   MariaDB primary / replica
 (HTTP 입출력)  (업무 규칙·트랜잭션)  (SQL)

@@ -1,8 +1,21 @@
-"""F-12~14 공간 검색·NEW와 F-20~22 상세·영업시간 SQL."""
+"""F-12~14 검색·NEW, F-20~22 상세·영업시간, F-61 공간 등록 SQL."""
 
 from datetime import date, datetime
 
-from sqlalchemy import and_, column, exists, false, func, literal, or_, select, table
+from sqlalchemy import (
+    and_,
+    column,
+    delete,
+    exists,
+    false,
+    func,
+    insert,
+    literal,
+    or_,
+    select,
+    table,
+)
+from sqlalchemy.dialects.mysql import insert as mysql_insert
 from sqlalchemy.engine import RowMapping
 from sqlalchemy.orm import Session
 
@@ -377,3 +390,43 @@ def list_images(db: Session, venue_id: int) -> list[str]:
         .order_by(VenueImage.sort_order, VenueImage.image_id)
     )
     return list(db.scalars(query))
+
+
+def insert_source(db: Session, values: dict) -> int:
+    """신규 출처를 INSERT한다. 같은 출처와의 경쟁은 UNIQUE 제약으로 판정한다."""
+    result = db.execute(mysql_insert(Venue).values(**values))
+    return int(result.lastrowid)
+
+
+def upsert_source(db: Session, values: dict) -> int:
+    """출처 충돌 후 갱신하며 NEW 기준 시각과 활성 상태는 보존한다."""
+    statement = mysql_insert(Venue).values(**values)
+    updates = {
+        name: statement.inserted[name]
+        for name in values
+        if name not in {"source_site", "source_id", "created_at"}
+    }
+    updates["venue_id"] = func.last_insert_id(Venue.venue_id)
+    result = db.execute(statement.on_duplicate_key_update(**updates))
+    return int(result.lastrowid)
+
+
+def replace_facilities_and_images(
+    db: Session, venue_id: int, facility_ids: list[int], images: list[str]
+) -> None:
+    """공간 행 잠금을 유지한 채 시설과 그림을 요청 목록으로 모두 교체한다."""
+    db.execute(delete(VenueFacility).where(VenueFacility.venue_id == venue_id))
+    db.execute(delete(VenueImage).where(VenueImage.venue_id == venue_id))
+    if facility_ids:
+        db.execute(
+            insert(VenueFacility),
+            [{"venue_id": venue_id, "facility_id": value} for value in facility_ids],
+        )
+    if images:
+        db.execute(
+            insert(VenueImage),
+            [
+                {"venue_id": venue_id, "url": value, "sort_order": i}
+                for i, value in enumerate(images)
+            ],
+        )
