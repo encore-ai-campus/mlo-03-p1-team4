@@ -12,8 +12,22 @@
 | `test_health.py`, `test_db_routing.py`, `test_metrics.py` | A | primary 끊김 503 / replica·MongoDB 끊김 200 degraded, replica 주소가 틀려도 공개 조회 성공 |
 | `test_catalog.py`, `test_venues.py` | B | 기준정보 필터·캐시, 공간 검색·정렬·상세·이미지·NEW·시간 칸·예약 가능 날짜 |
 | `test_reservations.py` | B | 예약·칸·모의결제 201, 10분 재시도 200, 409 소유권·대표 ID, 기간·시간·인원·수단 검증, 지난 시간 `completed`, 키 있는 가상 요청, 결제 실패 시 전체 롤백 |
-| `test_concurrency.py` | B | **다른 회원 50명이 같은 칸을 동시 요청 → 201 1건·409 49건**, 한 회원의 같은 요청 50건은 201 1건·200 49건, 겹치는 시간 범위 경쟁. DB 행 수·이벤트·카운터 확인 |
+| `test_concurrency.py` | B / A 연계 | **다른 회원 50명이 같은 칸을 동시 요청 → 201 1건·409 49건**, 한 회원의 같은 요청 50건은 201 1건·200 49건, 겹치는 시간 범위 경쟁. 예약·탈퇴 양방향 경쟁, 오래된 인증 스냅샷 뒤 최신 예약 집계, 슬롯 충돌 롤백 후 탈퇴 재확인도 실제 MariaDB 별도 세션으로 검증. DB 행·이벤트·카운터도 확인 |
 | `test_jobs.py`, `test_internal.py`, `test_read_routing.py` | B | 완료 배치 멱등, upsert 201·200·400, 공개 조회만 `get_db_read` |
+
+## F-04·F-30~32 예약·탈퇴 동시성 (#38)
+
+`test_concurrency.py`는 실제 로컬 MariaDB `spacecube_test`에서 별도 세션으로
+예약 선행 시 탈퇴 거절(409), 탈퇴 선행 시 예약 거절(401)을 검증합니다.
+두 요청 모두 `get_current_user()`의 회원 인증 조회를 먼저 마치도록 Barrier로
+맞춘 뒤 Event로 잠금 순서를 제어합니다. JWT 검증은 별도 HTTP 스모크 범위입니다.
+A·B 서비스와 예약 집계의 시각은 모두 같은 값으로 고정합니다.
+오래된 스냅샷에서의 최신 집계, 슬롯 충돌 롤백 후 탈퇴 재확인,
+검증/결제 실패 및 재시도 200 뒤의 잠금 해제와 최종 3개 표 행 수도 확인합니다.
+
+11-06 `verify.ps1` 전체 통과: Ruff 85파일, pytest 310건, 프론트 단위 55건·린트·빌드.
+기존 `check_reservation_http.py`도 실제 인증·Uvicorn·Postman 4요청/8검증과 DB 정합성,
+임시 데이터 정리를 통과했습니다. 기존 Starlette·프론트 E2E 린트 경고 각 1건이 남습니다.
 
 ## F-51 후기 목록용 B 조회 계약 (#43)
 
