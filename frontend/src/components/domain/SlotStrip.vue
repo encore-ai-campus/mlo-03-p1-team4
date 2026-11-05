@@ -59,7 +59,7 @@ function goReserve() {
       <li v-for="{ hour: h, taken, past } in slots.slots" :key="h">
         <UiTooltip v-if="taken" :text="`${pad(h)} 칸은 이미 예약됐어요`">
           <button type="button" class="slot is-taken" aria-disabled="true" :aria-label="`${pad(h)} 마감`">
-            <span class="slot__h num">{{ String(h).padStart(2, '0') }}</span>
+            <span class="slot__h num">{{ h }}시</span>
             <span class="slot__s">마감</span>
           </button>
         </UiTooltip>
@@ -72,7 +72,7 @@ function goReserve() {
           :aria-label="`${pad(h)}부터 1시간`"
           @click="toggle(h)"
         >
-          <span class="slot__h num">{{ String(h).padStart(2, '0') }}</span>
+          <span class="slot__h num">{{ h }}시</span>
           <span class="slot__s">{{ selected.includes(h) ? '선택' : past ? '지남' : '가능' }}</span>
         </button>
       </li>
@@ -87,7 +87,7 @@ function goReserve() {
 </template>
 
 <style scoped>
-.slot.is-past:not(.is-on) { background: repeating-linear-gradient(135deg, var(--c-dark-2) 0 6px, var(--c-dark-taken-2) 6px 12px); }
+.slot.is-past:not(.is-on) { background: var(--c-dark-taken); color: var(--c-on-dark-faint); }
 .strip {
   display: flex;
   flex-direction: column;
@@ -96,6 +96,9 @@ function goReserve() {
   border-radius: var(--r-lg);
   background: var(--c-ink);
   color: var(--c-on-dark);
+  --btn-bg: var(--c-on-dark);
+  --btn-ink: var(--c-brand);
+  --btn-bg-hover: var(--c-surface);
 }
 /* 제목과 공간 이름을 한 줄에 */
 .strip__head {
@@ -128,7 +131,7 @@ function goReserve() {
   justify-content: center;
   width: 100%;
   min-height: 46px;
-  border: 1px solid var(--c-dark-line);
+  border: 0;
   border-radius: var(--r-sm);
   background: var(--c-dark-2);
   color: var(--c-on-dark);
@@ -136,18 +139,18 @@ function goReserve() {
   transition: background-color var(--t-fast), border-color var(--t-fast), transform var(--t-fast) var(--ease-out);
 }
 .slot:hover:not(.is-taken) {
-  border-color: var(--c-brand-light);
+  background: var(--c-dark-line);
 }
 .slot:active:not(.is-taken) {
   transform: scale(0.97); /* 한 번 예약에 여러 번 누르는 칸이라 약하게 */
 }
-.slot.is-on {
-  background: var(--c-brand);
-  border-color: var(--c-brand);
+.slot.is-on,
+.slot.is-on:hover {
+  background: var(--c-on-dark);
+  color: var(--c-brand);
 }
 .slot.is-taken {
-  background: repeating-linear-gradient(135deg, var(--c-dark-taken) 0 6px, var(--c-dark-taken-2) 6px 12px);
-  border-color: var(--c-dark-taken-2);
+  background: var(--c-dark-taken);
   color: var(--c-on-dark-faint);
   cursor: not-allowed;
 }

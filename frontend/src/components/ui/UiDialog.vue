@@ -45,7 +45,7 @@ defineEmits(['open-auto-focus'])
   padding: var(--sp-24);
   border-radius: var(--r-lg);
   background: var(--c-surface);
-  box-shadow: var(--shadow-pop);
+  box-shadow: var(--shadow-pop); /* taste-skill-ignore 떠 있는 층·포커스 링 */
   animation: dialog-in var(--t-base) var(--ease-out);
 }
 .dialog[data-state='closed'] {

@@ -13,7 +13,7 @@ const bars = computed(() =>
   props.values.map((v, i) => ({
     v,
     hour: props.startHour + i,
-    label: String(props.startHour + i).padStart(2, '0'),
+    label: `${props.startHour + i}시`,
     peak: v >= PEAK,
   })),
 )
@@ -53,7 +53,7 @@ const peakHours = computed(() => bars.value.filter((b) => b.peak).map((b) => `${
   gap: 2px;
   height: 220px;
   padding-top: 24px;
-  border-bottom: 1px solid var(--c-line-strong);
+  border-bottom: 1px solid var(--c-line-strong); /* taste-skill-ignore 차트 기준선 */
 }
 .chart__col {
   position: relative;
