@@ -2,7 +2,7 @@
 import { computed, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
-import { CalendarDays, Menu, MessageSquareText, UserRound } from '@lucide/vue'
+import { CalendarDays, LogOut, Menu, MessageSquareText, UserRound } from '@lucide/vue'
 import SidebarLayout from '@/components/layout/SidebarLayout.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import UiDialog from '@/components/ui/UiDialog.vue'
@@ -41,6 +41,12 @@ const menu = computed(() => [
   { icon: MessageSquareText, label: '내가 쓴 후기', to: '/me?section=reviews', current: section.value === 'reviews' },
   { icon: UserRound, label: '회원 정보', to: '/me?section=account', current: section.value === 'account' },
 ])
+function doLogout() {
+  menuOpen.value = false
+  logout()
+  toast('로그아웃했어요')
+  router.push('/')
+}
 const timeRange = (r) => `${hourLabel(r.start_hour)}–${hourLabel(r.end_hour)}`
 const reviewDeadline = (r) => addDays([r.date, r.created_at.slice(0, 10)].sort().at(-1), 7)
 const canReview = (r) => r.status === 'completed' && !r.review_id && todayISO() <= reviewDeadline(r)
@@ -160,6 +166,7 @@ load()
             <RouterLink v-if="m.to" :to="m.to" class="menu__item" :aria-current="m.current ? 'page' : undefined"><component :is="m.icon" :size="20" aria-hidden="true" />{{ m.label }}</RouterLink>
             <span v-else class="menu__item is-soon"><component :is="m.icon" :size="20" aria-hidden="true" />{{ m.label }}<small>준비 중</small></span>
           </template>
+          <button type="button" class="menu__item menu__logout" @click="doLogout"><LogOut :size="20" aria-hidden="true" />로그아웃</button>
         </nav>
       </template>
 
@@ -173,6 +180,7 @@ load()
               <RouterLink v-if="m.to" :to="m.to" class="menu__item" :aria-current="m.current ? 'page' : undefined" @click="menuOpen = false"><component :is="m.icon" :size="20" aria-hidden="true" />{{ m.label }}</RouterLink>
               <span v-else class="menu__item is-soon"><component :is="m.icon" :size="20" aria-hidden="true" />{{ m.label }}<small>준비 중</small></span>
             </template>
+            <button type="button" class="menu__item menu__logout" @click="doLogout"><LogOut :size="20" aria-hidden="true" />로그아웃</button>
           </nav>
         </UiDrawer>
       </template>
@@ -313,8 +321,17 @@ load()
   font-weight: 500;
   text-decoration: none;
 }
-a.menu__item:hover {
+a.menu__item:hover,
+.menu__logout:hover {
   background: var(--c-brand-soft);
+}
+.menu__logout {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
 }
 .menu__item[aria-current='page'] {
   background: var(--c-brand-soft);
