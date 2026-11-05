@@ -32,7 +32,6 @@ const model = defineModel({ type: String })
   overflow-x: auto;
   scroll-snap-type: x proximity;
   scrollbar-width: none;
-  border-bottom: 1px solid var(--c-line);
 }
 .tabs__trigger {
   flex: none;
@@ -64,7 +63,7 @@ const model = defineModel({ type: String })
 /* 선택 탭으로 미끄러지는 밑줄 (마이크로 인터랙션) */
 .tabs__indicator {
   position: absolute;
-  bottom: -1px;
+  bottom: 0;
   left: 0;
   height: 3px;
   width: var(--reka-tabs-indicator-size);

@@ -13,11 +13,11 @@ const bars = computed(() =>
   props.values.map((v, i) => ({
     v,
     hour: props.startHour + i,
-    label: String(props.startHour + i).padStart(2, '0'),
+    label: `${props.startHour + i}시`,
     peak: v >= PEAK,
   })),
 )
-const peakHours = computed(() => bars.value.filter((b) => b.peak).map((b) => `${b.label}시`).join(', '))
+const peakHours = computed(() => bars.value.filter((b) => b.peak).map((b) => b.label).join(', '))
 </script>
 
 <template>
@@ -36,7 +36,7 @@ const peakHours = computed(() => bars.value.filter((b) => b.peak).map((b) => `${
         <caption>시간대별 평균 예약률</caption>
         <thead><tr><th scope="col">시간</th><th scope="col">예약률</th></tr></thead>
         <tbody>
-          <tr v-for="b in bars" :key="b.hour"><td>{{ b.label }}시</td><td>{{ b.v }}%</td></tr>
+          <tr v-for="b in bars" :key="b.hour"><td>{{ b.label }}</td><td>{{ b.v }}%</td></tr>
         </tbody>
       </table>
     </div>
@@ -53,7 +53,7 @@ const peakHours = computed(() => bars.value.filter((b) => b.peak).map((b) => `${
   gap: 2px;
   height: 220px;
   padding-top: 24px;
-  border-bottom: 1px solid var(--c-line-strong);
+  border-bottom: 1px solid var(--c-line-strong); /* taste-skill-ignore 차트 기준선 */
 }
 .chart__col {
   position: relative;

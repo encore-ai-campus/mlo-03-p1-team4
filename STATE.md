@@ -3,7 +3,7 @@
 사람과 에이전트(Codex, Claude Code)가 함께 고치는 진행 기록입니다. 작업을 끝낼 때마다 해당 줄을 고치고 '최근 변경' 맨 위에 한 줄 더합니다. 설계 내용 자체는 `docs/`에, 여기는 상태와 결정만 둡니다.
 
 - 마지막 갱신: 2026-11-05
-- 단계: **11-05 통합일** · 설계 11-03 확정안 + 11-05 회의(탈퇴·A6·A7 확정, A8 보류) · DB 0001·seed·로컬 compose 검증 · 프론트 7화면(목업, 다락큐브·푸터 반영) · GitHub develop 흐름·CI·Project 보드 · **1차 배포 로컬 VM 7대(노트북 4대, 11-05)** · B 조회 #31 develop 병합 완료. 예약 브랜치는 공식 A 코드·develop(eae5068) 통합, F-30~32·실제 HTTP 검증 완료(전체 pytest 241건, Postman 4요청·8검증, PR #39 재시도 회귀 수정 반영)
+- 단계: **11-05 통합일** · 설계 11-03 확정안 + 11-05 회의(탈퇴·A6·A7 확정, A8 보류) · DB 0001·seed·로컬 compose 검증 · 프론트 7화면(목업, 다락큐브·푸터 반영) · GitHub develop 흐름·CI·Project 보드 · **1차 배포 로컬 VM 7대(노트북 4대, 11-05)** · B 조회 #31 develop 병합 완료. 예약 브랜치는 공식 A 코드·develop(71d0681) 통합, F-30~32·실제 HTTP 검증 완료(전체 pytest 241건, Postman 4요청·8검증, PR #39 재시도 회귀 수정 반영)
 - 디자인 캔버스(화면 설계 · 시스템 아키텍처 · 글꼴 시안): https://claude.ai/artifact/5dQciCDEaMm8uNjw6sqZpm
 - 실행 환경: Python은 conda `pro_1`(`environment.yml`), 프론트는 `frontend/`의 npm
 
@@ -13,7 +13,7 @@
 | --- | --- | --- | --- | --- |
 | 프론트 | 노진산(FE·PM) | FE-1~9 확정안 반영, Claude 시안 대조·FE 오류/모바일 결제/가입 UX 재검토 및 목업·화면 검증 | A·B 구현 후 실제 API 연결·오류·예약 동시성 통합 검증 | 실제 API 미구현 |
 | FastAPI A | [이름] | 이슈 #1 코드·테스트를 현재 클론에 반영, 로컬 MariaDB로 pytest 40개 통과 | B 공용 함수 확인, 이벤트 자유 문자열 개인정보 정책을 팀과 합의, PR 검토 | 후기·탈퇴 B 연동 및 이벤트 개인정보 합의 대기 |
-| FastAPI B | [이름] | develop(eae5068) 통합, 공식 main.py에 reservations 등록·A 공통 가상 요청 키 검증 사용. PR #39 취소·환불 재시도 제외 반영. MariaDB 11.4.13 pytest 241건, Postman 실제 HTTP 4요청·8검증, FE 단위 54건·Ruff·린트·빌드 통과 | 예약 PR #39 리뷰·CI 확인 → 내 예약 목록·상세(F-40, #8) → 취소(F-34) → 완료 배치(F-35). 검색 개선 권고는 별도 후속 PR | A 탈퇴 함수 호출·동시 예약/탈퇴 계약은 A 후속 연계. 실제 replica 장애·복제 지연과 FE 실제 예약 화면 연결은 별도 검증 |
+| FastAPI B | [이름] | develop(71d0681) 통합, 공식 main.py에 reservations 등록·A 공통 가상 요청 키 검증 사용. PR #39 취소·환불 재시도 제외 반영. MariaDB 11.4.13 pytest 241건, Postman 실제 HTTP 4요청·8검증, FE 단위 55건·Ruff·린트·빌드 통과 | 예약 PR #39 리뷰·CI 확인 → 내 예약 목록·상세(F-40, #8) → 취소(F-34) → 완료 배치(F-35). 검색 개선 권고는 별도 후속 PR | A 탈퇴 함수 호출·동시 예약/탈퇴 계약은 A 후속 연계. 실제 replica 장애·복제 지연과 FE 실제 예약 화면 연결은 별도 검증 |
 | DB | [이름] | `0001_init.sql`·`mongo_init.js` 검증(설치형 11.8·compose 11.4 둘 다 29건 통과), seed(유형 5·시설 20·지역 230 → `seed.sql`), `infra/local` compose, 크롤러 시제품(옛 필터) | 크롤러 새 필터(유형 5·별칭) → `/internal/venues` 등록(B와) → 가상 데이터 생성기 | 없음(A2 결정을 팀원에게 공유) |
 
 ## 기능 진행표
@@ -162,6 +162,8 @@ A1~A4는 11-03에 확정했고, **A5~A8은 추후 확정**으로 미뤘다(11-03
 
 ## 최근 변경 (최신이 위)
 
+- 11-05 · B · PR #39에 최신 develop(71d0681, FE #36·40)을 통합. STATE.md 충돌은 예약 수정 기록과 FE 회원·후기 작업 기록을 함께 보존해 해결. 백엔드·DB는 검증된 f627774와 동일하며 MariaDB pytest 241건·Postman 4요청/8검증 결과 유지. 통합 후 프론트 verify(단위 55건·린트·빌드) 통과, 기존 린트 경고 1건. 변경 커밋 푸시 후 CI 재확인, #38 문서 변경은 별도 보존.
+
 - 11-05 · B · PR #39 리뷰 P1 수정: find_recent_matching에서 confirmed/completed + paid만 재시도 후보로 조회. 취소 후 같은 칸 재예약은 새 예약 ID로 200, 타인 선점은 소유권 비노출 409, 환불 건 제외와 완료 예약 재시도 유지를 검증. MariaDB 11.4.13 loopback 임시 인스턴스·spacecube_test에서 수정 전 4건 실패 재현 후 전체 pytest 241건·실제 HTTP Postman 4요청/8검증·Ruff 린트/포맷 통과(기존 Starlette 경고 1건). 프론트 verify(단위 54건·린트·빌드)도 통과. 기존 Starlette·프론트 린트 경고 각 1건. PR 기존 head의 CI 성공 확인, 수정 커밋의 CI 확인 필요. #38 문서 변경은 별도 작업으로 보존.
 
 - 11-05 · B · feat/FastAPI-B-reservation을 푸시하고 develop 대상 PR #39 생성: F-30~32 예약·모의 결제 API, 공식 A 통합·예약 라우터 연결, Postman 실제 HTTP 검증 포함. 리뷰어 jinsan02·naturedevworks 지정, 충돌 없음 확인. 로컬 pytest 236건·Postman 4요청/8검증·FE 단위 54건 및 린트·빌드 통과 기록 유지, GitHub CI 실행 중. 검색 개선 권고는 후속 PR로 분리.
@@ -171,6 +173,7 @@ A1~A4는 11-03에 확정했고, **A5~A8은 추후 확정**으로 미뤘다(11-03
 - 11-05 · B · Postman CLI 1.86.0을 npm 전역 설치하고 F-30~32용 로컬 v3 컬렉션·환경을 추가. OpenAPI 경로 계약·인증 오류·예약 생성 및 같은 요청 재시도 200 확인을 분리하고 토큰·예약 조건이 비면 쓰기 요청을 건너뜀. 컬렉션 4개 요청 파일·환경 2개 lint 오류/경고 0건, 빈 환경에서 쓰기 요청 2개 생략 러너 exit 0, Postman Echo HTTP 및 스크립트 검사 1개 통과. 실 API HTTP 검사는 미실행: `127.0.0.1:8000` 미기동, 지침의 `pro_1` Python 환경과 `backend/.env`가 현재 PC에서 발견되지 않음. `postman status`는 CLI 1.86.0을 확인했으며 프로젝트 init·Postman 계정 인증은 없음(로컬 실행은 성공). 전체 init은 스킬 파일 다수 추가와 루트 `AGENTS.md` 갱신이 필요해 이번 범위에서 제외. 이 실행 셸의 `postman`은 여전히 WindowsApps 데스크톱 별칭이 우선하므로 NVM shim 직접 실행으로 검증; 사용자 프로필 PATH 변경은 이 실행 컨텍스트에서 확인되지 않음. 기존 F-30 MariaDB pytest는 앞선 검증 결과(14 API + 동시성 3 시나리오, 전체 pytest 182건)로 유지.
 
 - 11-05 · B · F-30~32 `POST /reservations` 예약·모의 결제 구현. primary에서 공간·기간·영업시간·`min_hours`·인원·결제수단을 검증하고 `reservations`·`reservation_slots`·`payments`를 한 트랜잭션으로 커밋. 지난 종료 시각은 즉시 `completed`, 성공 201, 10분 안 같은 요청은 200 + 기존 결제. 시간 칸 기본키의 1062만 롤백 후 충돌로 처리하며 `slots`, 본인 단일·복수 충돌의 최소 ID, 혼합 소유자 ID 비노출을 확인. 가상 예약은 `X-Synthetic`과 `SYNTHETIC_API_KEY`를 함께 검사. MariaDB API 14건·경쟁 테스트: 다른 회원 50명(201 1건/409 49건), 같은 회원 재시도 50건(201 1건/200 49건), 겹친 시간 경쟁(201 1건/409 1건) 통과. 전체 `verify.ps1`: pytest 182건, FE 단위 54건, Ruff·프론트 린트·색 검사·빌드 통과, Starlette TestClient 경고 1건. 로컬 A `main.py`에는 reservations 라우터를 연결했으나 Git 제외 상태라 A 통합 후 등록을 확인해야 함. develop의 A 공통 `is_synthetic_request`는 키 검증을 제공하므로 통합 후 B의 별도 검증과 정합성을 확인해야 함. 예약 코드·테스트·API 문서는 `ad16619`로 커밋 완료; 이 진행 기록은 별도 문서 커밋으로 정리.
+- 11-05 · FE · 이슈 점검으로 찾은 프론트 빈 곳 보완: ① 탈퇴 막기(11-05 결정) — 취소할 수 있는 예약이 있으면 탈퇴 버튼 대신 '예약 내역 보기', 서버 409 `HAS_UPCOMING_RESERVATION`도 같은 안내, 목업도 409 ② 회원 정보 수정(F-03: 이름·휴대폰·소식 받기)·비밀번호 변경(`WRONG_PASSWORD` 칸 오류) ③ 내가 쓴 후기 고치기·지우기(F-50, 지우기 창은 '지우지 않기' 기본 초점) ④ Playwright `E2E_BASE_URL`·`E2E_SYNTHETIC_KEY`로 실제 서버·가상 데이터 헤더 ⑤ 창 뒤 배경 올리브 토큰 `--c-overlay`, 내 메뉴 탭 제목. 단위 55·E2E 67 통과(재시도 없음)·7 기기 조건 건너뜀
 - 11-05 · B · #31 브랜치 전용 작업 트리에서 origin/develop(c007470, A #34 포함)을 통합. STATE.md는 A 진행·로그아웃 결정과 B 조회 검증 기록을 함께 보존하고 backend/tests/README.md는 양쪽 검증 안내를 보존해 충돌 해결. 공식 main.py에 catalog·venues만 등록. A 탈퇴용 count_cancellable(db, user_id) → int 제공: 한국 시각 한 번을 기준으로 시작 전 confirmed 예약만 primary에서 집계하며 시작 정각은 제외, 커밋하지 않음. 기존 205건 + 경계·집계 12건 = MariaDB pytest 217건 통과(Starlette 경고 1건), Ruff 린트·포맷과 FE verify(단위 54건·린트·색 검사·빌드) 통과. FE 기존 E2E 파일의 조건문 린트 경고 1건. A 탈퇴 서비스는 503 유지, 실제 호출 연결·동시 탈퇴/예약 통합은 A와 후속 확인. 예약·Postman 커밋은 별도 예약 브랜치에 보존. 그 브랜치의 로컬 A 전달본 제외 설정은 공식 A 통합 때 정리하며 이 작업 트리는 모든 A 파일을 Git 추적 상태로 사용. 검색 개선 권고·실제 replica 장애 시험·브라우저 E2E는 이번에 진행하지 않음.
 
 - 11-05 · B · PR #31 브랜치에 origin/develop(1cc11a8)을 머지. STATE.md 충돌 2곳은 B 구현·검증 기록과 공동의 11-05 통합일·로컬 VM 배포·회의 결정을 함께 보존해 해결. STRUCTURE·B API 명세·요구사항은 양쪽 변경을 자동 병합. A 전달본의 로컬 Git 제외는 유지하며, 새 공유 계약 count_cancellable()과 X-Synthetic-Key 반영 여부는 A 통합 및 후속 구현에서 확인해야 함. 머지 후 verify.ps1 전체 통과: pytest 165건·프론트 단위 54건·Ruff 린트/포맷·프론트 린트/색 검사/빌드. Starlette 경고 1건. A 전달본을 사용한 로컬 검증이며 실제 replica 장애·복제 지연과 GitHub A 통합 후 재검증은 후속 항목.

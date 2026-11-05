@@ -1,22 +1,20 @@
 <script setup>
-import { BookOpen, Camera, Presentation, Coffee, PartyPopper } from '@lucide/vue'
 import RoomArt from './RoomArt.vue'
 
-// 유형 바로가기 (벤토). 개수가 정해진 입구 5개에만 쓴다. 큰 칸(스터디룸)은 그림 + 글자, 작은 칸은 아이콘 + 글자 한 줄.
+// 유형 바로가기 (벤토). 개수가 정해진 입구 5개에만 쓴다. 큰 칸(스터디룸)은 위 그림 + 글자, 작은 칸은 왼쪽 그림 + 글자.
 // 메인 첫 화면에 히어로와 함께 들어오도록 높이를 낮게 둔다 (2줄 × 108px).
 defineProps({
   categories: { type: Array, required: true }, // [{ code, name, use }]
 })
 const uses = { studyroom: '팀 과제 · 면접 연습', studio: '프로필 · 제품 촬영', cafe: '북토크 · 소모임', lectureroom: '강의 · 워크숍', partyroom: '생일 · 모임' }
-const icons = { studyroom: BookOpen, studio: Camera, cafe: Coffee, lectureroom: Presentation, partyroom: PartyPopper }
+const arts = { studyroom: 'group', studio: 'studio', cafe: 'cafe', lectureroom: 'seminar', partyroom: 'partyroom' }
 </script>
 
 <template>
   <ul class="bento">
     <li v-for="c in categories" :key="c.code" class="bento__cell" :class="`bento__cell--${c.code}`">
       <RouterLink :to="{ path: '/search', query: { category: c.code } }" class="tile">
-        <RoomArt v-if="c.code === 'studyroom'" kind="group" class="tile__art" />
-        <span class="tile__icon" aria-hidden="true"><component :is="icons[c.code]" :size="22" /></span>
+        <RoomArt :kind="arts[c.code]" class="tile__art" aria-hidden="true" />
         <span class="tile__text">
           <span class="tile__name">{{ c.name }}</span>
           <span class="tile__use">{{ uses[c.code] }}</span>
@@ -47,39 +45,34 @@ const icons = { studyroom: BookOpen, studio: Camera, cafe: Coffee, lectureroom: 
     grid-row: span 2;
   }
 }
-/* 작은 칸: 아이콘 왼쪽, 글자 오른쪽 */
+/* 작은 칸: 그림 왼쪽, 글자 오른쪽 */
 .tile {
   display: flex;
   align-items: center;
   gap: var(--sp-12);
   height: 100%;
   min-height: 88px;
-  padding: var(--sp-16);
-  border: 1px solid var(--c-line);
+  padding: 0 var(--sp-16) 0 0;
   border-radius: var(--r-lg);
   background: var(--c-surface);
   color: var(--c-ink);
   text-decoration: none;
   overflow: hidden;
-  transition: border-color var(--t-fast), transform var(--t-fast) var(--ease-out);
+  transition: background-color var(--t-fast), transform var(--t-fast) var(--ease-out);
 }
 .tile:hover {
-  border-color: var(--c-brand);
+  background: var(--c-fill);
+}
+.tile__art {
+  flex: none;
+  align-self: stretch;
+  width: 112px;
+  aspect-ratio: auto;
 }
 @media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
   .tile:hover {
     transform: translateY(-2px);
   }
-}
-.tile__icon {
-  flex: none;
-  display: grid;
-  place-items: center;
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;
-  background: var(--c-brand-soft);
-  color: var(--c-brand-ink);
 }
 .tile__text {
   display: flex;
@@ -92,7 +85,7 @@ const icons = { studyroom: BookOpen, studio: Camera, cafe: Coffee, lectureroom: 
   letter-spacing: -0.02em;
 }
 .tile__use {
-  font-size: var(--fs-13);
+  font-size: var(--fs-15);
   color: var(--c-muted);
 }
 /* 큰 칸(스터디룸): 위는 그림, 아래는 글자 */
@@ -105,14 +98,8 @@ const icons = { studyroom: BookOpen, studio: Camera, cafe: Coffee, lectureroom: 
 }
 .bento__cell--studyroom .tile__art {
   flex: 1;
+  width: auto;
   min-height: 120px;
-  aspect-ratio: auto;
-}
-.bento__cell--studyroom .tile__icon {
-  position: absolute;
-  top: var(--sp-12);
-  left: var(--sp-12);
-  background: var(--c-surface);
 }
 .bento__cell--studyroom .tile__text {
   padding: var(--sp-8) var(--sp-16) var(--sp-12);

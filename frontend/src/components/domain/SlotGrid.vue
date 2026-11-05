@@ -39,7 +39,7 @@ function toggle(h) {
     <li v-for="s in slots" :key="s.hour">
       <UiTooltip v-if="s.taken" :text="`${hourLabel(s.hour)} 칸은 이미 예약됐어요`">
         <button type="button" class="slot is-off" aria-disabled="true" :aria-label="`${hourLabel(s.hour)} 마감`">
-          <span class="slot__h num">{{ String(s.hour).padStart(2, '0') }}</span>
+          <span class="slot__h num">{{ s.hour }}시</span>
           <span class="slot__s">마감</span>
         </button>
       </UiTooltip>
@@ -53,7 +53,7 @@ function toggle(h) {
         :aria-label="`${hourLabel(s.hour)}부터 1시간`"
         @click="toggle(s.hour)"
       >
-        <span class="slot__h num">{{ String(s.hour).padStart(2, '0') }}</span>
+        <span class="slot__h num">{{ s.hour }}시</span>
         <span class="slot__s">{{ selected.includes(s.hour) ? '선택' : s.past ? '지남' : '가능' }}</span>
       </button>
     </li>
@@ -76,7 +76,7 @@ function toggle(h) {
   justify-content: center;
   width: 100%;
   min-height: 48px;
-  border: 1px solid var(--c-line-strong);
+  border: 1px solid var(--c-line-strong); /* taste-skill-ignore 입력 컨트롤 */
   border-radius: var(--r-sm);
   background: var(--c-surface);
   cursor: pointer;
@@ -95,14 +95,14 @@ function toggle(h) {
   color: var(--c-on-dark);
 }
 .slot.is-past:not(.is-on) {
-  background: repeating-linear-gradient(135deg, var(--c-paper) 0 6px, var(--c-surface) 6px 12px);
+  background: var(--c-paper);
 }
 .slot.is-on:hover {
   background: var(--c-brand-hover);
 }
 .slot.is-off {
-  background: repeating-linear-gradient(135deg, var(--c-slot-taken) 0 6px, var(--c-slot-taken-2) 6px 12px);
-  border-color: var(--c-slot-taken-2);
+  background: var(--c-slot-taken);
+  border-color: var(--c-slot-taken);
   color: var(--c-subtle);
   cursor: not-allowed;
 }
@@ -110,6 +110,7 @@ function toggle(h) {
   font-size: var(--fs-15);
   font-weight: 700;
   line-height: 1.15;
+  white-space: nowrap; /* '10시'가 좁은 칸에서 두 줄로 나뉘지 않게 */
 }
 .slot__s {
   font-size: 11px;

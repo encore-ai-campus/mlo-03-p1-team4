@@ -1,5 +1,5 @@
 import { USE_MOCK, mockDelay, request } from './client';
-import { currentUser, fail, stamp } from './mock/db';
+import { currentUser, fail, reservationItem, reservations, stamp } from './mock/db';
 import { validation } from './authApi';
 const publicUser = u => ({
   user_id: u.user_id, email: u.email, name: u.name, phone: u.phone, birth: u.birth, gender_digit: u.gender_digit, marketing_agreed: u.marketing_agreed
@@ -45,6 +45,12 @@ export async function withdraw(token) {
       method: 'DELETE', token
     });
   const u = currentUser(token);
+  // 11-05: 취소할 수 있는 예약(시작 전 confirmed)이 남으면 막는다. 이용 중인 예약은 막지 않는다.
+  const count = reservations.filter(r => r.user_id === u.user_id && reservationItem(r).can_cancel).length;
+  if (count)
+    fail('HAS_UPCOMING_RESERVATION', 409, '이용 예정 예약이 있어요. 예약 내역에서 먼저 취소해 주세요.', {
+      count
+    });
   Object.assign(u, {
     deleted: true, deleted_at: stamp(), name: '탈퇴회원', phone: null, birth: '000000', email: `deleted+${u.user_id}@invalid`, password: crypto.randomUUID(), marketing_agreed: false
   });

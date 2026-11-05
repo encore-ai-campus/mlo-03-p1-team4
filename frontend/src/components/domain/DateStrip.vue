@@ -59,7 +59,7 @@ const model = defineModel({ type: String })
   align-items: center;
   justify-content: center;
   min-height: 56px;
-  border: 1px solid var(--c-line-strong);
+  border: 1px solid var(--c-line-strong); /* taste-skill-ignore 입력 컨트롤 */
   border-radius: var(--r-md);
   background: var(--c-surface);
   scroll-snap-align: start;

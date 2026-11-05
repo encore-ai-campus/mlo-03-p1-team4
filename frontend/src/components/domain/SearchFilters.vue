@@ -91,15 +91,15 @@ const groups = [
 .type {
   min-height: var(--tap);
   padding: 0 var(--sp-12);
-  border: 1px solid var(--c-line-strong);
-  border-radius: 999px;
-  background: var(--c-surface);
+  border: 0;
+  border-radius: var(--r-sm);
+  background: var(--c-fill);
   font-size: var(--fs-15);
   cursor: pointer;
   transition: border-color var(--t-fast), background-color var(--t-fast);
 }
 .type:hover {
-  border-color: var(--c-brand);
+  background: var(--c-line-strong);
 }
 .type[aria-pressed='true'] {
   background: var(--c-ink);

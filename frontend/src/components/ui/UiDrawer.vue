@@ -35,7 +35,7 @@ const open = defineModel('open', { type: Boolean, default: false })
   display: flex;
   flex-direction: column;
   background: var(--c-surface);
-  box-shadow: var(--shadow-pop);
+  box-shadow: var(--shadow-pop); /* taste-skill-ignore 떠 있는 층·포커스 링 */
 }
 .drawer--right,
 .drawer--left {
@@ -64,7 +64,6 @@ const open = defineModel('open', { type: Boolean, default: false })
   align-items: center;
   justify-content: space-between;
   padding: var(--sp-12) var(--sp-12) var(--sp-12) var(--sp-24);
-  border-bottom: 1px solid var(--c-line);
 }
 .drawer__title {
   font-size: var(--fs-20);
