@@ -12,7 +12,7 @@
 | 파트 | 담당자 | 지금 | 다음 할 일 | 막힌 것 |
 | --- | --- | --- | --- | --- |
 | 프론트 | 노진산(FE·PM) | FE-1~9 확정안 반영, Claude 시안 대조·FE 오류/모바일 결제/가입 UX 재검토 및 목업·화면 검증 | A·B 구현 후 실제 API 연결·오류·예약 동시성 통합 검증 | 실제 API 미구현 |
-| FastAPI A | [이름] | 문서 확정(`docs/백엔드_A`), 폴더·README | 1일차 오전 `core/`(두 DB 세션·오류·`get_current_user`·`log_event`·`get_today`)·`models/base.py` → 회원 → 후기 → 이벤트 | 없음 |
+| FastAPI A | [이름] | 이슈 #1 코드·테스트를 현재 클론에 반영, 로컬 MariaDB로 pytest 40개 통과 | B 공용 함수 확인, 이벤트 자유 문자열 개인정보 정책을 팀과 합의, PR 검토 | 후기·탈퇴 B 연동 및 이벤트 개인정보 합의 대기 |
 | FastAPI B | [이름] | 문서 확정(`docs/백엔드_B`), 폴더·README | 공개 조회(catalog·venues·slots) → 예약+결제 트랜잭션·동시성 테스트 → `/internal/venues` | A의 core (DDL은 11-04 로컬 검증 끝) |
 | DB | [이름] | `0001_init.sql`·`mongo_init.js` 검증(설치형 11.8·compose 11.4 둘 다 29건 통과), seed(유형 5·시설 20·지역 230 → `seed.sql`), `infra/local` compose, 크롤러 시제품(옛 필터) | 크롤러 새 필터(유형 5·별칭) → `/internal/venues` 등록(B와) → 가상 데이터 생성기 | 없음(A2 결정을 팀원에게 공유) |
 
@@ -22,14 +22,14 @@
 
 | F-ID | 기능 | 담당 | 상태 |
 | --- | --- | --- | --- |
-| F-01~04 | 회원가입·로그인·내 정보·탈퇴 | A | 서버 설계 확정 / FE 가입·로그인·내 정보 조회·탈퇴 목업 검증 |
+| F-01~04 | 회원가입·로그인·내 정보·로그아웃·탈퇴 | A | 회원·로그아웃 pytest 통과. 탈퇴는 B 예약 확인 연결 전 503 |
 | F-10~14 | 유형·지역 조회, 검색, 정렬, NEW | B | 서버 설계 확정 / FE `/venues` 계약 목업 검증 |
 | F-20~22 | 상세, 예약 가능 날짜, 시간 칸 | B | 서버 설계 확정 / FE `/venues` 계약 목업 검증 |
 | F-30~32 | 예약+모의 결제 한 번, 중복 차단 | B | 서버 설계 확정 / FE 한 번 결제·409·지난 예약 목업 검증 |
 | F-34~35 | 취소, 이용 완료 배치 | B | 설계 확정 |
 | F-40~41 | 내 예약, 내 후기 | B / A | 서버 설계 확정 / FE 내 예약 3상태·내 후기 목업 검증 |
-| F-50~51 | 후기 작성·조회(후기 모아보기) | A | 서버 설계 확정 / FE 후기 작성·모아보기 목업 검증 |
-| F-60, F-62~65 | 이벤트(로그 파일 + MongoDB), 가상 데이터, `get_today`, 서버 로그, 지표 | A | 설계 확정 |
+| F-50~51 | 후기 작성·조회(후기 모아보기) | A | B 소유권 조회·공간 정보 연결 전 503 경로 존재, 미검증 |
+| F-60, F-62~65 | 이벤트(로그 파일 + MongoDB), 가상 데이터, `get_today`, 서버 로그, 지표 | A | 공통 계약·이벤트 pytest 통과. 자유 문자열 개인정보 처리 팀 합의 대기 |
 | F-61 | 크롤링 신규 등록 | DB / B | 진행 (크롤러 동작, 필터가 옛 스터디룸 기준, `crawl_raw`·`/internal/venues` 연결 전) |
 | F-70 | 헬스체크 3단계 | A | 설계 확정 |
 | — | 같은 칸 동시 50건 중 1건만 성공 | B / DB | 설계 확정 (MVP 통과 조건) |
@@ -142,6 +142,7 @@ A1~A4는 11-03에 확정했고, **A5~A8은 추후 확정**으로 미뤘다(11-03
 
 ## 최근 변경 (최신이 위)
 
+- 11-05 · A · 이슈 #1 변경을 `C:\mlo-03-p1-team4` 클론에 반영하고 경로 독립 테스트 실행 스크립트를 추가. 인증된 `POST /auth/logout` 204 및 Swagger Bearer 계약을 문서·테스트에 반영. 로컬 MariaDB `spacecube_test`에서 pytest 40개, Ruff 검사·포맷 확인 통과. DB 세션 시간대·STRICT 모드와 replica 대체도 로컬 확인 통과. 이벤트 자유 문자열 개인정보 정책은 팀 합의 대기. 후기·탈퇴 B 연동 전 제한은 유지.
 - 11-05 · 공동 · 1차 배포를 로컬 VM으로 바꿈: `docs/로컬_VM_구성.md`·`infra/vm/README.md` 추가, 아키텍처 그림을 노트북 4대 · VM 7대로 새로 그림(AWS C안 그림은 `architecture_aws.png`로 보관). README·산출물 01·02·04·05·AGENTS·STRUCTURE·infra·simulator 반영, AWS 문서·`infra/monitoring`·`db/README`에는 맨 위 안내만
 
 - 11-05 · 공동 · PM 회의(노진산): ① 탈퇴 — 시작 전 예약이 있으면 409 `HAS_UPCOMING_RESERVATION`, B가 `reservation_repo.count_cancellable()` 제공(A·B 확인 필요) ② A6 — `X-Synthetic` + `X-Synthetic-Key`(`SYNTHETIC_API_KEY`), RDS 백업 7일·삭제 보호, `limit_req` 안 넣음, Nginx `max_fails=2` ③ A7 — 동시 50명에서 조회 300ms·예약 500ms·로그인 800ms·오류 1% 미만, 200명은 한계 찾기 ④ A8 보류. 반영: `오류코드.md`, `백엔드_A·B`, `산출물_01·02·05`, `인프라_트래픽_안정성_검토`, `AGENTS.md`, `backend/.env.example`, `backend/app/core/README.md`, `simulator/`, `infra/aws·nginx`, `프론트_변경목록` 4-1절, README, CI 환경 변수
