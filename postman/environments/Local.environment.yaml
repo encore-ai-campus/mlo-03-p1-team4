@@ -15,6 +15,11 @@ values:
     enabled: true
     type: default
     description: Active synthetic venue in the local spacecube_test database
+  - key: synthetic_api_key
+    value: ''
+    enabled: true
+    type: secret
+    description: Local-only SYNTHETIC_API_KEY; do not commit a value
   - key: booking_date
     value: ''
     enabled: true

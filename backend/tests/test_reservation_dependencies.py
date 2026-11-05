@@ -1,4 +1,4 @@
-"""F-50: B 모델·소유권 조회와 A 후기 작성 연결 검증. DB는 CHECK_DB_URL로 지정한다."""
+"""F-04·50: 탈퇴 전 예약 수·B 모델·A 후기 연결 검증. DB는 CHECK_DB_URL로 지정한다."""
 
 import os
 import re
@@ -182,6 +182,55 @@ def test_owned_reservation(connection, sample, status):
         assert type(result[2]) is date and type(result[6]) is datetime
         assert reservation_repo.get_owned(db, user + 1, reservation_id) is None
         assert reservation_repo.get_owned(db, user, 0) is None
+
+
+@pytest.mark.parametrize(
+    ("status", "day_offset", "start_hour", "now", "expected"),
+    [
+        ("confirmed", 0, 12, NOW - timedelta(seconds=1), 1),
+        ("confirmed", 0, 12, NOW, 0),
+        ("confirmed", 0, 12, NOW + timedelta(seconds=1), 0),
+        ("confirmed", 0, 13, NOW, 1),
+        ("confirmed", 0, 9, NOW, 0),
+        ("confirmed", -1, 22, NOW, 0),
+        ("confirmed", 1, 9, NOW, 1),
+        ("confirmed", 1, 9, NOW.replace(hour=23, minute=59, second=59), 1),
+        ("confirmed", 0, 9, NOW.replace(hour=0), 1),
+        ("completed", 1, 13, NOW, 0),
+        ("cancelled", 1, 13, NOW, 0),
+    ],
+)
+def test_count_cancellable_boundaries(
+    connection, sample, monkeypatch, status, day_offset, start_hour, now, expected
+):
+    """시작 정각·날짜 경계·상태별로 취소 가능한 예약만 포함한다."""
+    user, _, create = sample
+    reservation_id = create(status, TODAY + timedelta(days=day_offset))
+    connection.execute(
+        text("UPDATE reservations SET start_hour=:start, end_hour=:end WHERE reservation_id=:id"),
+        {"start": start_hour, "end": start_hour + 1, "id": reservation_id},
+    )
+    monkeypatch.setattr(reservation_repo, "get_now", lambda: now)
+    with Session(bind=connection, join_transaction_mode="create_savepoint") as db:
+        transaction = db.begin()
+        result = reservation_repo.count_cancellable(db, user)
+        assert type(result) is int
+        assert result == expected
+        assert reservation_repo.count_cancellable(db, user + 1) == 0
+        assert db.get_transaction() is transaction  # 호출자의 트랜잭션을 끝내지 않는다.
+
+
+def test_count_cancellable_total_and_empty(connection, sample, monkeypatch):
+    """칸이 아닌 예약 행 수를 집계하고 0건도 정수로 반환한다."""
+    user, _, create = sample
+    monkeypatch.setattr(reservation_repo, "get_now", lambda: NOW)
+    with Session(bind=connection, join_transaction_mode="create_savepoint") as db:
+        assert reservation_repo.count_cancellable(db, user) == 0
+        for days in (1, 2, 3):
+            create("confirmed", TODAY + timedelta(days=days))
+        create("cancelled", TODAY + timedelta(days=1))
+        create("completed", TODAY + timedelta(days=1))
+        assert reservation_repo.count_cancellable(db, user) == 3
 
 
 @pytest.mark.parametrize(

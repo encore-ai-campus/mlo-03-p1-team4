@@ -64,20 +64,21 @@ Pro_1/
 │  ├─ public/fonts/           웹용 글꼴 (Noto Sans KR 서브셋)
 │  └─ scripts/check-colors.mjs  tokens.css 밖 색 코드 검사
 │
-├─ backend/                   [A·B] FastAPI 한 앱 (B F-10~13·20~22·시설·get_owned 구현, A 코드는 로컬 전달본 사용)
+├─ backend/                   [A·B] FastAPI 한 앱 (공식 A 통합, B F-10~14·20~22·30~32·get_owned·count_cancellable 구현)
 │  ├─ AGENTS.md · README.md · .env.example
 │  ├─ app/
-│  │  ├─ main.py              [A] (예정)
-│  │  ├─ core/                [A] config, db, mongo, security, deps, errors, pagination, events, metrics, logging, clock, synthetic (예정)
+│  │  ├─ main.py              [A] 공식 앱 통합, [B] catalog·venues·reservations 라우터 등록
+│  │  ├─ core/                [A] config, db, mongo, security, deps, errors, pagination, events, metrics, logging, clock, synthetic (공식 A 구현)
 │  │  ├─ models/              [A] base, user, review / [B] catalog·reservation·venue 구현 — DDL 대응 모델
 │  │  ├─ routers/             [A] auth, users, reviews, events, health / [B] catalog·venues(검색·정렬·NEW·상세·예약 가능 날짜·시간 칸), reservations(F-30~32) 구현, internal 예정
 │  │  ├─ schemas/             라우터와 같은 이름 ([B] catalog·venues 조회, reservations 생성 계약 구현)
 │  │  ├─ services/            [A] auth_service, user_service, review_service / [B] catalog_service·venue_service 조회, reservation_service(F-30~32) 구현, internal 예정
-│  │  ├─ repositories/        [A] user_repo, review_repo / [B] catalog_repo·reservation_repo(생성·재시도·get_owned)·venue_repo·slot_repo·payment_repo 구현
+│  │  ├─ repositories/        [A] user_repo, review_repo / [B] catalog_repo·reservation_repo(생성·재시도·get_owned·count_cancellable)·venue_repo·slot_repo·payment_repo 구현
 │  │  └─ jobs/                [B] complete_reservations (예정)
 │  ├─ scripts/                [A] replay_events (예정)
 │  └─ tests/                  [B] test_catalog·test_reservation_dependencies·test_venues·test_reservations·test_concurrency·test_read_routing 구현
 │     └─ check_venue_browser.py·mjs  [B] 별도 실행: 임시 실제 API + Chrome 검색·정렬·NEW·오류·상세·날짜 목록·시간 칸 검증
+│        check_reservation_http.py  [B] 별도 실행: 공식 앱·실제 인증·Postman 예약/재시도·DB 확인, 가상 데이터 정리
 │
 ├─ postman/                   [B] Git-native v3 예약 API 컬렉션·로컬 환경 (CLI 테스트)
 │  ├─ README.md               안전한 실행 방법과 F-30 쓰기 요청 안내

@@ -1,10 +1,11 @@
-"""F-30·F-50 예약 생성·재시도·소유권 조회. 트랜잭션은 서비스가 관리한다."""
+"""F-04·30·50 예약 생성·재시도·탈퇴 전 예약 수·소유권 조회. 트랜잭션은 서비스가 관리한다."""
 
 from datetime import date, datetime
 
-from sqlalchemy import select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session
 
+from app.core.clock import get_now
 from app.models.reservation import Payment, Reservation
 
 
@@ -84,6 +85,27 @@ def find_recent_matching(
         .one_or_none()
     )
     return dict(row) if row is not None else None
+
+
+def count_cancellable(db: Session, user_id: int) -> int:
+    """primary 세션에서 시작 전 confirmed 예약 수를 센다. 시작 정각은 제외한다."""
+    now = get_now()
+    query = (
+        select(func.count())
+        .select_from(Reservation)
+        .where(
+            Reservation.user_id == user_id,
+            Reservation.status == "confirmed",
+            or_(
+                Reservation.reserve_date > now.date(),
+                and_(
+                    Reservation.reserve_date == now.date(),
+                    Reservation.start_hour > now.hour,
+                ),
+            ),
+        )
+    )
+    return int(db.scalar(query) or 0)
 
 
 def get_owned(

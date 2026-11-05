@@ -2,10 +2,11 @@
 
 import os
 from datetime import date, datetime, timedelta
+from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
-from fastapi import FastAPI, Request
+from fastapi import Request
 from fastapi.testclient import TestClient
 from pydantic import SecretStr
 from sqlalchemy import create_engine, text
@@ -13,12 +14,12 @@ from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import NullPool
 
+from app.core import synthetic
 from app.core.db import get_db_write
 from app.core.deps import CurrentUser, get_current_user
-from app.core.errors import AppError, register_error_handlers
+from app.core.errors import AppError
 from app.core.metrics import reservation_counter
-from app.routers import reservations as reservations_router
-from app.routers.reservations import router
+from app.main import create_app
 from app.services import reservation_service
 
 TODAY = date(2026, 11, 5)
@@ -88,9 +89,7 @@ def sample(connection):
 
 @pytest.fixture
 def api(connection, sample, monkeypatch):
-    test_app = FastAPI()
-    register_error_handlers(test_app)
-    test_app.include_router(router, prefix="/reservations")
+    test_app = create_app()
 
     def test_db():
         with Session(bind=connection, join_transaction_mode="create_savepoint") as db:
@@ -145,6 +144,34 @@ def count_reservation_slots(connection, reservation_id):
     )
 
 
+def test_main_exposes_booking_contract_and_requires_authentication(connection, sample, api):
+    """공식 앱에서 경로·201/200/409 계약과 인증 전 예약 차단을 확인한다."""
+    operation = api.get("/openapi.json").json()["paths"]["/reservations"]["post"]
+    assert {"200", "201", "409"} <= operation["responses"].keys()
+    override = api.app.dependency_overrides.pop(get_current_user)
+    try:
+        response = api.post("/reservations", json=booking(sample["venue_id"]))
+    finally:
+        api.app.dependency_overrides[get_current_user] = override
+    assert response.status_code == 401
+    assert response.json()["code"] == "UNAUTHORIZED"
+    assert count_venue_reservations(connection, sample["venue_id"]) == 0
+
+
+def test_unconfigured_synthetic_key_rejects_booking(connection, sample, api, monkeypatch):
+    """공통 키 미설정이면 헤더에 임의 키를 넣어도 예약을 만들지 못한다."""
+    monkeypatch.setattr(synthetic, "get_settings", lambda: SimpleNamespace(synthetic_api_key=None))
+    response = api.post(
+        "/reservations",
+        json=booking(sample["venue_id"]),
+        headers={"X-Synthetic": "1", "X-Synthetic-Key": "unconfigured-key"},
+    )
+    assert response.status_code == 401
+    assert response.json()["code"] == "UNAUTHORIZED"
+    assert count_venue_reservations(connection, sample["venue_id"]) == 0
+    assert api.app.state.booking_events == []
+
+
 def test_create_reservation_writes_three_tables_and_returns_mock_payment(connection, sample, api):
     before_ok = reservation_counter.labels(result="ok")._value.get()
     response = api.post(
@@ -193,6 +220,11 @@ def test_create_reservation_writes_three_tables_and_returns_mock_payment(connect
 def test_synthetic_booking_requires_its_own_key_and_sets_the_database_flag(
     connection, sample, api, monkeypatch
 ):
+    monkeypatch.setattr(
+        synthetic,
+        "get_settings",
+        lambda: SimpleNamespace(synthetic_api_key=SecretStr("reservation-test-key")),
+    )
     body = booking(sample["venue_id"])
     missing_key = api.post("/reservations", json=body, headers={"X-Synthetic": "1"})
     assert missing_key.status_code == 401
@@ -206,11 +238,6 @@ def test_synthetic_booking_requires_its_own_key_and_sets_the_database_flag(
     assert wrong_key.status_code == 401
     assert wrong_key.json()["code"] == "UNAUTHORIZED"
 
-    monkeypatch.setattr(
-        reservations_router,
-        "_get_synthetic_api_key",
-        lambda: SecretStr("reservation-test-key"),
-    )
     response = api.post(
         "/reservations",
         json=body,

@@ -9,6 +9,10 @@ headers:
     value: application/json
   - key: Content-Type
     value: application/json
+  - key: X-Synthetic
+    value: '1'
+  - key: X-Synthetic-Key
+    value: '{{synthetic_api_key}}'
 auth:
   type: bearer
   credentials:
@@ -31,7 +35,7 @@ scripts:
     code: |-
       const required = [
         'access_token', 'venue_id', 'booking_date', 'start_hour',
-        'hours', 'headcount', 'method', 'reservation_id'
+        'hours', 'headcount', 'method', 'reservation_id', 'synthetic_api_key'
       ];
       const missing = required.filter((key) => !pm.environment.get(key));
 
