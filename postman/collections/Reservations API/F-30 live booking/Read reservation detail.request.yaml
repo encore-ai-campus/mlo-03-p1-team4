@@ -1,0 +1,39 @@
+$kind: http-request
+id: 302cd4ab24ca45f0aee64d27
+name: Read reservation detail
+order: 4000
+url: '{{base_url}}/reservations/{{reservation_id}}'
+method: GET
+headers:
+  - key: Accept
+    value: application/json
+auth:
+  type: bearer
+  credentials:
+    - key: token
+      value: '{{access_token}}'
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('Reservation detail returns the owned reservation', () => {
+        pm.response.to.have.status(200);
+        const body = pm.response.json();
+        pm.expect(body.reservation_id).to.equal(Number(pm.environment.get('reservation_id')));
+        pm.expect(body.status).to.equal('confirmed');
+        pm.expect(body.date).to.equal(pm.environment.get('booking_date'));
+        pm.expect(body.can_cancel).to.equal(true);
+        pm.expect(body.created_at).to.match(/\+09:00$/);
+      });
+
+      pm.test('Reservation detail contains payment and venue information', () => {
+        const body = pm.response.json();
+        pm.expect(body.payment).to.include({
+          method: pm.environment.get('method'),
+          status: 'paid',
+          refunded_at: null
+        });
+        pm.expect(body.venue.venue_id).to.equal(Number(pm.environment.get('venue_id')));
+        pm.expect(body.venue).to.have.all.keys('venue_id', 'name', 'category', 'region', 'image');
+        pm.expect(body.venue.image).to.equal('art:group-0');
+      });

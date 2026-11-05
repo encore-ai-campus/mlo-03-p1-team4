@@ -11,7 +11,7 @@
 | `test_models_match_db.py` | A | `app/models`의 표·컬럼 이름·NULL 여부가 `spacecube_test`의 실제 표와 같은지 (SQLAlchemy `inspect`) |
 | `test_health.py`, `test_db_routing.py`, `test_metrics.py` | A | primary 끊김 503 / replica·MongoDB 끊김 200 degraded, replica 주소가 틀려도 공개 조회 성공 |
 | `test_catalog.py`, `test_venues.py` | B | 기준정보 필터·캐시, 공간 검색·정렬·상세·이미지·NEW·시간 칸·예약 가능 날짜 |
-| `test_reservations.py` | B | 예약·칸·모의결제 201, 10분 재시도 200, 409 소유권·대표 ID, 기간·시간·인원·수단 검증, 지난 시간 `completed`, 키 있는 가상 요청, 결제 실패 시 전체 롤백 |
+| `test_reservations.py` | B | 예약·칸·모의결제 201, 10분 재시도 200, 409 소유권·대표 ID, 기간·시간·인원·수단 검증, 지난 시간 `completed`, 키 있는 가상 요청, 결제 실패 시 전체 롤백; F-40 목록·상세 소유권·상태·페이지·정렬·이미지 묶음·환불·취소 경계 |
 | `test_concurrency.py` | B | **다른 회원 50명이 같은 칸을 동시 요청 → 201 1건·409 49건**, 한 회원의 같은 요청 50건은 201 1건·200 49건, 겹치는 시간 범위 경쟁. DB 행 수·이벤트·카운터 확인 |
 | `test_jobs.py`, `test_internal.py`, `test_read_routing.py` | B | 완료 배치 멱등, upsert 201·200·400, 공개 조회만 `get_db_read` |
 
@@ -197,11 +197,11 @@ CHECK_DB_URL에 기존 DDL·seed가 있는 로컬 spacecube_test 접속 정보�
 
     python backend/tests/check_reservation_http.py
 
-공식 앱을 임시 포트에 띄우고 가상 회원가입·실제 로그인 후 기존 Postman 컬렉션을 실행합니다.
-**4개 요청·8개 검증 통과**: OpenAPI 200, 무인증 401, 생성 201, 동일 예약 재시도 200.
+공식 앱을 임시 포트에 띄우고 가상 회원가입·실제 로그인 후 Postman 컬렉션을 실행합니다.
+**6개 요청·12개 검증 통과**: OpenAPI 200, 무인증 401, 생성 201, 동일 예약 재시도 200, F-40 목록·상세 200.
 DB의 예약 1건·칸 2개·결제 1건·가상 데이터 표시와 성공 카운터 1회를 확인했습니다.
 종료 시 서버·임시 비밀 환경과 생성한 ID의 회원·공간·예약을 정리합니다.
-Postman CLI와 Node가 필요하며 컬렉션 4개 요청 파일·환경 lint도 오류·경고 0건입니다.
+Postman CLI와 Node가 필요하며 컬렉션 6개 요청 파일·환경 lint도 오류·경고 0건입니다.
 프론트 화면 전체의 실제 예약 API 연결과 실제 replica 장애·복제 지연 시험은 포함하지 않습니다.
 
 ## PR #39: 취소·환불 예약의 재시도 성공 제외

@@ -13,7 +13,7 @@
 | --- | --- | --- | --- | --- |
 | 프론트 | 노진산(FE·PM) | FE-1~9 확정안 반영, Claude 시안 대조·FE 오류/모바일 결제/가입 UX 재검토 및 목업·화면 검증 | A·B 구현 후 실제 API 연결·오류·예약 동시성 통합 검증 | 실제 API 미구현 |
 | FastAPI A | [이름] | 이슈 #2 회원·탈퇴 구현 및 수동 확인, 로컬 전체 pytest 230건·프론트 단위 54건 통과 | 이슈 #2 PR 검토, 후기 목록 연결·테스트 | 탈퇴와 동시 예약 처리 B 협의, 이벤트 개인정보 정책 합의 대기 |
-| FastAPI B | [이름] | develop를 origin/develop(87de174, A #41·F-61 #42 포함)로 최신화하고 feat/B-F-51-review-context 생성. #43 PM 승인 review_context_query(*, active_only=True)와 계약 테스트 14건 추가. MariaDB 예약 의존성 43건·전체 pytest 303건, Ruff·프론트 린트/단위 55건/빌드 통과 | #43 B 함수 검토·병합 → A review_repo 직접 import·후기 목록 통합 검증. F-61 api1 제공·크롤러/생성기 연동, 내 예약·취소·완료 배치는 별도 | api1 실제 제공 시각은 배포 협의 후 확정. 탈퇴·동시 예약 잠금은 별도 후속 작업 |
+| FastAPI B | [이름] | 최신 develop `bdd6dea`에서 `feat/B-F-40-reservations` 생성. F-40 조회 구현. MariaDB 대상 pytest 67건·Uvicorn/Postman 6요청·12검증, Ruff 린트·포맷 통과 | A 후기 ID 묶음 조회·삭제 후기 표시 합의 후 반영. Draft PR은 미합의 범위를 표시해 준비. F-34·35는 #8 후속 | #45 댓글 없음으로 후기 연계 미합의. Starlette TestClient deprecation 경고 1건. Postman CLI workspace 로그인 안내는 나왔으나 로컬 실행은 성공. 탈퇴·동시 예약 잠금은 A·B 협의 필요 |
 | DB | [이름] | `0001_init.sql`·`mongo_init.js` 검증(설치형 11.8·compose 11.4 둘 다 29건 통과), seed(유형 5·시설 20·지역 230 → `seed.sql`), `infra/local` compose, 크롤러 시제품(옛 필터). 1차 수집원 2곳+부족분 생성 방향 확정 | 스페이스클라우드 새 필터·쉐어잇 파서/사이트별 robots 확인 → 속성 기반 시연용 공간 선별·`/internal/venues` 등록(B와) → 부족한 공간·과거 30일 행동 데이터 생성기 | 없음(A2 결정을 팀원에게 공유) |
 
 ## 기능 진행표
@@ -33,8 +33,8 @@
 | F-21 | 예약 가능 날짜 | B | 검증: 공개 available-dates API 구현. 빈 칸 총수·min_hours 이상 연속 빈 칸 판정, 음수 offset·days 1~31·기간 양끝·0일 설정·마지막 페이지 잘림·큰 offset·점유 분리·재조회·SQL 2회·400/404·읽기 의존성 등 48건 추가. test_venues 114건, 전체 pytest 153건, 실제 HTTP Chrome 1건 통과. FE 전체 연결은 별도 |
 | F-22 | 날짜별 시간 칸 | B | 검증: 공개 GET /venues/{venue_id}/slots?date=YYYY-MM-DD 구현. 엄격한 날짜·설정 범위 양끝·0일 설정, 공간/날짜별 점유·완료 칸·past·F-20 일치·재조회·400/404·읽기 의존성 등 38건 추가. test_venues 총 66건, 전체 pytest 105건, 실제 HTTP Chrome 1건 통과 |
 | F-30~32 | 예약+모의 결제 한 번, 중복 차단 | B | 공식 앱의 POST /reservations 등록·A 공통 가상 키 검증 사용. API 21건·경쟁 3건 포함 전체 MariaDB pytest 241건 통과. PR #39의 취소·환불 재시도 제외 및 취소 후 재예약·타인 선점 회귀 검증 반영. 동시 다른 회원 50명: 201 1건/409 49건, 같은 회원: 201 1건/200 49건. 실제 인증·Postman 4요청/8검증에서 OpenAPI 200·무인증 401·생성 201·재시도 200 확인, DB 3개 표·합성 표시·카운터 검증·테스트 데이터 정리 완료 |
-| F-34~35 | 취소, 이용 완료 배치 | B | 설계 확정, 사용자 요청으로 구현 보류 |
-| F-40~41 | 내 예약, 내 후기 | B / A | 서버 설계 확정 / FE 내 예약 3상태·내 후기 목업 검증, B 내 예약 구현은 사용자 요청으로 보류 |
+| F-34~35 | 취소, 이용 완료 배치 | B | 설계 확정. 11-05 남은 예약 기능 구현 계획 검토: 열린 이슈 #8 기준으로 취소·환불과 완료 배치를 분리 구현 제안, 코드 착수 전 |
+| F-40~41 | 내 예약, 내 후기 | B / A | F-40 진행: `/reservations/me`·`/reservations/{id}` B 구현, 상태·페이지·정렬·이미지 묶음·소유권·환불·취소 경계 포함 pytest·Uvicorn/Postman 검증 통과. 후기 ID 묶음 조회·삭제 후기 표시는 #45 미합의라 보류, 미설정 `review_id`는 응답에서 생략. F-41은 A 범위 |
 | F-50 지원 | A 후기 작성용 예약 소유권 조회 | B | 예약·칸·결제 모델 및 `get_owned()`를 이전 프로젝트에서 가져옴. DDL 일치·매퍼 구성 4건, 실제 MariaDB 소유권·A 후기 작성 연결 10건 통과. 예약 생성 API 구현 완료를 뜻하지 않음 |
 | F-51 지원 (#43) | A 후기 목록용 예약·공간·유형 조회식 | B / A 연계 | B review_context_query(*, active_only=True) 구현·MariaDB 계약 테스트 14건 포함 예약 의존성 43건·전체 pytest 303건 통과. 반환 4열·예약당 한 행·유형 5개·활성 필터·필터/개수/페이지 결합 검증. A 직접 import와 공개 후기 숨김·내 후기 유지 HTTP 검증은 후속 |
 | F-50~51 | 후기 작성·조회(후기 모아보기) | A | B 소유권 조회·공간 정보 연결 전 503 경로 존재, 미검증 |
@@ -166,6 +166,18 @@ A1~A4는 11-03에 확정했고, **A5~A8은 추후 확정**으로 미뤘다(11-03
 - 개인 기억(Claude 자동 메모리 등)은 팀에 공유되지 않는다. 팀이 알아야 할 것은 이 파일과 `docs/`에 쓴다.
 
 ## 최근 변경 (최신이 위)
+
+- 11-05 · B · #45 댓글 0건 확인 후 최신 `origin/develop` `bdd6dea`에서 `feat/B-F-40-reservations` 생성. 목록·상세 라우터·스키마·서비스·리포지토리를 추가하고, `review_id`는 A 묶음 조회 계약이 미합의라 응답에서 생략. `test_reservations.py` 24건과 `test_reservation_dependencies.py` 43건, 총 67건이 로컬 MariaDB `spacecube_test`에서 통과(exit 0); F-40 신규 3건 포함. Ruff lint·format 통과, 기존 Starlette TestClient deprecation 경고 1건. 별도 실제 Uvicorn/Postman 검증은 MariaDB 11.4.13에서 6요청·12검증 통과(exit 0): OpenAPI·무인증 401·예약 생성/재시도·F-40 목록/상세. 일시 Uvicorn과 합성 회원·공간·예약은 종료 시 정리됨. CLI workspace 로그인 안내는 있었으나 no-report-events 로컬 실행은 성공. 커밋·푸시·PR 없음.
+
+- 11-05 · B · GitHub CLI 일반 Windows 환경의 hun117 로그인 정상 확인(샌드박스 인증은 이전 자격 증명으로 401). 중복 F-40 제목 이슈가 없는지 확인 후 사용자 승인 초안으로 #45 등록: jinsan02·naturedevworks 멘션·담당, B·feature·review-needed 라벨, 11-05 통합 마일스톤. 원격 본문·담당·라벨·마일스톤 재조회 검증 완료. https://github.com/encore-ai-campus/mlo-03-p1-team4/issues/45 . 구현·테스트는 아직 진행하지 않음.
+
+- 11-05 · B · 사용자 승인 초안으로 F-40 이슈 등록 시도(검토 요청·담당 jinsan02/naturedevworks, B·feature·review-needed). GitHub 연결 도구가 403 Resource not accessible by integration으로 생성 거절. 브라우저 대체도 접근 호스트·네이티브 연결 부재로 불가. 이슈는 생성되지 않았고 번호 없음. GitHub 이슈 쓰기 권한 복구 후 등록 필요. 코드·테스트 변경 없음.
+
+- 11-05 · B · F-40 기존 합의 재점검: 기준 문서·관련 이슈 #3·4·7·8·9·11·43 댓글 및 PR #31·34·36·39 논의를 확인. 목록/상세 경로·primary·상태 필터·응답 필드는 기존 기준이며 #7 PM 댓글도 F-40 미구현을 확인함. #43 승인은 B→A 후기 목록 문맥 제공 계약으로, A→B 후기 ID 묶음 조회 승인은 확인되지 않음. 삭제 후기 숨김·예약당 후기 UNIQUE 및 삭제 후 재작성 차단은 기존 코드/DDL에 존재함. develop 목업은 삭제 후 review_id=null, MyPage는 null이면 기한 내 작성 버튼 노출하므로 화면과 재작성 차단의 불일치 보완 필요. 최신순은 목업 동작, ID 동률 정렬·상세와 목록 동일 구조·비활성 공간 예약 유지·새 묶음 함수는 제안으로 구분. 정적 확인만 수행, 테스트·GitHub 변경 없음.
+
+- 11-05 · B · F-40 계획 재확인: GitHub develop의 예약 라우터는 생성 POST만 구현되어 있고 B 명세 5-3절은 내 예약 목록·상세 및 review_id를 요구함. 기존 이슈 전체와 F-40·내 예약 검색에서 독립 구현 이슈는 확인되지 않음. 이전 설명 보정: A의 get_by_reservation(db, reservation_id)는 이미 존재하며 삭제 후기까지 반환하므로 '후기 조회 함수가 전혀 없음'은 아님. 없는 것은 내 예약 목록용 묶음 조회 계약이고, 추가 함수는 A·B 합의할 개선안. 삭제 후기의 review_id 처리도 작성 중복 방지와 화면 표시 목적을 구분해 합의 필요. 원격 코드·명세 정적 확인만 수행, 테스트·이슈 등록 없음.
+
+- 11-05 · B · 남은 예약 기능 계획 검토. GitHub #7 종료·#8 진행 전·#12 결정 완료·#43 열림 및 관련 댓글을 확인하고 코드·B 명세·프론트 목업과 대조. F-40 목록·상세 → F-34 취소·환불 → F-35 완료 배치 순서와 기능별 PR을 제안. F-40 독립 이슈, A 후기 ID 조회 계약, 취소 응답 명세 보완이 선행 항목이며 탈퇴·동시 예약 잠금은 A·B 협의 후 별도 처리. gh 인증 401로 Project 보드는 미확인. 이번에는 계획·상태 기록만 변경, 구현·테스트·GitHub 변경 없음.
 
 - 11-05 · B · #43 PM 제안 및 B 동의에 따라 최신 develop(87de174, #41·#42 병합)에서 feat/B-F-51-review-context 생성·기준 커밋 확인 후 구현. review_context_query(*, active_only=True)가 예약·공간·유형을 조인한 4열 Select를 반환하며 예약 상태·후기 작성 자격은 거르지 않음. 기본값은 비활성 공간 제외, False는 포함. A 코드·main.py·DDL·API·이벤트 변경 없이 루트 약속·A/B 명세 3절·리포지토리/테스트 안내·구조에 계약 반영. pro_1·격리된 loopback MariaDB 11.4.13의 spacecube_test(0001·seed)에서 계약 14건 추가 포함 예약 의존성 43건·전체 pytest 303건 통과. verify.ps1 구성요소를 설치된 Miniforge pro_1·Node 경로로 실행해 Ruff 린트/포맷 및 프론트 린트·색 검사·단위 55건·빌드 통과. Starlette 사용 중단 예정·pytest 캐시 경로 권한·기존 FE 조건문 경고 각 1건. 테스트 데이터 6개 표 모두 0건 확인, 임시 DB 종료·정리. 후기 목록 HTTP·실제 replica·E2E·DDL 전용 검증은 이번에 실행하지 않았으며 A 직접 import 연결 후 통합 검증 예정. 커밋·푸시·PR은 아직 하지 않음.
 
