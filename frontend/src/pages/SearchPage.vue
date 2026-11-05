@@ -206,8 +206,8 @@ function resetFilters() {
           <div class="result__info">
             <span class="result__thumb"><RoomArt :image="r.image" /></span>
             <div class="result__text">
-              <span class="result__type">{{ r.category.name }} · {{ r.region.sido }} {{ r.region.sigungu }}</span>
               <h3 class="result__name"><RouterLink :to="`/venues/${r.venue_id}`">{{ r.name }}</RouterLink></h3>
+              <span class="result__type">{{ r.category.name }} · {{ r.region.sido }} {{ r.region.sigungu }}</span>
               <span class="result__meta num">최대 {{ r.capacity_max }}명 · {{ won(r.price_per_hour) }}/시간<template v-if="r.min_hours > 1"> · 최소 {{ r.min_hours }}시간</template></span>
             </div>
           </div>
@@ -333,8 +333,8 @@ function resetFilters() {
   border-color: var(--c-brand);
 }
 .legend__box--off {
-  background: repeating-linear-gradient(135deg, var(--c-slot-taken) 0 4px, var(--c-slot-taken-2) 4px 8px);
-  border-color: var(--c-slot-taken-2);
+  background: var(--c-slot-taken);
+  border-color: var(--c-slot-taken);
 }
 .results {
   display: flex;
@@ -345,14 +345,13 @@ function resetFilters() {
   display: grid;
   gap: var(--sp-12);
   padding: var(--sp-16);
-  border: 1px solid var(--c-line);
   border-radius: var(--r-lg);
   background: var(--c-surface);
-  transition: border-color var(--t-fast), box-shadow var(--t-fast);
+  transition: background-color var(--t-fast);
 }
 .result.is-selected {
-  border-color: var(--c-brand);
-  box-shadow: 0 0 0 1px var(--c-brand);
+  outline: 2px solid var(--c-brand);
+  outline-offset: -2px;
 }
 .result__info {
   display: flex;
@@ -371,9 +370,8 @@ function resetFilters() {
   min-width: 0;
 }
 .result__type {
-  font-size: var(--fs-12);
-  font-weight: 700;
-  color: var(--c-brand-ink);
+  font-size: var(--fs-13);
+  color: var(--c-muted);
 }
 .result__name {
   font-size: var(--fs-16);
@@ -450,7 +448,10 @@ function resetFilters() {
   border-radius: var(--r-lg);
   background: var(--c-ink);
   color: var(--c-on-dark);
-  box-shadow: var(--shadow-pop);
+  --btn-bg: var(--c-on-dark);
+  --btn-ink: var(--c-brand);
+  --btn-bg-hover: var(--c-surface);
+  box-shadow: var(--shadow-pop); /* taste-skill-ignore 떠 있는 층·포커스 링 */
 }
 .sumbar__text {
   display: flex;

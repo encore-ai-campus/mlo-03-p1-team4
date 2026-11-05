@@ -290,10 +290,9 @@ async function submitSignup() {
 }
 .card {
   padding: var(--sp-24);
-  border: 1px solid var(--c-line);
+  border: 0;
   border-radius: var(--r-lg);
   background: var(--c-surface);
-  box-shadow: var(--shadow-lift);
 }
 .form {
   display: flex;
@@ -357,7 +356,7 @@ async function submitSignup() {
   flex-direction: column;
   margin: 0;
   padding: var(--sp-12) var(--sp-16);
-  border: 1px solid var(--c-line);
+  border: 0;
   border-radius: var(--r-md);
 }
 .terms.has-error {
@@ -378,12 +377,10 @@ async function submitSignup() {
 }
 .check--all {
   padding-bottom: var(--sp-8);
-  border-bottom: 1px solid var(--c-line);
   font-weight: 800;
 }
 .check--optional {
-  margin-top: var(--sp-8);
-  border-top: 1px solid var(--c-line);
+  margin-top: var(--sp-12);
 }
 .err {
   color: var(--c-danger);

@@ -65,14 +65,14 @@ function page(dir) {
   place-items: center;
   width: var(--tap);
   height: var(--tap);
-  border: 1px solid var(--c-line-strong);
+  border: 0;
   border-radius: 50%;
-  background: var(--c-surface);
+  background: var(--c-fill);
   cursor: pointer;
-  transition: border-color var(--t-fast);
+  transition: background-color var(--t-fast);
 }
 .carousel__btn:hover:not(:disabled) {
-  border-color: var(--c-brand);
+  background: var(--c-line-strong);
 }
 .carousel__btn:disabled {
   opacity: 0.4;

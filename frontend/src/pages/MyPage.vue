@@ -2,7 +2,7 @@
 import { computed, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
-import { CalendarDays, LogOut, Menu, MessageSquareText, UserRound } from '@lucide/vue'
+import { CalendarDays, LogOut, Menu, MessageSquareText, Star, UserRound } from '@lucide/vue'
 import SidebarLayout from '@/components/layout/SidebarLayout.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import UiDialog from '@/components/ui/UiDialog.vue'
@@ -242,7 +242,7 @@ load()
           <div class="stars__row">
             <label v-for="n in 5" :key="n" class="star" :class="{ 'is-on': n <= review.rating }">
               <input v-model="review.rating" type="radio" name="rating" :value="n" class="star__input" />
-              <span aria-hidden="true">★</span><span class="sr-only">{{ n }}점</span>
+              <Star :size="30" fill="currentColor" aria-hidden="true" /><span class="sr-only">{{ n }}점</span>
             </label>
             <span class="stars__label" aria-live="polite">{{ RATING_LABEL[review.rating] }}</span>
           </div>
@@ -277,7 +277,7 @@ load()
   align-items: center;
   gap: var(--sp-12);
   padding: var(--sp-16);
-  border: 1px solid var(--c-line);
+  border: 0;
   border-radius: var(--r-lg);
   background: var(--c-surface);
 }
@@ -375,7 +375,7 @@ a.menu__item:hover,
   grid-template-columns: 96px 1fr;
   gap: var(--sp-16);
   padding: var(--sp-16);
-  border: 1px solid var(--c-line);
+  border: 0;
   border-radius: var(--r-lg);
   background: var(--c-surface);
 }
@@ -403,26 +403,19 @@ a.menu__item:hover,
   gap: var(--sp-8);
 }
 .status {
-  padding: 2px 8px;
-  border-radius: 6px;
-  font-size: var(--fs-12);
+  font-size: var(--fs-15);
   font-weight: 800;
 }
-.status--wait {
-  background: var(--c-highlight);
-  color: var(--c-highlight-ink);
-}
+/* 상태는 알약 대신 색 글자 */
+.status--wait,
 .status--ok {
-  background: var(--c-brand);
-  color: var(--c-on-dark);
+  color: var(--c-brand-ink);
 }
 .status--done {
-  background: var(--c-success-soft);
-  color: var(--c-success);
+  color: var(--c-ink-2);
 }
 .status--off {
-  background: var(--c-slot-taken);
-  color: var(--c-muted);
+  color: var(--c-subtle);
 }
 .dday {
   color: var(--c-brand-ink);
@@ -506,7 +499,7 @@ a.menu__item:hover,
   transition: transform var(--t-fast), color var(--t-fast);
 }
 .star.is-on {
-  color: var(--c-highlight);
+  color: var(--c-brand);
 }
 .star:active {
   transform: scale(0.95);
@@ -523,9 +516,9 @@ a.menu__item:hover,
   font-size: var(--fs-13);
 }
 
-.safe-button { min-height: var(--tap); padding: 0 var(--sp-16); border: 1px solid var(--c-line-strong); border-radius: var(--r-md); background: var(--c-surface); color: var(--c-ink); font-weight: 700; cursor: pointer; }
+.safe-button { min-height: var(--tap); padding: 0 var(--sp-16); border: 0; border-radius: var(--r-md); background: var(--c-fill); color: var(--c-ink); font-weight: 700; cursor: pointer; }
 .danger-button, .danger-button:hover:not(:disabled) { background: var(--c-danger); color: var(--c-on-dark); }
-.own-review { padding-block: var(--sp-16); border-bottom: 1px solid var(--c-line); }
+.own-review { padding-block: var(--sp-16); }
 .account { display: grid; grid-template-columns: auto 1fr; gap: var(--sp-12) var(--sp-24); }
 .account dd { margin: 0; overflow-wrap: anywhere; }
 .withdraw-check { display: flex; align-items: center; min-height: var(--tap); gap: var(--sp-8); }

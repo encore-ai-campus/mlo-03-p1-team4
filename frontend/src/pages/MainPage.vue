@@ -113,7 +113,7 @@ const won = (n) => n.toLocaleString('ko-KR')
     <div class="section__head section__head--row section__head--tight">
       <h2 id="bento-title" class="section__title">어떤 공간이 필요하세요?</h2>
       <RouterLink :to="{ path: '/search', query: { now: 1 } }" class="now-link">
-        <span class="now-link__dot" aria-hidden="true" />지금 바로 들어갈 수 있는 곳 <strong class="num">{{ availableNow }}곳</strong>
+        지금 바로 들어갈 수 있는 곳 <strong class="num">{{ availableNow }}곳</strong>
       </RouterLink>
     </div>
     <CategoryBento v-if="categories.length" :categories="categories" />
@@ -127,7 +127,7 @@ const won = (n) => n.toLocaleString('ko-KR')
     <UiCarousel label="새로 문을 연 공간">
       <template v-if="newRooms.length">
         <RouterLink v-for="n in newRooms" :key="n.venue_id" :to="`/venues/${n.venue_id}`" class="new-card">
-          <span class="new-card__art"><RoomArt :image="n.image" /><span class="new-card__badge">NEW</span></span>
+          <span class="new-card__art"><RoomArt :image="n.image" /></span>
           <span class="new-card__body">
             <span class="new-card__open num">{{ n.registered_on }} 오픈 · {{ n.new_days_left }}일 남음</span>
             <span class="new-card__name">{{ n.name }}</span>
@@ -195,7 +195,7 @@ const won = (n) => n.toLocaleString('ko-KR')
         <li v-for="v in reviews" :key="v.review_id" class="review">
           <div class="review__meta">
             <span class="review__type">{{ categories.find((c) => c.code === v.category)?.name }}</span>
-            <span class="review__stars" :aria-label="`별점 ${v.rating}점`">{{ '★'.repeat(v.rating) }}{{ '☆'.repeat(5 - v.rating) }}</span>
+            <span class="review__stars">별점 {{ v.rating }}</span>
             <span class="review__by num">{{ v.author }} · {{ v.created_at.slice(0, 10) }}</span>
           </div>
           <p class="review__text">{{ v.content }}</p>
@@ -207,12 +207,11 @@ const won = (n) => n.toLocaleString('ko-KR')
 
 <style scoped>
 .hero {
-  padding-block: var(--sp-24) var(--sp-20, 20px);
+  padding-block: var(--sp-32) var(--sp-32);
   background: var(--c-surface);
-  border-bottom: 1px solid var(--c-line);
 }
 .hero__title {
-  font-size: clamp(1.625rem, 2.4vw, 2.125rem);
+  font-size: clamp(2rem, 3.6vw, 3.25rem);
   font-weight: 900;
   line-height: 1.22;
   letter-spacing: -0.03em;
@@ -228,7 +227,6 @@ const won = (n) => n.toLocaleString('ko-KR')
   gap: var(--sp-12);
   margin-top: var(--sp-16);
   padding: var(--sp-12);
-  border: 1px solid var(--c-line-strong);
   border-radius: var(--r-lg);
   background: var(--c-paper);
 }
@@ -263,24 +261,14 @@ const won = (n) => n.toLocaleString('ko-KR')
   align-items: center;
   gap: var(--sp-8);
   min-height: var(--tap);
-  padding: 0 var(--sp-16);
-  border-radius: 999px;
-  background: var(--c-ink);
-  color: var(--c-on-dark);
-  font-size: var(--fs-15);
+  color: var(--c-brand-ink);
+  font-size: var(--fs-16);
+  text-underline-offset: 4px;
   text-decoration: none;
   transition: background-color var(--t-fast);
 }
 .now-link:hover {
-  background: var(--c-ink-2);
-  color: var(--c-on-dark);
-}
-.now-link__dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: var(--c-now-on-dark);
-  box-shadow: 0 0 0 3px rgba(52, 209, 122, 0.25);
+  text-decoration: underline;
 }
 .section__head--row {
   display: flex;
@@ -322,16 +310,15 @@ const won = (n) => n.toLocaleString('ko-KR')
 .new-card {
   display: flex;
   flex-direction: column;
-  border: 1px solid var(--c-line);
   border-radius: var(--r-lg);
   background: var(--c-surface);
   color: var(--c-ink);
   text-decoration: none;
   overflow: hidden;
-  transition: border-color var(--t-fast);
+  transition: background-color var(--t-fast);
 }
 .new-card:hover {
-  border-color: var(--c-brand);
+  background: var(--c-fill);
 }
 .new-card__art {
   position: relative;
@@ -340,17 +327,6 @@ const won = (n) => n.toLocaleString('ko-KR')
 .new-card__art-sk {
   aspect-ratio: 400 / 260;
 }
-.new-card__badge {
-  position: absolute;
-  left: var(--sp-12);
-  top: var(--sp-12);
-  padding: 2px 8px;
-  border-radius: 6px;
-  background: var(--c-danger);
-  color: var(--c-on-dark);
-  font-size: var(--fs-12);
-  font-weight: 900;
-}
 .new-card__body {
   display: flex;
   flex-direction: column;
@@ -358,9 +334,8 @@ const won = (n) => n.toLocaleString('ko-KR')
   padding: var(--sp-12) var(--sp-16) var(--sp-16);
 }
 .new-card__open {
-  font-size: var(--fs-13);
-  font-weight: 700;
-  color: var(--c-danger);
+  font-size: var(--fs-15);
+  color: var(--c-muted);
 }
 .new-card__name {
   font-size: var(--fs-20);
@@ -391,7 +366,6 @@ const won = (n) => n.toLocaleString('ko-KR')
 }
 .panel {
   padding: var(--sp-24);
-  border: 1px solid var(--c-line);
   border-radius: var(--r-lg);
   background: var(--c-surface);
 }
@@ -429,11 +403,7 @@ const won = (n) => n.toLocaleString('ko-KR')
   list-style: none;
 }
 .review {
-  padding-block: var(--sp-16);
-  border-top: 1px solid var(--c-line);
-}
-.review:first-child {
-  border-top: 0;
+  padding-block: var(--sp-12);
 }
 .review__meta {
   display: flex;
@@ -443,15 +413,11 @@ const won = (n) => n.toLocaleString('ko-KR')
   font-size: var(--fs-13);
 }
 .review__type {
-  padding: 2px 8px;
-  border-radius: 6px;
-  background: var(--c-brand-soft);
-  color: var(--c-brand-ink);
+  color: var(--c-ink);
   font-weight: 700;
 }
 .review__stars {
-  color: var(--c-star-ink);
-  letter-spacing: 1px;
+  color: var(--c-muted);
 }
 .review__by {
   margin-left: auto;

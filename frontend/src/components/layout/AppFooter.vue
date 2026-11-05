@@ -133,7 +133,7 @@ const REPO = 'https://github.com/encore-ai-campus/mlo-03-p1-team4'
   text-decoration: underline;
 }
 .footer__bottom {
-  border-top: 1px solid var(--c-dark-line);
+
   padding-top: var(--sp-16);
   display: flex;
   flex-wrap: wrap;

@@ -16,9 +16,9 @@ const pressed = defineModel({ type: Boolean, default: false })
   gap: 6px;
   min-height: 40px;
   padding: 0 var(--sp-12);
-  border: 1px solid var(--c-line-strong);
-  border-radius: 999px;
-  background: var(--c-surface);
+  border: 0;
+  border-radius: var(--r-sm);
+  background: var(--c-fill);
   color: var(--c-ink-2);
   font-size: var(--fs-15);
   font-weight: 500;
@@ -26,11 +26,10 @@ const pressed = defineModel({ type: Boolean, default: false })
   transition: border-color var(--t-fast), background-color var(--t-fast), color var(--t-fast);
 }
 .chip:hover {
-  border-color: var(--c-brand);
+  background: var(--c-line-strong);
 }
 .chip[aria-pressed='true'] {
   background: var(--c-ink);
-  border-color: var(--c-ink);
   color: var(--c-on-dark);
 }
 </style>
