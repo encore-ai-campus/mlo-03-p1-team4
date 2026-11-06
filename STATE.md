@@ -174,6 +174,8 @@ A1~A4는 11-03에 확정했고, **A5~A8은 추후 확정**으로 미뤘다(11-03
 
 ## 최근 변경 (최신이 위)
 
+- 11-06 · B · A #72+B 임시 통합 브랜치에서 최종 `verify.ps1` 전체 통과: Ruff 93파일·pytest 375건·FE 67건·린트/빌드. 잘못된 브라우저 문맥도 유효한 세션 헤더와 함께 보내 예약 응답을 유지하는지 별도 1건 통과. B 전용 브랜치와 A+B 통합 테스트 브랜치를 로컬에 분리 보존했으며 원격 푸시·PR은 아직 하지 않음. 지정 MongoDB의 문맥 null 거절(121)과 A의 세션 ID 보완 미반영은 후속 항목으로 유지.
+
 - 11-06 · B · #60·#72 요청에 따라 예약 결과 3종을 새 이름과 `products` 키워드로 전환. primary 공간명·확정 예약 조건·시간당 금액(취소는 저장 총액/시간)·KST 시각을 전달하고 선택적 `event_context`는 기록 후 복원. 본문 없는 취소·재시도 중복 방지·동시성 유지. `test/B-F60-integration`에서 A d75deea와 관련 pytest 77건·전체 pytest 375건 통과. 최초 정렬 예상값 오류 수정 후 통과. 실제 JWT/Uvicorn·Postman 7요청/15검증과 지정 원격 MongoDB 결과 3종 저장·같은 ID 재적재 0건 추가·이번 가상 데이터 정리 확인. 원격 validator는 문맥 null을 121로 거절하며 변경하지 않았고 A 세션 ID 보완도 미반영. 전체 verify 최초 실행은 프론트 run-s 미설치로 실패했으나 기존 잠금파일로 의존성 설치 후 별도 FE verify 67건·린트/빌드 통과. 비밀값은 실행 환경에만 전달. 푸시·PR·배포는 하지 않음.
 
 - 11-06 · 공동(PM 요청) · MongoDB 초기화를 새 구조 하나로 정리. 옛 `docs/db/mongo_init.js`(`spacecube.user_events`)를 삭제하고 #68의 `mongo_init_2.js`를 `mongo_init.js`로 이름 변경(compose·CI 자동 실행 경로 그대로). `db/tests/check_mongo_init.js`를 새 `events`·`event_daily`·`crawl_raw` 기준 24건으로 다시 씀. 로컬에서 mongosh·Docker를 쓰지 않아 실행 검증은 CI로 확인. `산출물_04` 8절·백엔드 A 문서의 `user_events` 설명은 #63에서 DB·A가 고침

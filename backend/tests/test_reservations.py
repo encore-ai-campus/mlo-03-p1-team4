@@ -322,7 +322,12 @@ def test_new_event_documents_cover_booking_conflict_and_cancel(
 
 def test_bad_event_context_does_not_change_booking_result(sample, api, collected_documents):
     body = {**booking(sample["venue_id"]), "event_context": {"page": {"url": "bad"}}}
-    assert api.post("/reservations", json=body).status_code == 201
+    response = api.post(
+        "/reservations",
+        json=body,
+        headers={"X-Session-Id": "cb98d91e-b62c-46e7-bbd4-ec158672e4ec"},
+    )
+    assert response.status_code == 201
     assert collected_documents == []
 
 

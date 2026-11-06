@@ -7,6 +7,7 @@
 `check_reservation_http.py`는 기본적으로 MongoDB 없이 로컬 MariaDB `spacecube_test`와 실제 인증·Uvicorn·Postman 7요청/15검증을 실행합니다. 명시적으로 `CHECK_MONGO_URL`을 실행 환경에 제공하면 `check_reservation_events_mongo.py`가 예약 성공·충돌·취소의 실제 저장과 같은 `event_id` 재적재 중복 차단을 추가 확인합니다. 접속 정보는 출력·파일 저장하지 않으며 지정한 MongoDB의 validator·인덱스는 변경하지 않습니다. 해당 실행의 세션과 `is_synthetic=true`로 확인한 이벤트 ID만 정리합니다. 문맥 null 문서가 121로 거절되면 계약 차이로 별도 보고합니다.
 
 11-06 검증: A `d75deea` 통합에서 관련 pytest 77건·전체 pytest 375건 통과. 실제 HTTP/Postman 7요청/15검증, 지정한 MongoDB 결과 3종 저장·중복 재적재 0건·임시 데이터 정리 확인. 원격 validator는 서버 문맥 null을 121로 거절하며, A는 세션 헤더 없는 요청의 `server-<request_id>` 보완이 아직 없어 이 두 항목의 최종 통합 완료는 아님.
+최종 `verify.ps1`도 Ruff 93파일·pytest 375건·FE 단위 67건·린트/빌드까지 전체 통과했습니다. 추가로 유효 세션 헤더가 있는 잘못된 브라우저 문맥의 예약 성공을 별도 재검증했습니다. Starlette 사용 중단 예정·기존 FE E2E 린트 경고 각 1건이며 실패는 없습니다.
 
 ## F-40 후기 ID 연결 (#45)
 
