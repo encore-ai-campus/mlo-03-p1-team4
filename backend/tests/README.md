@@ -1,5 +1,9 @@
 # tests — pytest (담당: A·B 각자)
 
+## 공유 테스트 DB 실행 잠금 (#78)
+
+직접 pytest와 `verify.ps1`은 루트 `conftest.py`를 통해 같은 로컬 `spacecube_test`를 사용하는 검증끼리 대기합니다. 테스트 전체 session에서 잠금을 유지하며, suite 내부의 예약 동시성 검증은 그대로 실행합니다. 기본 대기는 600초이고 실행 환경의 `TEST_DB_LOCK_TIMEOUT`으로 조정합니다. 잠금 미적용 이전 checkout·별도 DB 초기화 스크립트까지 보호하지는 않습니다. [공통 테스트 안내](../../tests/README.md)를 확인하세요.
+
 ## F-60 예약 서버 이벤트 전환 (#60·#72)
 
 `test_reservations.py`는 A #72와 합친 환경에서 새 결과 3종의 실제 문서 조립·primary 상품값·UTC 변환·문맥 전달/격리·재시도 중복 방지를 검사합니다. 비활성/가격 변경 공간 취소는 원래 결제 금액의 시간당 가격을 보존합니다. `test_concurrency.py`는 다른 회원 50건 중 성공 1/충돌 49와 같은 회원 재시도 성공 이벤트 1건을 확인합니다. 순수 B 브랜치는 A #72의 `products`·`ClientEventContext` 확장에 의존하므로 임시 통합 브랜치에서 실행합니다.
