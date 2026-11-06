@@ -1,4 +1,4 @@
-"""F-30~32 예약 트랜잭션과 F-40 내 예약 조회."""
+"""F-30~35 예약·취소·완료 배치와 F-40 내 예약 조회."""
 
 from datetime import date, datetime, time, timedelta
 from typing import Literal
@@ -12,9 +12,11 @@ from app.core.errors import AppError, fail
 from app.core.events import log_event
 from app.core.metrics import reservation_counter
 from app.core.pagination import Pagination, paginate
-from app.repositories import payment_repo, reservation_repo, slot_repo, venue_repo
+from app.repositories import payment_repo, reservation_repo, slot_repo, user_repo, venue_repo
 from app.schemas.reservations import (
     PaymentRead,
+    ReservationCancelPaymentRead,
+    ReservationCancelRead,
     ReservationCreate,
     ReservationCreateRead,
     ReservationPaymentRead,
@@ -110,6 +112,12 @@ def _duplicate_key(error: IntegrityError) -> bool:
     return bool(arguments) and arguments[0] == 1062
 
 
+def _lock_active_user(db: Session, user_id: int) -> None:
+    """탈퇴와 예약을 같은 회원 행 잠금으로 직렬화한다."""
+    if user_repo.get_active(db, user_id, for_update=True) is None:
+        raise fail("UNAUTHORIZED", 401)
+
+
 def _slot_taken(detail: dict, *, mine: bool = False) -> AppError:
     message = (
         "이미 내 예약과 겹치는 시간이에요." if mine else "다른 분이 먼저 결제한 시간이 있어요."
@@ -185,14 +193,16 @@ def create_reservation(
     is_synthetic: bool,
 ) -> tuple[ReservationCreateRead, int]:
     """검증 후 예약·칸·모의 결제를 커밋하고, 슬롯 경쟁만 명세대로 409 처리한다."""
-    venue_row = venue_repo.get_booking_info(db, body.venue_id)
-    if venue_row is None:
-        raise AppError("VENUE_NOT_FOUND", "공간을 찾을 수 없어요.", 404)
-    venue = dict(venue_row)
-    end_hour, status, now, _ = _validate(body, venue=venue)
-    total_price = venue["price_per_hour"] * body.hours
-
     try:
+        # 인증 조회 뒤 탈퇴가 끝났거나 동시에 진행 중일 수 있으므로 primary에서 다시 잠근다.
+        _lock_active_user(db, user_id)
+        venue_row = venue_repo.get_booking_info(db, body.venue_id)
+        if venue_row is None:
+            raise AppError("VENUE_NOT_FOUND", "공간을 찾을 수 없어요.", 404)
+        venue = dict(venue_row)
+        end_hour, status, now, _ = _validate(body, venue=venue)
+        total_price = venue["price_per_hour"] * body.hours
+
         reservation = reservation_repo.create(
             db,
             user_id=user_id,
@@ -220,19 +230,21 @@ def create_reservation(
                 raise
             db.rollback()
             try:
-                return (
-                    _handle_slot_conflict(
-                        db,
-                        user_id=user_id,
-                        venue=venue,
-                        body=body,
-                        end_hour=end_hour,
-                        session_id=session_id,
-                        is_synthetic=is_synthetic,
-                    ),
-                    200,
+                # rollback이 회원 잠금도 해제하므로 재시도 응답 전에 다시 확인한다.
+                _lock_active_user(db, user_id)
+                duplicate = _handle_slot_conflict(
+                    db,
+                    user_id=user_id,
+                    venue=venue,
+                    body=body,
+                    end_hour=end_hour,
+                    session_id=session_id,
+                    is_synthetic=is_synthetic,
                 )
-            except AppError:
+                db.commit()
+                return duplicate, 200
+            except Exception:
+                db.rollback()
                 raise
 
         payment = payment_repo.create(
@@ -368,3 +380,77 @@ def get_my_reservation(
         # TODO(#45): A get_review_ids 제공 후 본인 예약의 조회 결과로 연결한다.
         review_id=None,
     )
+
+
+def cancel_reservation(
+    db: Session,
+    *,
+    user_id: int,
+    reservation_id: int,
+    session_id: str | None,
+) -> ReservationCancelRead:
+    """시작 전 본인 예약을 잠그고 칸 반납·전액 모의 환불을 한 번에 커밋한다."""
+    try:
+        reservation = reservation_repo.get_owned_for_update(
+            db, user_id=user_id, reservation_id=reservation_id
+        )
+        if reservation is None:
+            raise AppError("RESERVATION_NOT_FOUND", "예약을 찾을 수 없어요.", 404)
+        if reservation.status == "cancelled":
+            raise AppError("ALREADY_CANCELLED", "이미 취소된 예약이에요.", 409)
+
+        now = get_now()
+        starts_at = datetime.combine(reservation.reserve_date, time(reservation.start_hour))
+        if reservation.status != "confirmed" or starts_at <= now:
+            raise AppError("NOT_CANCELLABLE", "이용이 시작된 예약은 취소할 수 없어요.", 409)
+
+        # 비활성 공간도 취소할 수 있으므로 활성 여부로 거르지 않고 유형을 읽는다.
+        venue = venue_repo.get_booking_info(db, reservation.venue_id)
+        if venue is None:
+            raise RuntimeError("예약에 연결된 공간 정보가 없습니다.")
+
+        reservation.status = "cancelled"
+        if reservation_repo.delete_slots(db, reservation_id=reservation_id) <= 0:
+            raise RuntimeError("확정 예약에 연결된 시간 칸이 없습니다.")
+        payment = payment_repo.refund(db, reservation_id=reservation_id, refunded_at=now)
+        if payment is None:
+            raise RuntimeError("예약에 연결된 결제 정보가 없습니다.")
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+
+    log_event(
+        session_id,
+        user_id,
+        "reserve_cancel_ok",
+        venue_id=reservation.venue_id,
+        category=venue["category_code"],
+        payload={"reservation_id": reservation_id},
+        is_synthetic=reservation.is_synthetic,
+    )
+    reservation_counter.labels(result="cancel").inc()
+    return ReservationCancelRead(
+        reservation_id=reservation_id,
+        status="cancelled",
+        total_price=reservation.total_price,
+        payment=ReservationCancelPaymentRead(
+            method=payment.method,
+            status="refunded",
+            paid_at=as_korean_time(payment.paid_at),
+            refunded_at=as_korean_time(payment.refunded_at),
+        ),
+        can_cancel=False,
+    )
+
+
+def complete_ended_reservations(db: Session) -> int:
+    """현재 한국 시각을 한 번 읽고 종료된 예약을 완료 처리해 커밋한다."""
+    now = get_now()
+    try:
+        completed = reservation_repo.complete_ended(db, today=now.date(), now_hour=now.hour)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    return completed

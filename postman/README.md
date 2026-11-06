@@ -16,7 +16,7 @@ $PostmanCli = Get-ChildItem (Join-Path $env:NVM_HOME 'installs') -Directory |
 ## 안전 확인
 
 - `Contract checks`는 OpenAPI의 예약 경로와 인증 실패 응답을 확인하며 DB 데이터를 쓰지 않습니다.
-- `F-30 live booking`은 예약 생성·10분 내 재시도 뒤 F-40 내 예약 목록·상세 조회를 확인합니다. 로컬 `spacecube_test` API만 대상으로 하고, 활성 공간·예약 가능 시간·Bearer 액세스 토큰을 환경에 넣은 뒤 실행하세요.
+- `F-30 live booking`은 예약 생성·재시도·F-40 목록/상세 조회 후 마지막에 취소·전액 환불을 확인합니다. 로컬 spacecube_test API만 대상으로 실행하세요.
 - F-40 조회 검증은 방금 생성해 후기를 작성하지 않은 예약의 `review_id: null` 필드 포함도 검사합니다. 작성·삭제 후기 ID의 실제 조회와 일괄 SQL 검증은 A `get_review_ids` 연결 후 추가해야 하며, 현재 실행 성공이 후기 연계 완료를 뜻하지 않습니다.
 - `access_token`은 비워 두고 Git에 저장하지 않습니다. 실예약 확인용으로 `Local.private.environment.yaml`을 복사해 사용하며, 이 파일은 `.gitignore`에 포함됩니다.
 - 가상 예약에는 `X-Synthetic: 1`과 `synthetic_api_key`를 함께 보냅니다. 키는 임시 API 서버의 `SYNTHETIC_API_KEY`와 같아야 하며 공유 템플릿에는 비워 둡니다.
@@ -54,5 +54,5 @@ API는 `backend/`에서 실행하고 `base_url`은 `http://127.0.0.1:8000`을 �
 python backend/tests/check_reservation_http.py
 ```
 
-검증기는 설치된 Node·Postman CLI를 찾아 공식 앱을 임시 포트로 기동합니다. 가상 회원가입·실제 로그인 후 컬렉션의 OpenAPI·401·예약 생성·재시도·F-40 목록·상세 요청을 실행하고, DB의 예약 1건·칸 2개·결제 1건과 성공 카운터 1회를 확인합니다.
+검증기는 실제 인증으로 OpenAPI·401·생성·재시도·목록·상세·취소 순서의 7요청/15검증을 실행합니다. DB 환불·칸 반환·예약/취소 카운터와 events.log의 취소 유형을 확인하고 임시 데이터를 정리합니다.
 테스트용 서명 키·비밀번호는 자식 프로세스 환경과 메모리에만 두고, 액세스 토큰·가상 요청 키는 실행 중의 임시 환경 파일에만 넣습니다. 출력에서는 비밀값을 가립니다. 종료 시 서버·임시 파일과 이번 실행에서 만든 ID의 가상 데이터만 정리합니다.

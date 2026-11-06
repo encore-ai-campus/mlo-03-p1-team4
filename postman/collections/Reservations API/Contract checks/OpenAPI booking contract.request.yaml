@@ -24,3 +24,12 @@ scripts:
         pm.expect(operation.responses).to.have.property('201');
         pm.expect(operation.responses).to.have.property('409');
       });
+
+      pm.test('F-34 cancellation operation is registered with documented errors', () => {
+        const spec = pm.response.json();
+        const operation = spec.paths['/reservations/{reservation_id}/cancel'].post;
+        pm.expect(operation).to.exist;
+        pm.expect(operation.responses).to.have.property('200');
+        pm.expect(operation.responses).to.have.property('404');
+        pm.expect(operation.responses).to.have.property('409');
+      });

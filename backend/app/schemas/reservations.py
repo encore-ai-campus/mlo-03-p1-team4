@@ -1,4 +1,4 @@
-"""F-30~32 예약·모의 결제와 F-40 내역 조회 요청·응답."""
+"""F-30~34 예약·모의 결제·취소와 F-40 내역 조회 요청·응답."""
 
 from datetime import date, datetime
 from typing import Annotated, Literal
@@ -79,3 +79,18 @@ class ReservationRead(BaseModel):
     can_cancel: bool
     # #45 확정: 삭제된 후기 ID도 유지하고, 작성한 적이 없을 때만 null이다.
     review_id: int | None
+
+
+class ReservationCancelPaymentRead(BaseModel):
+    method: Literal["transfer", "card", "phone"]
+    status: Literal["refunded"]
+    paid_at: datetime
+    refunded_at: datetime
+
+
+class ReservationCancelRead(BaseModel):
+    reservation_id: int
+    status: Literal["cancelled"]
+    total_price: int
+    payment: ReservationCancelPaymentRead
+    can_cancel: Literal[False]

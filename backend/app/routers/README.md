@@ -12,7 +12,7 @@
 | `events.py` | A | `POST /events` (최대 50건 묶음, 202) | — (로그 파일 + MongoDB) |
 | `catalog.py` | B | `GET /categories`, `GET /regions`, `GET /facilities` | R |
 | `venues.py` | B | `GET /venues`(검색), `GET /venues/new`, `GET /venues/{id}`, `GET /venues/{id}/available-dates`, `GET /venues/{id}/slots` | R |
-| `reservations.py` | B | `POST /reservations`(F-30~32 예약+결제 구현), `POST /reservations/{id}/cancel`(F-34 예정) | W |
+| `reservations.py` | B | `POST /reservations`(F-30~32 예약+결제), `POST /reservations/{id}/cancel`(F-34 구현) | W |
 | `reservations.py` | B | `GET /reservations/me`, `GET /reservations/{id}` | W |
 | `internal.py` | B | F-61 `POST /internal/venues` 구현(크롤러·생성기, `X-Internal-Key`, 신규 201·갱신 200) | W |
 
