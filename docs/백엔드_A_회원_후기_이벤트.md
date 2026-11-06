@@ -49,7 +49,7 @@ backend/app/
     events.py                # log_event(): events.log 한 줄 + MongoDB는 내부 스레드 풀(2개, 대기열 1,000건)
     metrics.py               # /metrics (prometheus-fastapi-instrumentator), 앱 지표 정의
     logging.py               # 서버 로그 app.log·이벤트 로그 events.log (JSON 한 줄)
-    clock.py                 # get_today(), get_now()
+    clock.py                 # get_today(), get_now(), override_business_time(), get_event_time()
   models/    base.py user.py review.py   # SQLAlchemy 모델 (DDL과 같게)
   routers/   auth.py users.py reviews.py events.py health.py
   schemas/   auth.py users.py reviews.py events.py
@@ -70,7 +70,7 @@ infra/monitoring/  alloy.config                # [A] 로그 파일 → Loki, 로
 | `DB_READ_URL` | RDS replica 엔드포인트. 비우면 primary를 씀(로컬 개발) |
 | `MONGO_URL`, `MONGO_DB` | MongoDB (인증 포함) |
 | `JWT_SECRET`, `JWT_EXPIRE_MINUTES` | 토큰 (초안 60분) |
-| `LOG_DIR`, `SERVER_NAME` | `app.log`·`events.log` 위치, `api-1` / `api-2` |
+| `LOG_DIR`, `SERVER_NAME` | `app.log`·`events.log` 위치, API 프로세스는 `api-1` / `api-2`. 백필 생성기는 생성기 프로세스 실행 때만 `SERVER_NAME=generator`를 지정 |
 | `CORS_ORIGINS` | 개발 서버 주소 |
 | `TODAY_OVERRIDE` | 비우면 실제 날짜. 시연·테스트에서만 날짜 고정 |
 
@@ -87,7 +87,7 @@ infra/monitoring/  alloy.config                # [A] 로그 파일 → Loki, 로
 | `paginate()` | `{"items","page","size","total"}` | A·B |
 | `log_event(session_id, user_id, event_type, venue_id=None, category=None, payload=None, is_synthetic=False, *, products=None)` | 앞의 7개 인자는 변경하지 않는다. #60 PM 승인에 따라 B는 확정 예약에서 만든 상품 스냅샷을 `products=`로 전달한다. A는 새 15종 구조를 조립해 `events.log`에 먼저 기록하고 MongoDB `space_rental_analytics.events`에는 내부 2작업자·1,000건 대기열로 보낸다. 파일 실패는 이벤트 API 503, MongoDB 실패는 202 및 재적재 대상이다. 현재 B 구형 이벤트 호출은 변경 전까지 새 이벤트로 저장되지 않는다. | B 예약 서비스, 배치 |
 | `reservation_counter` | Prometheus 카운터 `reservation_total{result="ok"\|"conflict"\|"cancel"}` | B 예약 서비스 |
-| `get_today() -> date`, `get_now() -> datetime` | Asia/Seoul 오늘·지금. **`get_now()`는 시간대 없는(naive) 한국 시각**이라 MariaDB `DATETIME`과 그대로 비교·저장. UTC는 `log_event` 안에서만(MongoDB `ts`), 응답 JSON에는 `+09:00`을 붙여 냄. `TODAY_OVERRIDE`가 있으면 그 날짜 + 실제 시각(테스트 전용) (11-03 A1 확정) | A·B 전체 |
+| `get_today() -> date`, `get_now() -> datetime` | Asia/Seoul 오늘·지금. **`get_now()`는 시간대 없는(naive) 한국 시각**이라 MariaDB `DATETIME`과 그대로 비교·저장. `override_business_time(value)`는 생성기 백필에서 회원·후기 서비스와 가입 스키마 검증이 참조하는 업무 시각만 `with` 블록 안에서 임시 고정하며, 블록을 나가면 복원한다. 이벤트 빌더의 과거 행동 시각은 `occurred_at` 인자로 전달한다. `get_event_time()`은 이 업무 시각 재정의와 무관하게 실제 UTC 적재 시각(`received_at`)을 반환한다. `TODAY_OVERRIDE`는 테스트 전용 (11-03 A1 확정, #75) | A·B 전체·생성기 |
 | `is_synthetic_request(request) -> bool` | 헤더 `X-Synthetic: 1` + `X-Synthetic-Key`(= `.env` `SYNTHETIC_API_KEY`)일 때만 true. `X-Synthetic`이 있는데 키가 없거나 틀리면 `AppError("UNAUTHORIZED", …, 401)` (11-05 A6) | A 가입, B 예약 |
 | `get_session_id(request) -> str \| None` | 헤더 `X-Session-Id`(프론트가 모든 요청에 붙이는 UUID). 없거나 형식이 틀리면 `None` | B 예약 서비스가 `log_event`에 넘김 → 서버 이벤트와 프론트 이벤트를 같은 세션으로 묶음(이탈 계산에 필요) |
 
@@ -212,6 +212,16 @@ infra/monitoring/  alloy.config                # [A] 로그 파일 → Loki, 로
 - FE PR #59는 현재 상품 이벤트마다 `product_id` 하나만 보낸다. A는 추가 `product_name`·`price` 입력을 400으로 거절하고 B의 `venue_repo.get_detail()`을 primary에서 호출해 활성 공간의 이름·수집 시점 가격을 채운다(복제 지연 방지). 인증된 `user_id`는 JWT 확인 결과만 사용한다. 같은 묶음의 서로 다른 공간 ID마다 상세 조회 SQL 한 번이 실행되므로 최대 50건 묶음에서 조회도 최대 50회다. DB 명세는 상품을 1개 이상 허용하지만 현재 FE는 한 개씩 보내므로, 다중 상품 이벤트 도입 전 B의 일괄 공간 스냅샷 조회 계약을 협의해야 한다.
 - URL query·fragment를 제거하고 `page.title`은 고정 화면명으로 바꾼다. UTM은 팀 허용 목록 결정 전까지 null, 임의 자유 문자열은 제외한다. `region_id`·`facility_ids`처럼 형식을 확인한 값과 `reservation_conflict.reason=SLOT_TAKEN`은 보존한다.
 - 서버 결과 3종은 문맥이 없을 때 `user.anonymous_id`·`user.session_sequence`·`site`·`acquisition`·`page`·`navigation`을 null로 기록한다(#60 승인). `X-Session-Id`가 없으면 A가 요청 ID로 `user.session_id=server-<request_id>`를 채운다(#60 PM 결정). 예약 응답과 이벤트 수집은 독립적으로 유지한다.
+
+#### 생성기 백필에서 A 서비스 사용 (#75)
+
+- 새 합성 회원은 일반 가입 중복 정책을 그대로 지키며 `auth_service.signup()`으로 만든다. 회원 한 명의 과거 가입 시각을 `joined_at`이라고 하면 `with override_business_time(joined_at):` 블록 안에서 `SignupCreate` 입력 객체를 만들고 `auth_service.signup(db, body, is_synthetic=True)`를 호출한다. 스키마의 만 14세 검증과 서비스의 동의·가입 시각이 모두 같은 과거 업무 시각을 본다. 기존 비밀번호 검증·bcrypt 해시를 그대로 사용한다.
+- 후기는 이용 종료 후의 과거 작성 시각 `reviewed_at`을 `override_business_time(reviewed_at)`으로 감싼 상태에서 `review_service.create_review()`를 호출한다. 자격 판정·기한 확인·`reviews.created_at`이 과거 행동 시각을 따른다.
+- 이벤트는 A의 `build_document()`로 조립하고 `is_synthetic=True`, 각 행동 시각은 `occurred_at`으로 명시한다. `received_at`은 `get_event_time()`의 실제 적재 시각으로 둔다. 업무 시각 override를 이벤트 수신 시각에 적용하지 않는다.
+- `SERVER_NAME=generator`는 백필 실행 프로세스의 환경에만 지정하고 공용 `backend/.env`에는 넣지 않는다. 예: Linux `env SERVER_NAME=generator python -m <생성기_모듈>`. 앱 설정은 첫 `get_settings()` 때 읽으므로 프로세스를 시작하기 전에 지정한다. API 프로세스의 `api-1`·`api-2` 표시는 유지한다.
+- 재실행 때 기존 일반 가입 API의 중복 허용을 추가하지 않는다. 결정적 이메일이 이미 있으면 생성기에서 `is_synthetic` 표식과 manifest의 동일 seed·회원 데이터를 확인한다. 기대한 합성 회원과 일치하면 그 `user_id`를 재사용하고, 일반 회원 또는 다른 생성 결과와 충돌하면 덮어쓰지 말고 중단한다. 비밀번호는 bcrypt 해시 문자열이 매번 달라질 수 있으므로 해시 문자열끼리 비교하지 않는다.
+- 후기는 예약당 UNIQUE와 소프트 삭제 정책을 따른다. 같은 seed에서 해당 예약의 후기가 이미 있으면 `user_id`, 내용·평점·작성 시각 및 삭제 상태가 manifest의 기대 결과와 일치할 때만 재생성 없이 건너뛴다. 불일치하면 수정하거나 삭제 후 다시 쓰지 말고 충돌로 중단한다. 새 후기는 `review_service.create_review()`를 호출한다. 삭제된 후기도 예약당 1개 제한에 포함되므로 재작성하지 않는다.
+- 주의: 현재 B `reservation_service`는 예약 성공·충돌·취소 후 A `log_event()`와 `reservation_counter`를 자동 호출한다. 생성기가 서비스 호출 뒤 같은 행동 이벤트를 다시 만들면 MongoDB 원천 이벤트가 중복되고, B 지표를 실행 환경 메트릭에 올리면 실제 사용자 예약·취소율이 오염된다. `SERVER_NAME=generator`는 출처 표지만 바꾸며 이벤트·로그·계측을 끄지 않는다. 백필 전에 B가 기본값은 기존 동작을 유지하면서 내부 호출에만 이벤트 기록·Prometheus 계측을 각각 끌 수 있는 keyword-only 옵션을 제공해야 한다. 이 계약 전에는 B 예약·취소 서비스로 파일럿을 적재하지 않는다.
 
 **#60 전환 상태(11-06):** A는 새 문서 조립·저장 대상·재적재 형식을 구현했다. 공식 `mongo_init.js`를 전용 `space_rental_analytics_test`에 적용한 뒤 실제 HTTP 검색 이벤트와 `log_event` 서버 이벤트 각 1건을 `events.log`와 MongoDB에서 확인했고, 같은 로그를 두 번 재적재해도 ID별 1건만 남음을 확인했다. 생성한 두 문서는 삭제했다. 이벤트 pytest 24건·전체 375건, Ruff·프론트 verify가 통과했다. FE PR #59는 develop에 병합됐지만 지역·시설 ID와 예약 문맥 전송은 남았고, B 서버 이벤트 이름·상품 전달도 미완료다. 비활성 공간 `review_create`가 유효한 항목과 섞이면 전체 400인 현행 정책은 PM 후속 논의 대상이다. 옛 로그는 별도로 보존하고 재적재에서 제외한다. HTTP 재전송은 서버가 새 ID를 발급한다.
 

@@ -12,7 +12,7 @@
 | 파트 | 담당자 | 지금 | 다음 할 일 | 막힌 것 |
 | --- | --- | --- | --- | --- |
 | 프론트 | 노진산(FE·PM) | FE-1~9 확정안 반영, Claude 시안 대조·FE 오류/모바일 결제/가입 UX 재검토 및 목업·화면 검증. 11-06 C안 화풍(흰 바탕·검은 글자·주칠)과 유형별 일러스트 5장 유지. CCL 분위기 참고 사진 40장(유형별 8장)을 정적 경로로 연결하고 유형·venue ID 해시로 안정 선택, 사진 표시·크레딧 추가(API `art:` 계약 그대로) | A·B 구현 후 실제 API 연결·오류·예약 동시성 통합 검증 | 실제 API 미구현 |
-| FastAPI A | [이름] | 회원·후기 A 기능 구현. F-60 공식 `mongo_init.js`를 전용 테스트 DB에 적용하고 실제 HTTP 202→파일→MongoDB 저장·재적재 중복 제외를 확인. 헤더 없는 서버 이벤트에 `server-<request_id>` 적용. 이벤트 관련 pytest 24건·전체 375건, Ruff, FE verify 통과 | B 서버 이벤트 3종 새 이름·상품 전달 및 FE 남은 지역·시설 ID/예약 문맥 통합 | 비활성 공간 `review_create`가 정상 건과 섞이면 전체 400(기존 계약, PM 후속 논의). UTM 허용 값 미확정 |
+| FastAPI A | [이름] | 회원·후기 A 기능 구현. F-60 공식 `mongo_init.js`와 이벤트 파일·Mongo 저장을 검증. #75에서 `override_business_time()`으로 가입 스키마/서비스·후기 서비스의 과거 업무 시각만 고정하고 `build_document(occurred_at=...)`와 실제 `received_at`을 분리하는 지원 및 사용 지침 반영 | B 생성기에서 가입·후기·이벤트 생성 경로 연결, B 자동 예약 이벤트·Prometheus 계측 억제 옵션 합의, 같은 seed 재실행 안전 처리. FE 지역·시설 ID/예약 문맥 통합도 진행 | B 생성기 호출부·계측 옵션 미제공. 이번 #75 변경 테스트는 지시대로 미실행. 비활성 공간 이벤트 혼합 처리·UTM 허용 값은 별도 결정 |
 | FastAPI B | 이세훈 | `feat/B-F60-events`에서 #60·#72 예약 결과 3종 이름·상품값·선택적 문맥 연결. A `d75deea`와 임시 통합에서 관련 pytest 77건·전체 375건·실제 HTTP/Postman 7요청/15검증·지정 MongoDB 결과 3종 저장/중복 제외/정리 확인. FE verify 67건·빌드 통과 | B 변경 리뷰 후 A #72와 함께 통합·배포. #8 api1 cron·생성기 백필 지원은 별도 | A의 세션 헤더 없는 요청 ID 보완 미반영, 원격 MongoDB 서버 문맥 null validator 동기화 필요. 실제 api1·replica·브라우저 E2E 미검증 |
 | DB | [이름] | `0001_init.sql`·`mongo_init.js` 검증(설치형 11.8·compose 11.4 둘 다 29건 통과), seed(유형 5·시설 20·지역 230 → `seed.sql`), `infra/local` compose, 크롤러 시제품(옛 필터). 1차 수집원 2곳+부족분 생성 방향 확정. 별도 Compass DB의 events·event_daily 속성 정리 v1을 docs/db에 공유 | 스페이스클라우드 새 필터·쉐어잇 파서/사이트별 robots 확인 → 속성 기반 시연용 공간 선별·`/internal/venues` 등록(B와) → 부족한 공간·과거 30일 행동 데이터 생성기 | 없음(A2 결정을 팀원에게 공유) |
 
@@ -174,6 +174,8 @@ A1~A4는 11-03에 확정했고, **A5~A8은 추후 확정**으로 미뤘다(11-03
 - 개인 기억(Claude 자동 메모리 등)은 팀에 공유되지 않는다. 팀이 알아야 할 것은 이 파일과 `docs/`에 쓴다.
 
 ## 최근 변경 (최신이 위)
+
+- 11-06 · A · #75 백필 연계 지침 갱신. 기존 로컬 `override_business_time()`은 가입 입력 객체 생성·`auth_service.signup()`·`review_service.create_review()` 범위에 한정하고, 이벤트 발생 시각은 `build_document(occurred_at=...)`, 수신 시각은 실제 `get_event_time()`으로 분리한다. `SERVER_NAME=generator`는 생성 프로세스에만 지정하도록 문서화. 중복 회원·후기 재사용 기준과 B 자동 이벤트·예약 지표 오염 위험 및 필요한 내부 억제 옵션을 기록했다. B 호출부·옵션은 미완료이며 테스트는 실행하지 않음.
 
 - 11-06 · B · 사용자 요청으로 `feat/B-F60-events`를 푸시하고 GitHub CLI에서 Draft PR #74를 develop 대상으로 생성. B 변경만 포함하며 A #72 의존성과 서버 세션 ID·원격 MongoDB validator 후속 항목을 PR 본문에 명시. 이전 통합 검증 결과를 그대로 첨부했고 이번 PR 작성 작업에서는 테스트를 재실행하지 않음.
 
