@@ -34,6 +34,7 @@ def get_booking_info(db: Session, venue_id: int) -> RowMapping | None:
     query = (
         select(
             Venue.venue_id,
+            Venue.name,
             Venue.is_active,
             Venue.open_hour,
             Venue.close_hour,

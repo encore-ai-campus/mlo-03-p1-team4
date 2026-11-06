@@ -13,7 +13,7 @@
 | --- | --- | --- | --- | --- |
 | 프론트 | 노진산(FE·PM) | FE-1~9 확정안 반영, Claude 시안 대조·FE 오류/모바일 결제/가입 UX 재검토 및 목업·화면 검증. 11-06 C안 화풍(흰 바탕·검은 글자·주칠)과 유형별 일러스트 5장 유지. CCL 분위기 참고 사진 40장(유형별 8장)을 정적 경로로 연결하고 유형·venue ID 해시로 안정 선택, 사진 표시·크레딧 추가(API `art:` 계약 그대로) | A·B 구현 후 실제 API 연결·오류·예약 동시성 통합 검증 | 실제 API 미구현 |
 | FastAPI A | [이름] | 이슈 #2 회원·탈퇴, 후기 작성·목록 #47 develop 병합(#43 직접 import·공개 비활성 공간 제외·내 후기 유지, 관련 테스트 58건 재확인). #45 `review_repo.get_review_ids(db, reservation_ids)` 계약 #55: 삭제된 후기 포함, 페이지당 SQL 1회, 빈 입력 SQL 없음. 관련 pytest 60건·전체 verify 통과 | B의 PR #46에서 목록·상세 실제 ID 연결 및 통합 검증 확인, Swagger에서 실제 데이터로 후기 목록 수동 확인 | 탈퇴와 동시 예약 처리 B 협의, 이벤트 개인정보 정책 합의 대기 |
-| FastAPI B | 이세훈 | #49·#50 develop 병합 완료. 최신 develop `b6a97c6` 기반 `feat/B-F-40-review-ids`에서 #45 목록·상세 실제 후기 ID 연결, 소프트 삭제 이력 보존, 페이지당 A 일괄 조회 검증. 전체 verify Python 362건·FE 56건·Ruff 90파일·린트/빌드 및 실제 HTTP 확인 통과 | #45 PR 생성·CI·A/PM 리뷰·병합 → api1 cron #8과 생성기 백필 지원은 별도 | 실제 api1·replica·브라우저 E2E는 미검증 |
+| FastAPI B | 이세훈 | `feat/B-F60-events`에서 #60·#72 예약 결과 3종 이름·상품값·선택적 문맥 연결. A `d75deea`와 임시 통합에서 관련 pytest 77건·전체 375건·실제 HTTP/Postman 7요청/15검증·지정 MongoDB 결과 3종 저장/중복 제외/정리 확인. FE verify 67건·빌드 통과 | B 변경 리뷰 후 A #72와 함께 통합·배포. #8 api1 cron·생성기 백필 지원은 별도 | A의 세션 헤더 없는 요청 ID 보완 미반영, 원격 MongoDB 서버 문맥 null validator 동기화 필요. 실제 api1·replica·브라우저 E2E 미검증 |
 | DB | [이름] | `0001_init.sql`·`mongo_init.js` 검증(설치형 11.8·compose 11.4 둘 다 29건 통과), seed(유형 5·시설 20·지역 230 → `seed.sql`), `infra/local` compose, 크롤러 시제품(옛 필터). 1차 수집원 2곳+부족분 생성 방향 확정. 별도 Compass DB의 events·event_daily 속성 정리 v1을 docs/db에 공유 | 스페이스클라우드 새 필터·쉐어잇 파서/사이트별 robots 확인 → 속성 기반 시연용 공간 선별·`/internal/venues` 등록(B와) → 부족한 공간·과거 30일 행동 데이터 생성기 | 없음(A2 결정을 팀원에게 공유) |
 
 ## 기능 진행표
@@ -40,6 +40,7 @@
 | F-51 지원 (#43) | A 후기 목록용 예약·공간·유형 조회식 | B / A 연계 | 검증: B 4열 `review_context_query(*, active_only=True)` PR #44, A 직접 import·공개 비활성 공간 제외·내 후기 유지 PR #47이 develop 병합됨. 로컬 MariaDB 관련 테스트 58건 통과. Swagger 실제 데이터 수동 확인은 별도 |
 | F-50~51 | 후기 작성·조회(후기 모아보기) | A | B get_owned·review_context_query 연결, 작성·목록·수정·삭제 및 탈퇴 후 예약·후기 보존·작성자 익명화 로컬 MariaDB 검증. 공개 비활성 공간 제외·내 후기는 포함. 전체 backend pytest 318건 통과 |
 | F-60, F-62~65 | 이벤트(로그 파일 + MongoDB), 가상 데이터, `get_today`, 서버 로그, 지표 | A | 공통 계약·이벤트 pytest 통과. 자유 문자열 개인정보 처리 팀 합의 대기. DB 참고 문서 `docs/db/events_event_daily_컬렉션_속성정리_v1.md` 공유: 별도 `space_rental_analytics` 설정이며 기존 `spacecube.user_events` 계약·초기화 코드는 변경하지 않음 |
+| F-60 B 지원 (#60·#72) | 예약 결과 3종·상품 스냅샷·선택적 브라우저 문맥 | B / A·DB 연계 | B 구현·A d75deea 임시 통합 검증: 관련 pytest 77건·전체 375건, Postman 7요청/15검증, 지정 MongoDB에서 결과 3종 실저장·동일 ID 중복 제외·가상 데이터 정리. A의 server-요청 ID 보완 및 원격 validator null 허용 반영 전 최종 완료 아님 |
 | F-61 | 크롤링 신규 등록 | DB / B | 진행: B POST /internal/venues 구현·로컬 검증 완료(35건·같은 출처 동시 8건·HTTP 6요청/12검증). DB 크롤러 새 필터·쉐어잇 파서·crawl_raw 연결과 api1 배포는 후속 |
 | #19 생성기 | 시연용 공간 부족분 생성·과거 30일 백필(회원·예약·결제·후기·이벤트)·`event_daily` 집계 | DB (api1 실행 환경 A, 과거 시각 저장 지원 B) | 설계 확정(11-05 #38), 코드 전. 100명으로 먼저 검증 → 11-07까지 규모 확정 |
 | F-70 | 헬스체크 3단계 | A | 설계 확정 |
@@ -172,6 +173,8 @@ A1~A4는 11-03에 확정했고, **A5~A8은 추후 확정**으로 미뤘다(11-03
 - 개인 기억(Claude 자동 메모리 등)은 팀에 공유되지 않는다. 팀이 알아야 할 것은 이 파일과 `docs/`에 쓴다.
 
 ## 최근 변경 (최신이 위)
+
+- 11-06 · B · #60·#72 요청에 따라 예약 결과 3종을 새 이름과 `products` 키워드로 전환. primary 공간명·확정 예약 조건·시간당 금액(취소는 저장 총액/시간)·KST 시각을 전달하고 선택적 `event_context`는 기록 후 복원. 본문 없는 취소·재시도 중복 방지·동시성 유지. `test/B-F60-integration`에서 A d75deea와 관련 pytest 77건·전체 pytest 375건 통과. 최초 정렬 예상값 오류 수정 후 통과. 실제 JWT/Uvicorn·Postman 7요청/15검증과 지정 원격 MongoDB 결과 3종 저장·같은 ID 재적재 0건 추가·이번 가상 데이터 정리 확인. 원격 validator는 문맥 null을 121로 거절하며 변경하지 않았고 A 세션 ID 보완도 미반영. 전체 verify 최초 실행은 프론트 run-s 미설치로 실패했으나 기존 잠금파일로 의존성 설치 후 별도 FE verify 67건·린트/빌드 통과. 비밀값은 실행 환경에만 전달. 푸시·PR·배포는 하지 않음.
 
 - 11-06 · 공동(PM 요청) · MongoDB 초기화를 새 구조 하나로 정리. 옛 `docs/db/mongo_init.js`(`spacecube.user_events`)를 삭제하고 #68의 `mongo_init_2.js`를 `mongo_init.js`로 이름 변경(compose·CI 자동 실행 경로 그대로). `db/tests/check_mongo_init.js`를 새 `events`·`event_daily`·`crawl_raw` 기준 24건으로 다시 씀. 로컬에서 mongosh·Docker를 쓰지 않아 실행 검증은 CI로 확인. `산출물_04` 8절·백엔드 A 문서의 `user_events` 설명은 #63에서 DB·A가 고침
 

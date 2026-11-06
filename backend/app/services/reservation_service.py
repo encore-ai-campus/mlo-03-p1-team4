@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.core.clock import as_korean_time, get_now, get_today
 from app.core.config import get_settings
 from app.core.errors import AppError, fail
+from app.core.event_context import ClientEventContext, client_event_context
 from app.core.events import log_event
 from app.core.metrics import reservation_counter
 from app.core.pagination import Pagination, paginate
@@ -26,6 +27,7 @@ from app.schemas.reservations import (
     ReservationCancelRead,
     ReservationCreate,
     ReservationCreateRead,
+    ReservationEventContext,
     ReservationPaymentRead,
     ReservationRead,
     ReservationStatus,
@@ -35,6 +37,47 @@ from app.schemas.reservations import (
 _METHODS = frozenset({"transfer", "card", "phone"})
 _DUPLICATE_WINDOW = timedelta(minutes=10)
 _OUT_OF_RANGE_MESSAGE = "예약할 수 없는 날짜나 시간이에요."
+
+
+def _event_product(*, venue, day, start_hour, end_hour, headcount, price_per_hour):
+    """primary 공간 정보와 검증·저장된 이용 조건으로 상품 한 건을 만든다."""
+    return [
+        {
+            "product_id": str(venue["venue_id"]),
+            "product_name": venue["name"],
+            "price": {
+                "currency": "KRW",
+                "displayed_amount_minor": price_per_hour,
+                "displayed_text": f"{price_per_hour:,}원 / 시간",
+                "billing_unit": "hour",
+            },
+            "rental_conditions": {
+                "start_at": as_korean_time(datetime.combine(day, time(start_hour))),
+                "end_at": as_korean_time(datetime.combine(day, time(end_hour))),
+                "timezone": "Asia/Seoul",
+                "guest_count": headcount,
+                "option_ids": [],
+            },
+        }
+    ]
+
+
+def _log_reservation_event(*args, event_context=None, **kwargs):
+    """브라우저 문맥은 이 기록에만 적용하고 스레드 재사용 전에 복원한다."""
+    context = None
+    if event_context is not None:
+        user = event_context.user or {}
+        context = ClientEventContext(
+            occurred_at=None,
+            anonymous_id=user.get("anonymous_id"),
+            session_sequence=user.get("session_sequence"),
+            browser_context=event_context.model_dump(exclude={"user"}),
+        )
+    token = client_event_context.set(context)
+    try:
+        log_event(*args, **kwargs)
+    finally:
+        client_event_context.reset(token)
 
 
 def _range_dates() -> tuple[date, date]:
@@ -174,18 +217,28 @@ def _handle_slot_conflict(
         raise _slot_taken(detail, mine=True)
 
     log_event_payload = {
+        "reason": "SLOT_TAKEN",
         "date": body.date.isoformat(),
         "start_hour": body.start_hour,
         "hours": body.hours,
     }
-    log_event(
+    _log_reservation_event(
         session_id,
         user_id,
-        "reserve_conflict",
+        "reservation_conflict",
         venue_id=body.venue_id,
         category=venue["category_code"],
         payload=log_event_payload,
         is_synthetic=is_synthetic,
+        products=_event_product(
+            venue=venue,
+            day=body.date,
+            start_hour=body.start_hour,
+            end_hour=end_hour,
+            headcount=body.headcount,
+            price_per_hour=venue["price_per_hour"],
+        ),
+        event_context=body.event_context,
     )
     reservation_counter.labels(result="conflict").inc()
     raise _slot_taken(detail)
@@ -265,10 +318,10 @@ def create_reservation(
         db.rollback()
         raise
 
-    log_event(
+    _log_reservation_event(
         session_id,
         user_id,
-        "reserve_ok",
+        "reservation_complete",
         venue_id=body.venue_id,
         category=venue["category_code"],
         payload={
@@ -277,6 +330,15 @@ def create_reservation(
             "hours": body.hours,
         },
         is_synthetic=is_synthetic,
+        products=_event_product(
+            venue=venue,
+            day=reservation.reserve_date,
+            start_hour=reservation.start_hour,
+            end_hour=reservation.end_hour,
+            headcount=reservation.headcount,
+            price_per_hour=total_price // (reservation.end_hour - reservation.start_hour),
+        ),
+        event_context=body.event_context,
     )
     reservation_counter.labels(result="ok").inc()
     return (
@@ -395,6 +457,7 @@ def cancel_reservation(
     user_id: int,
     reservation_id: int,
     session_id: str | None,
+    event_context: ReservationEventContext | None = None,
 ) -> ReservationCancelRead:
     """시작 전 본인 예약을 잠그고 칸 반납·전액 모의 환불을 한 번에 커밋한다."""
     try:
@@ -427,14 +490,24 @@ def cancel_reservation(
         db.rollback()
         raise
 
-    log_event(
+    _log_reservation_event(
         session_id,
         user_id,
-        "reserve_cancel_ok",
+        "reservation_cancel_complete",
         venue_id=reservation.venue_id,
         category=venue["category_code"],
         payload={"reservation_id": reservation_id},
         is_synthetic=reservation.is_synthetic,
+        products=_event_product(
+            venue=venue,
+            day=reservation.reserve_date,
+            start_hour=reservation.start_hour,
+            end_hour=reservation.end_hour,
+            headcount=reservation.headcount,
+            price_per_hour=reservation.total_price
+            // (reservation.end_hour - reservation.start_hour),
+        ),
+        event_context=event_context,
     )
     reservation_counter.labels(result="cancel").inc()
     return ReservationCancelRead(
