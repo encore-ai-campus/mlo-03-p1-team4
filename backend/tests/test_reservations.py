@@ -332,7 +332,7 @@ def test_bad_event_context_does_not_change_booking_result(sample, api, collected
     assert collected_documents == []
 
 
-@pytest.mark.parametrize("failure_point", ["model_dump", "log_event"])
+@pytest.mark.parametrize("failure_point", ["model_dump", "log_event", "product"])
 def test_event_failure_after_commit_preserves_created_booking(
     connection, sample, api, monkeypatch, failure_point
 ):
@@ -345,6 +345,8 @@ def test_event_failure_after_commit_preserves_created_booking(
 
     if failure_point == "model_dump":
         monkeypatch.setattr(ReservationEventContext, "model_dump", fail_event)
+    elif failure_point == "product":
+        monkeypatch.setattr(reservation_service, "_event_product", fail_event)
     else:
         monkeypatch.setattr(reservation_service, "log_event", fail_event)
 
@@ -369,6 +371,43 @@ def test_event_failure_after_commit_preserves_created_booking(
     assert count_reservation_slots(connection, reservation_id) == 2
     assert count_reservation_payments(connection, reservation_id) == 1
     assert reservation_counter.labels(result="ok")._value.get() == before_ok + 1
+
+
+@pytest.mark.parametrize("operation", ["conflict", "cancel"])
+def test_event_product_failure_preserves_conflict_and_cancel_results(
+    connection, sample, api, monkeypatch, operation
+):
+    first = api.post("/reservations", json=booking(sample["venue_id"]))
+    assert first.status_code == 201
+    reservation_id = first.json()["reservation_id"]
+
+    def fail_product(**kwargs):
+        raise RuntimeError("상품 스냅샷 실패 주입")
+
+    monkeypatch.setattr(reservation_service, "_event_product", fail_product)
+    if operation == "cancel":
+        response = api.post(f"/reservations/{reservation_id}/cancel")
+        assert response.status_code == 200
+        assert response.json()["status"] == "cancelled"
+        assert (
+            connection.scalar(
+                text("SELECT status FROM payments WHERE reservation_id=:id"),
+                {"id": reservation_id},
+            )
+            == "refunded"
+        )
+        assert count_reservation_slots(connection, reservation_id) == 0
+    else:
+        other_user_id = sample["create_user"]()
+        response = api.post(
+            "/reservations",
+            json=booking(sample["venue_id"]),
+            headers={"X-Test-User-Id": str(other_user_id)},
+        )
+        assert response.status_code == 409
+        assert response.json()["code"] == "SLOT_TAKEN"
+        assert response.json()["detail"]["slots"] == [13, 14]
+        assert count_venue_reservations(connection, sample["venue_id"]) == 1
 
 
 def test_event_logging_failure_restores_previous_context(monkeypatch):

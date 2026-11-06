@@ -32,4 +32,4 @@ F-40의 `_as_owned_read`는 `review_id`를 명시적으로 전달받아 null 또
 - 취소: `SELECT … FOR UPDATE` → 시작 전인지 → status = cancelled, 칸 DELETE, payments = refunded(전액) → COMMIT.
 - 자세한 순서: [백엔드_B 6절](../../../docs/백엔드_B_공간_예약_결제_크롤링.md)
 
-F-60(#60·#72): 서버 결과 3종은 primary에서 읽은 공간명과 확정된 예약 조건으로 `products`를 전달합니다. 충돌에는 검증한 시도 조건과 `reason=SLOT_TAKEN`을 기록합니다. 취소는 비활성 공간도 처리하고 시간당 요금은 저장된 총액/이용시간으로 복원합니다. 공간명은 이벤트 시점 DB 값이며 과거 이름을 새로 저장하지 않습니다. 선택적 `event_context`는 기록할 때만 A `ClientEventContext`에 설정하고 `finally`에서 복원합니다. A PR #72의 새 함수·문맥 계약이 필요하므로 두 변경을 함께 검증·배포해야 합니다.
+F-60(#60·#72): 서버 결과 3종은 primary에서 읽은 공간명과 확정된 예약 조건으로 `products`를 전달합니다. 상품 스냅샷은 `_log_reservation_event` 안에서 지연 생성해, 조립이나 기록 실패가 이미 커밋된 예약·취소·충돌 결과를 바꾸지 않게 합니다. 충돌에는 검증한 시도 조건과 `reason=SLOT_TAKEN`을 기록합니다. 취소는 비활성 공간도 처리하고 시간당 요금은 저장된 총액/이용시간으로 복원합니다. 공간명은 이벤트 시점 DB 값이며 과거 이름을 새로 저장하지 않습니다. 선택적 `event_context`는 기록할 때만 A `ClientEventContext`에 설정하고 `finally`에서 복원합니다. A PR #72의 새 함수·문맥 계약이 필요하므로 두 변경을 함께 검증·배포해야 합니다.

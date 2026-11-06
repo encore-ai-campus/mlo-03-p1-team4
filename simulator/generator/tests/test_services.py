@@ -21,6 +21,7 @@ from app.core.clock import KST
 from app.core.event_document import EVENT_DOCUMENT_FIELDS
 from app.core.metrics import reservation_counter
 from app.repositories import reservation_repo
+from app.services import reservation_service
 from simulator.generator.events import MongoSink
 from simulator.generator.gateway import Gateway
 from simulator.generator.plan import Config
@@ -197,8 +198,12 @@ def test_real_services_recover_booking_cancel_and_review_commit_windows(database
 
 @pytest.mark.parametrize("pilot", [False, True], ids=["small", "100-users-30-days"])
 def test_full_service_flow_and_resume_preserve_counts_and_metrics(
-    database, venues, tmp_path, pilot, request
+    database, venues, tmp_path, pilot, request, monkeypatch
 ):
+    def fail_operational_product(**kwargs):
+        raise AssertionError("가상 실행에서 운영 이벤트 상품을 만들면 안 됩니다.")
+
+    monkeypatch.setattr(reservation_service, "_event_product", fail_operational_product)
     options = {} if pilot else {"users": 8, "days": 14, "sessions_per_day": 12}
     config = Config(int(uuid4().hex[:12], 16), date(2026, 11, 7), **options)
     manifest = {"config": config.document(), "venues": venues}

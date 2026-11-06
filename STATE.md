@@ -13,7 +13,7 @@
 | --- | --- | --- | --- | --- |
 | 프론트 | 노진산(FE·PM) | FE-1~9 확정안 반영, Claude 시안 대조·FE 오류/모바일 결제/가입 UX 재검토 및 목업·화면 검증. 11-06 C안 화풍(흰 바탕·검은 글자·주칠)과 유형별 일러스트 5장 유지. CCL 분위기 참고 사진 40장(유형별 8장)을 정적 경로로 연결하고 유형·venue ID 해시로 안정 선택, 사진 표시·크레딧 추가(API `art:` 계약 그대로) | A·B 구현 후 실제 API 연결·오류·예약 동시성 통합 검증 | 실제 API 미구현 |
 | FastAPI A | [이름] | 회원·후기 A 기능 구현. F-60 공식 `mongo_init.js`를 전용 테스트 DB에 적용하고 실제 HTTP 202→파일→MongoDB 저장·재적재 중복 제외를 확인. 헤더 없는 서버 이벤트에 `server-<request_id>` 적용. 이벤트 관련 pytest 24건·전체 375건, Ruff, FE verify 통과 | B 서버 이벤트 3종 새 이름·상품 전달 및 FE 남은 지역·시설 ID/예약 문맥 통합 | 비활성 공간 `review_create`가 정상 건과 섞이면 전체 400(기존 계약, PM 후속 논의). UTM 허용 값 미확정 |
-| FastAPI B | 이세훈 | #74·#76 develop 병합: 예약 결과 이벤트 새 형식, 커밋 후 이벤트 문맥 조립·기록 실패에도 예약 응답 유지(회귀 테스트 포함). #77 `feat/B-F-62-generator`에서 #75 생성기 본체·서비스 연결·재개 구현, 실제 MongoDB 100명/30일 검증 완료 | #75 A 연결 확인·DB 공간 보충/집계/CSV·api1 수동 파일럿. #79 공유 테스트 DB 경합 방지. #8 api1 cron | 원격 MongoDB 서버 문맥 null validator 동기화 필요. 실제 api1·replica·브라우저 E2E 미검증 |
+| FastAPI B | 이세훈 | #74·#76 develop 병합: 예약 결과 이벤트 새 형식, 커밋 후 이벤트 문맥·상품 생성·기록 실패에도 업무 응답 유지. 후속 수정은 `fix/B-issue5-product-factory`에서 검증 대기. #77 `feat/B-F-62-generator`에서 #75 생성기 본체·서비스 연결·재개 구현, 실제 MongoDB 100명/30일 검증 완료 | #76 PM 상품 팩토리 후속 리뷰·병합. #75 A 연결 확인·DB 공간 보충/집계/CSV·api1 수동 파일럿. #79 공유 테스트 DB 경합 방지. #8 api1 cron | 원격 MongoDB 서버 문맥 null validator 동기화 필요. 실제 api1·replica·브라우저 E2E 미검증 |
 | DB | [이름] | `0001_init.sql`·`mongo_init.js` 검증(설치형 11.8·compose 11.4 둘 다 29건 통과), seed(유형 5·시설 20·지역 230 → `seed.sql`), `infra/local` compose, 크롤러 시제품(옛 필터). 1차 수집원 2곳+부족분 생성 방향 확정. 별도 Compass DB의 events·event_daily 속성 정리 v1을 docs/db에 공유 | 스페이스클라우드 새 필터·쉐어잇 파서/사이트별 robots 확인 → 속성 기반 시연용 공간 선별·`/internal/venues` 등록(B와) → 부족한 공간·과거 30일 행동 데이터 생성기 | 없음(A2 결정을 팀원에게 공유) |
 
 ## 기능 진행표
@@ -32,7 +32,7 @@
 | F-20 | 공간 상세 | B / A·FE 연계 | B 상세 API 구현·검증: test_venues 28건, 공간 모델 DDL 3건, 실제 API Chrome 1건 통과. 공개 읽기 경로 3건·기존 목업 E2E 59건 통과. A 후기 목록·FE 실제 서버 연결은 별도 통합 항목 |
 | F-21 | 예약 가능 날짜 | B | 검증: 공개 available-dates API 구현. 빈 칸 총수·min_hours 이상 연속 빈 칸 판정, 음수 offset·days 1~31·기간 양끝·0일 설정·마지막 페이지 잘림·큰 offset·점유 분리·재조회·SQL 2회·400/404·읽기 의존성 등 48건 추가. test_venues 114건, 전체 pytest 153건, 실제 HTTP Chrome 1건 통과. FE 전체 연결은 별도 |
 | F-22 | 날짜별 시간 칸 | B | 검증: 공개 GET /venues/{venue_id}/slots?date=YYYY-MM-DD 구현. 엄격한 날짜·설정 범위 양끝·0일 설정, 공간/날짜별 점유·완료 칸·past·F-20 일치·재조회·400/404·읽기 의존성 등 38건 추가. test_venues 총 66건, 전체 pytest 105건, 실제 HTTP Chrome 1건 통과 |
-| F-30~32 | 예약+모의 결제 한 번, 중복 차단 | B | #5 후속: model_dump·log_event 예외에도 201·예약/칸/결제 저장·성공 카운터 유지, 기록 뒤 기존 문맥 복원 회귀 통과. 예약·동시성 65건 및 추가 문맥 복원 포함 회귀 3건, 실제 인증·Postman 7요청/15검증 통과. 기존 트랜잭션·슬롯 중복·이벤트 이름/products/event_context 계약 유지. 동시 다른 회원 50명: 201 1건/409 49건, 같은 회원: 201 1건/200 49건 |
+| F-30~32 | 예약+모의 결제 한 번, 중복 차단 | B | #76 PM 후속: 상품 팩토리를 이벤트 래퍼 안에서 호출. 상품 생성 실패 시 예약 201·취소 200·충돌 409와 저장·환불·슬롯 결과 유지 회귀 추가. 생성기 흐름에서 운영 상품 빌더 억제 확인. `verify.ps1` Ruff 109파일·pytest 434건·FE 단위 67건·린트/색 검사/빌드 통과. FE 조건문 린트 경고와 Starlette 사용 중단 경고 각 1건 |
 | F-34 | 예약 취소·환불 | B | #49에서 develop 3a729f2와 코드 충돌 해결. 실제 취소 API 뒤 F-40 목록/상세가 같은 cancelled·refunded 상태인지 검증. 활성/비활성 공간 5개 유형 category 기록과 원자 환불·슬롯 반납·동시 취소·재예약 유지. 관련 94건·전체 347건·HTTP 7요청/15검증·CI 통과 후 #49가 55ebd23으로 develop 병합됨 |
 | F-35 | 이용 완료 배치 | B | #49의 primary 조건부 일괄 UPDATE·get_now 1회·commit/rollback·CLI·완료 뒤 칸/결제 보존을 develop 통합 후 재검증. test_jobs 6건 포함 관련 94건·전체 347건 통과. 실제 api1 시간별 cron 등록·실행은 미완료이므로 #8 유지 |
 | F-40~41 | 내 예약, 내 후기 | B / A | #46 조회·필수 nullable review_id·필드 생략 해제는 develop 병합됨. #49·#50 후속 병합도 완료. #45 브랜치에서 A `get_review_ids`를 목록·상세에 연결하고 미작성 null·작성/삭제 이력 ID·페이지당 SQL 1회·소유권 차단을 MariaDB/HTTP로 검증. PR 리뷰·병합 대기. F-41은 A 범위 |
@@ -177,6 +177,8 @@ A1~A4는 11-03에 확정했고, **A5~A8은 추후 확정**으로 미뤘다(11-03
 - 개인 기억(Claude 자동 메모리 등)은 팀에 공유되지 않는다. 팀이 알아야 할 것은 이 파일과 `docs/`에 쓴다.
 
 ## 최근 변경 (최신이 위)
+
+- 11-07 · B · PR #76 PM 후속으로 `_event_product()`를 이벤트 래퍼 내부에서 실행하도록 `product_factory`를 전달. 예약·충돌·취소 각 API가 상품 조립 실패에도 201·409·200과 커밋 결과를 유지하는 회귀, HistoricalRuntime에서 상품 팩토리 미호출 및 MariaDB 생성기 전체 흐름을 운영 상품 빌더 실패 상태로 검증하는 테스트를 추가. `verify.ps1` 통과: Ruff 109파일, pytest 434건, FE 단위 67건·린트·색 검사·빌드. 기존 Starlette 사용 중단·FE 조건문 린트 경고 각 1건. 브랜치 `fix/B-issue5-product-factory`, 미커밋·미푸시, PR 후속 리뷰 대기.
 
 - 11-07 · 공동(B) · 사용자 승인으로 `fix/B-generator-db-race`와 재검증 기록 커밋을 푸시하고 develop 대상 PR #79([B] F-62 생성기 검증 시 공유 테스트 DB 경합 방지)를 생성. Closes #78 및 앞서 확인한 로컬 검증 결과를 본문에 포함. jinsan02·naturedevworks 자동 리뷰 요청과 open·비초안·충돌 없음 상태 확인. GitHub 연결 도구의 생성 권한 부족 및 기존 gh 인증 만료는 정상 Git 인증을 통한 CLI 실행으로 처리했으며 인증정보는 출력·파일 저장하지 않음. 이번 게시 작업에서 제품 코드 수정·테스트 재실행·머지 없음. 원격 CI 결과는 후속 확인.
 
