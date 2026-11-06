@@ -8,8 +8,8 @@ from uuid import uuid4
 import pytest
 from fastapi import Request
 from fastapi.testclient import TestClient
-from pydantic import SecretStr
-from sqlalchemy import create_engine, text
+from pydantic import SecretStr, ValidationError
+from sqlalchemy import create_engine, event, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import NullPool
@@ -20,6 +20,7 @@ from app.core.deps import CurrentUser, get_current_user
 from app.core.errors import AppError
 from app.core.metrics import reservation_counter
 from app.main import create_app
+from app.schemas.reservations import ReservationRead
 from app.services import reservation_service
 
 TODAY = date(2026, 11, 5)
@@ -276,21 +277,6 @@ def test_retry_within_ten_minutes_returns_original_booking_without_extra_rows(
     assert [event[0] for event in api.app.state.booking_events] == ["reserve_ok"]
 
 
-def cancel_test_reservation(connection, reservation_id):
-    """취소 API 구현 전이므로 현재 명세의 취소·환불·칸 반납 상태를 만든다."""
-    connection.execute(
-        text("UPDATE reservations SET status='cancelled' WHERE reservation_id=:id"),
-        {"id": reservation_id},
-    )
-    connection.execute(
-        text("UPDATE payments SET status='refunded', refunded_at=:now WHERE reservation_id=:id"),
-        {"id": reservation_id, "now": NOW},
-    )
-    connection.execute(
-        text("DELETE FROM reservation_slots WHERE reservation_id=:id"), {"id": reservation_id}
-    )
-
-
 def test_retry_after_cancellation_and_rebooking_returns_the_new_paid_reservation(
     connection, sample, api
 ):
@@ -298,7 +284,8 @@ def test_retry_after_cancellation_and_rebooking_returns_the_new_paid_reservation
     first = api.post("/reservations", json=body)
     assert first.status_code == 201
     cancelled_id = first.json()["reservation_id"]
-    cancel_test_reservation(connection, cancelled_id)
+    cancelled = api.post(f"/reservations/{cancelled_id}/cancel")
+    assert cancelled.status_code == 200
 
     rebooked = api.post("/reservations", json={**body, "method": "phone"})
     assert rebooked.status_code == 201
@@ -316,7 +303,11 @@ def test_retry_after_cancellation_and_rebooking_returns_the_new_paid_reservation
     assert count_reservation_payments(connection, cancelled_id) == 1
     assert count_reservation_payments(connection, new_id) == 1
     assert reservation_counter.labels(result="ok")._value.get() == before_ok
-    assert [event[0] for event in api.app.state.booking_events] == ["reserve_ok", "reserve_ok"]
+    assert [event[0] for event in api.app.state.booking_events] == [
+        "reserve_ok",
+        "reserve_cancel_ok",
+        "reserve_ok",
+    ]
 
 
 def test_retry_after_cancellation_reports_conflict_when_another_user_books_the_slots(
@@ -325,7 +316,8 @@ def test_retry_after_cancellation_reports_conflict_when_another_user_books_the_s
     body = booking(sample["venue_id"])
     first = api.post("/reservations", json=body)
     assert first.status_code == 201
-    cancel_test_reservation(connection, first.json()["reservation_id"])
+    cancelled = api.post(f"/reservations/{first.json()['reservation_id']}/cancel")
+    assert cancelled.status_code == 200
     other = api.post(
         "/reservations",
         json=body,
@@ -341,6 +333,7 @@ def test_retry_after_cancellation_reports_conflict_when_another_user_books_the_s
     assert count_venue_reservations(connection, sample["venue_id"]) == 2
     assert [event[0] for event in api.app.state.booking_events] == [
         "reserve_ok",
+        "reserve_cancel_ok",
         "reserve_ok",
         "reserve_conflict",
     ]
@@ -495,3 +488,403 @@ def test_payment_insert_failure_rolls_back_reservation_and_slots(
         == 0
     )
     assert connection.scalar(text("SELECT COUNT(*) FROM payments")) == payments_before
+
+
+def test_my_reservation_list_filters_pages_and_batches_images(connection, sample, api):
+    """F-40 목록은 primary에서 필터·페이지 처리하고 이미지 SQL은 페이지당 한 번이다."""
+    first = api.post(
+        "/reservations", json=booking(sample["venue_id"], day=TODAY + timedelta(days=1))
+    )
+    second = api.post(
+        "/reservations",
+        json=booking(sample["venue_id"], day=TODAY + timedelta(days=2), start=14, hours=1),
+    )
+    past = api.post(
+        "/reservations",
+        json=booking(sample["venue_id"], day=TODAY - timedelta(days=1), start=9, hours=1),
+    )
+    assert first.status_code == second.status_code == past.status_code == 201
+    for reservation_id, created_at in (
+        (first.json()["reservation_id"], NOW - timedelta(minutes=1)),
+        (second.json()["reservation_id"], NOW),
+        (past.json()["reservation_id"], NOW - timedelta(minutes=2)),
+    ):
+        connection.execute(
+            text("UPDATE reservations SET created_at=:created_at WHERE reservation_id=:id"),
+            {"created_at": created_at, "id": reservation_id},
+        )
+    connection.execute(
+        text("INSERT INTO venue_images (venue_id,url,sort_order) VALUES (:venue,:url,0)"),
+        {"venue": sample["venue_id"], "url": "art:group-1"},
+    )
+
+    statements = []
+
+    def capture_select(connection, cursor, statement, parameters, context, executemany):
+        if statement.lstrip().upper().startswith("SELECT"):
+            statements.append(statement.lower())
+
+    event.listen(connection, "before_cursor_execute", capture_select)
+    try:
+        response = api.get("/reservations/me?page=1&size=1")
+    finally:
+        event.remove(connection, "before_cursor_execute", capture_select)
+
+    assert response.status_code == 200
+    body = response.json()
+    assert (body["page"], body["size"], body["total"]) == (1, 1, 3)
+    item = body["items"][0]
+    assert item["reservation_id"] == second.json()["reservation_id"]
+    assert item["status"] == "confirmed"
+    assert item["date"] == (TODAY + timedelta(days=2)).isoformat()
+    assert item["total_price"] == 11000
+    assert item["created_at"] == "2026-11-05T12:00:00+09:00"
+    assert item["payment"] == {
+        "method": "card",
+        "status": "paid",
+        "paid_at": "2026-11-05T12:00:00+09:00",
+        "refunded_at": None,
+    }
+    assert item["venue"] == {
+        "venue_id": sample["venue_id"],
+        "name": "예약 검증 공간",
+        "category": dict(
+            connection.execute(
+                text(
+                    "SELECT code,name FROM categories WHERE category_id=(SELECT MIN(category_id) FROM categories)"
+                )
+            )
+            .mappings()
+            .one()
+        ),
+        "region": dict(
+            connection.execute(
+                text(
+                    "SELECT sido,sigungu FROM regions WHERE region_id=(SELECT MIN(region_id) FROM regions)"
+                )
+            )
+            .mappings()
+            .one()
+        ),
+        "image": "art:group-1",
+    }
+    assert item["can_cancel"] is True
+    assert item["review_id"] is None
+    assert sum("from reservations" in statement for statement in statements) == 2
+    assert sum("from venue_images" in statement for statement in statements) == 1
+
+    confirmed = api.get("/reservations/me?status=confirmed&page=1&size=1").json()
+    assert (confirmed["total"], confirmed["items"][0]["reservation_id"]) == (
+        2,
+        second.json()["reservation_id"],
+    )
+    page_two = api.get("/reservations/me?page=2&size=1").json()
+    assert page_two["items"][0]["reservation_id"] == first.json()["reservation_id"]
+    completed = api.get("/reservations/me?status=completed").json()
+    assert completed["total"] == 1
+    assert completed["items"][0]["status"] == "completed"
+    assert completed["items"][0]["can_cancel"] is False
+    empty = api.get("/reservations/me?status=cancelled").json()
+    assert (empty["items"], empty["total"]) == ([], 0)
+
+
+def test_my_reservation_detail_hides_other_users_and_reports_cancel_boundary(
+    connection, sample, api
+):
+    at_start = api.post(
+        "/reservations",
+        json=booking(sample["venue_id"], day=TODAY, start=12, hours=1),
+    )
+    before_start = api.post(
+        "/reservations",
+        json=booking(sample["venue_id"], day=TODAY, start=13, hours=1),
+    )
+    other_user_id = sample["create_user"]()
+    other = api.post(
+        "/reservations",
+        json=booking(sample["venue_id"], day=TODAY, start=14, hours=1),
+        headers={"X-Test-User-Id": str(other_user_id)},
+    )
+    assert at_start.status_code == before_start.status_code == other.status_code == 201
+
+    at_start_read = api.get(f"/reservations/{at_start.json()['reservation_id']}")
+    before_start_read = api.get(f"/reservations/{before_start.json()['reservation_id']}")
+    assert at_start_read.status_code == before_start_read.status_code == 200
+    assert at_start_read.json()["can_cancel"] is False
+    assert before_start_read.json()["can_cancel"] is True
+    assert at_start_read.json()["venue"] == before_start_read.json()["venue"]
+    assert before_start_read.json()["review_id"] is None
+
+    connection.execute(
+        text("UPDATE venues SET is_active=FALSE WHERE venue_id=:venue"),
+        {"venue": sample["venue_id"]},
+    )
+    assert api.get(f"/reservations/{before_start.json()['reservation_id']}").status_code == 200
+
+    assert (
+        api.post(f"/reservations/{before_start.json()['reservation_id']}/cancel").status_code == 200
+    )
+    refunded = api.get(f"/reservations/{before_start.json()['reservation_id']}")
+    assert refunded.status_code == 200
+    assert refunded.json()["status"] == "cancelled"
+    assert refunded.json()["payment"]["status"] == "refunded"
+    assert refunded.json()["payment"]["refunded_at"] == "2026-11-05T12:00:00+09:00"
+    assert refunded.json()["can_cancel"] is False
+    cancelled_list = api.get("/reservations/me?status=cancelled").json()
+    assert cancelled_list["total"] == 1
+    assert cancelled_list["items"][0] == refunded.json()
+    assert (
+        connection.scalar(
+            text("SELECT status FROM reservations WHERE reservation_id=:id"),
+            {"id": before_start.json()["reservation_id"]},
+        )
+        == "cancelled"
+    )
+
+    for reservation_id in (other.json()["reservation_id"], 9223372036854775000):
+        missing_or_other = api.get(f"/reservations/{reservation_id}")
+        assert missing_or_other.status_code == 404
+        assert missing_or_other.json()["code"] == "RESERVATION_NOT_FOUND"
+
+
+def test_my_reservation_routes_require_auth_and_validate_query_and_id(connection, sample, api):
+    invalid_status = api.get("/reservations/me?status=pending")
+    invalid_id = api.get("/reservations/0")
+    assert invalid_status.status_code == invalid_id.status_code == 400
+    assert invalid_status.json()["code"] == invalid_id.json()["code"] == "VALIDATION"
+
+    override = api.app.dependency_overrides.pop(get_current_user)
+    try:
+        response = api.get("/reservations/me")
+    finally:
+        api.app.dependency_overrides[get_current_user] = override
+    assert response.status_code == 401
+    assert response.json()["code"] == "UNAUTHORIZED"
+
+
+@pytest.fixture
+def owned_read_row():
+    """후기 조회와 분리해 B 응답 변환에 필요한 예약 행만 준비한다."""
+    return {
+        "reservation_id": 100,
+        "venue_id": 7,
+        "reserve_date": TODAY - timedelta(days=1),
+        "start_hour": 13,
+        "end_hour": 15,
+        "headcount": 2,
+        "total_price": 22000,
+        "status": "completed",
+        "created_at": NOW,
+        "payment_method": "card",
+        "payment_status": "paid",
+        "paid_at": NOW,
+        "refunded_at": None,
+        "venue_name": "예약 검증 공간",
+        "category_code": "studyroom",
+        "category_name": "스터디룸",
+        "region_sido": "서울",
+        "region_sigungu": "관악구",
+    }
+
+
+@pytest.mark.parametrize("review_id", [None, 101])
+def test_owned_read_serializes_explicit_null_or_provided_review_id(owned_read_row, review_id):
+    """A 조회 결과를 전달받으면 null과 ID가 모두 생략되지 않고 직렬화된다."""
+    response = reservation_service._as_owned_read(
+        owned_read_row, image="art:group-0", now=NOW, review_id=review_id
+    )
+    body = response.model_dump(mode="json", exclude_unset=True)
+    assert "review_id" in body
+    assert body["review_id"] == review_id
+    assert body["status"] == "completed"
+    assert body["can_cancel"] is False
+
+
+def test_owned_read_requires_review_id_even_when_nullable(owned_read_row):
+    """후기 결과를 빠뜨린 응답은 기본 null로 조용히 바뀌지 않고 검증에 실패한다."""
+    response = reservation_service._as_owned_read(
+        owned_read_row, image="art:group-0", now=NOW, review_id=None
+    )
+    body = response.model_dump()
+    del body["review_id"]
+    with pytest.raises(ValidationError) as caught:
+        ReservationRead.model_validate(body)
+    assert [(error["loc"], error["type"]) for error in caught.value.errors()] == [
+        (("review_id",), "missing")
+    ]
+    assert "review_id" in ReservationRead.model_json_schema()["required"]
+
+
+def test_cancel_refunds_and_releases_only_owned_reservation_slots(connection, sample, api):
+    first = api.post("/reservations", json=booking(sample["venue_id"]))
+    second = api.post(
+        "/reservations",
+        json=booking(sample["venue_id"], start=16, hours=1, method="phone"),
+    )
+    assert first.status_code == second.status_code == 201
+    first_id = first.json()["reservation_id"]
+    second_id = second.json()["reservation_id"]
+    before_cancel = reservation_counter.labels(result="cancel")._value.get()
+
+    response = api.post(f"/reservations/{first_id}/cancel")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "reservation_id": first_id,
+        "status": "cancelled",
+        "total_price": 22000,
+        "payment": {
+            "method": "card",
+            "status": "refunded",
+            "paid_at": "2026-11-05T12:00:00+09:00",
+            "refunded_at": "2026-11-05T12:00:00+09:00",
+        },
+        "can_cancel": False,
+    }
+    assert (
+        connection.scalar(
+            text("SELECT status FROM reservations WHERE reservation_id=:id"), {"id": first_id}
+        )
+        == "cancelled"
+    )
+    assert (
+        connection.scalar(
+            text("SELECT status FROM payments WHERE reservation_id=:id"), {"id": first_id}
+        )
+        == "refunded"
+    )
+    assert count_reservation_slots(connection, first_id) == 0
+    assert count_reservation_slots(connection, second_id) == 1
+    assert reservation_counter.labels(result="cancel")._value.get() == before_cancel + 1
+    assert [event[0] for event in api.app.state.booking_events] == [
+        "reserve_ok",
+        "reserve_ok",
+        "reserve_cancel_ok",
+    ]
+
+    rebooked = api.post("/reservations", json=booking(sample["venue_id"], method="phone"))
+    assert rebooked.status_code == 201
+    assert rebooked.json()["reservation_id"] != first_id
+    assert count_reservation_slots(connection, rebooked.json()["reservation_id"]) == 2
+
+
+@pytest.mark.parametrize("category", ["studyroom", "studio", "cafe", "lectureroom", "partyroom"])
+@pytest.mark.parametrize("is_active", [True, False])
+def test_cancel_event_includes_category_for_active_and_inactive_venues(
+    connection, sample, api, category, is_active
+):
+    """F-34 취소 이벤트는 비활성 공간을 포함한 모든 유형의 코드를 기록한다."""
+    connection.execute(
+        text(
+            "UPDATE venues SET category_id=(SELECT category_id FROM categories WHERE code=:code) "
+            "WHERE venue_id=:venue"
+        ),
+        {"code": category, "venue": sample["venue_id"]},
+    )
+    created = api.post("/reservations", json=booking(sample["venue_id"]))
+    assert created.status_code == 201
+    reservation_id = created.json()["reservation_id"]
+    connection.execute(
+        text("UPDATE venues SET is_active=:active WHERE venue_id=:venue"),
+        {"active": is_active, "venue": sample["venue_id"]},
+    )
+
+    response = api.post(f"/reservations/{reservation_id}/cancel")
+
+    assert response.status_code == 200
+    assert [item for item in api.app.state.booking_events if item[0] == "reserve_cancel_ok"] == [
+        (
+            "reserve_cancel_ok",
+            {
+                "venue_id": sample["venue_id"],
+                "category": category,
+                "payload": {"reservation_id": reservation_id},
+                "is_synthetic": False,
+            },
+        )
+    ]
+
+
+def test_cancel_reports_hidden_ownership_and_documented_state_errors(connection, sample, api):
+    future = api.post("/reservations", json=booking(sample["venue_id"]))
+    at_start = api.post(
+        "/reservations", json=booking(sample["venue_id"], day=TODAY, start=12, hours=1)
+    )
+    completed = api.post(
+        "/reservations", json=booking(sample["venue_id"], day=TODAY - timedelta(days=1))
+    )
+    assert future.status_code == at_start.status_code == completed.status_code == 201
+
+    unknown = api.post("/reservations/9223372036854775000/cancel")
+    other = api.post(
+        f"/reservations/{future.json()['reservation_id']}/cancel",
+        headers={"X-Test-User-Id": str(sample["create_user"]())},
+    )
+    at_start_response = api.post(f"/reservations/{at_start.json()['reservation_id']}/cancel")
+    completed_response = api.post(f"/reservations/{completed.json()['reservation_id']}/cancel")
+    first_cancel = api.post(f"/reservations/{future.json()['reservation_id']}/cancel")
+    repeated = api.post(f"/reservations/{future.json()['reservation_id']}/cancel")
+
+    assert (unknown.status_code, unknown.json()["code"]) == (404, "RESERVATION_NOT_FOUND")
+    assert (other.status_code, other.json()["code"]) == (404, "RESERVATION_NOT_FOUND")
+    assert (at_start_response.status_code, at_start_response.json()["code"]) == (
+        409,
+        "NOT_CANCELLABLE",
+    )
+    assert (completed_response.status_code, completed_response.json()["code"]) == (
+        409,
+        "NOT_CANCELLABLE",
+    )
+    assert first_cancel.status_code == 200
+    assert (repeated.status_code, repeated.json()["code"]) == (409, "ALREADY_CANCELLED")
+
+
+def test_cancel_refund_failure_rolls_back_status_and_released_slots(
+    connection, sample, api, monkeypatch
+):
+    created = api.post("/reservations", json=booking(sample["venue_id"]))
+    assert created.status_code == 201
+    reservation_id = created.json()["reservation_id"]
+    before_cancel = reservation_counter.labels(result="cancel")._value.get()
+    events_before = len(api.app.state.booking_events)
+
+    def fail_refund(*args, **kwargs):
+        raise RuntimeError("simulated payment repository failure")
+
+    monkeypatch.setattr(reservation_service.payment_repo, "refund", fail_refund)
+    response = api.post(f"/reservations/{reservation_id}/cancel")
+
+    assert response.status_code == 500
+    assert response.json()["code"] == "INTERNAL_ERROR"
+    assert (
+        connection.scalar(
+            text("SELECT status FROM reservations WHERE reservation_id=:id"),
+            {"id": reservation_id},
+        )
+        == "confirmed"
+    )
+    assert (
+        connection.scalar(
+            text("SELECT status FROM payments WHERE reservation_id=:id"),
+            {"id": reservation_id},
+        )
+        == "paid"
+    )
+    assert count_reservation_slots(connection, reservation_id) == 2
+    assert reservation_counter.labels(result="cancel")._value.get() == before_cancel
+    assert len(api.app.state.booking_events) == events_before
+
+
+def test_cancel_route_requires_authentication_and_positive_id(connection, sample, api):
+    invalid = api.post("/reservations/0/cancel")
+    override = api.app.dependency_overrides.pop(get_current_user)
+    try:
+        unauthenticated = api.post("/reservations/1/cancel")
+    finally:
+        api.app.dependency_overrides[get_current_user] = override
+
+    assert (invalid.status_code, invalid.json()["code"]) == (400, "VALIDATION")
+    assert (unauthenticated.status_code, unauthenticated.json()["code"]) == (
+        401,
+        "UNAUTHORIZED",
+    )

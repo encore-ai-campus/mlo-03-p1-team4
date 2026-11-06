@@ -1,13 +1,13 @@
-"""F-04·30·50·51 예약 생성·재시도·탈퇴·후기 조회 지원. 트랜잭션은 서비스가 관리한다."""
+"""F-04·30·40·50·51 예약 생성·내역·탈퇴·후기 조회 지원. 트랜잭션은 서비스가 관리한다."""
 
 from datetime import date, datetime
 
-from sqlalchemy import Select, and_, or_, select
+from sqlalchemy import Select, and_, delete, func, or_, select, update
 from sqlalchemy.orm import Session
 
 from app.core.clock import get_now
-from app.models.catalog import Category
-from app.models.reservation import Payment, Reservation
+from app.models.catalog import Category, Region
+from app.models.reservation import Payment, Reservation, ReservationSlot
 from app.models.venue import Venue
 
 
@@ -134,6 +134,82 @@ def count_cancellable(db: Session, user_id: int) -> int:
     return len(db.scalars(query).all())
 
 
+def count_owned(db: Session, *, user_id: int, status: str | None = None) -> int:
+    """본인 예약의 전체 건수를 선택 상태와 함께 센다."""
+    conditions = [Reservation.user_id == user_id]
+    if status is not None:
+        conditions.append(Reservation.status == status)
+    return int(db.scalar(select(func.count()).select_from(Reservation).where(*conditions)) or 0)
+
+
+def _owned_read_query():
+    """목록·상세 응답에 필요한 예약·결제·공간 기준 정보를 예약당 한 행으로 읽는다."""
+    return (
+        select(
+            Reservation.reservation_id.label("reservation_id"),
+            Reservation.venue_id.label("venue_id"),
+            Reservation.reserve_date.label("reserve_date"),
+            Reservation.start_hour.label("start_hour"),
+            Reservation.end_hour.label("end_hour"),
+            Reservation.headcount.label("headcount"),
+            Reservation.total_price.label("total_price"),
+            Reservation.status.label("status"),
+            Reservation.created_at.label("created_at"),
+            Payment.method.label("payment_method"),
+            Payment.status.label("payment_status"),
+            Payment.paid_at.label("paid_at"),
+            Payment.refunded_at.label("refunded_at"),
+            Venue.name.label("venue_name"),
+            Category.code.label("category_code"),
+            Category.name.label("category_name"),
+            Region.sido.label("region_sido"),
+            Region.sigungu.label("region_sigungu"),
+        )
+        .select_from(Reservation)
+        .join(Payment, Payment.reservation_id == Reservation.reservation_id)
+        .join(Venue, Venue.venue_id == Reservation.venue_id)
+        .join(Category, Category.category_id == Venue.category_id)
+        .join(Region, Region.region_id == Venue.region_id)
+    )
+
+
+def list_owned(
+    db: Session,
+    *,
+    user_id: int,
+    status: str | None,
+    offset: int,
+    limit: int,
+) -> list[dict]:
+    """본인 예약을 최신 생성순으로 페이지 조회한다. 비활성 공간의 이력도 포함한다."""
+    conditions = [Reservation.user_id == user_id]
+    if status is not None:
+        conditions.append(Reservation.status == status)
+    rows = db.execute(
+        _owned_read_query()
+        .where(*conditions)
+        .order_by(Reservation.created_at.desc(), Reservation.reservation_id.desc())
+        .offset(offset)
+        .limit(limit)
+    ).mappings()
+    return [dict(row) for row in rows]
+
+
+def get_owned_detail(db: Session, *, user_id: int, reservation_id: int) -> dict | None:
+    """본인 예약 한 건을 읽는다. 타인·없는 예약은 같은 404 처리를 위해 None이다."""
+    row = (
+        db.execute(
+            _owned_read_query().where(
+                Reservation.user_id == user_id,
+                Reservation.reservation_id == reservation_id,
+            )
+        )
+        .mappings()
+        .one_or_none()
+    )
+    return dict(row) if row is not None else None
+
+
 def get_owned(
     db: Session, user_id: int, reservation_id: int
 ) -> tuple[int, int, date, int, int, str, datetime] | None:
@@ -154,3 +230,40 @@ def get_owned(
         ).where(Reservation.reservation_id == reservation_id, Reservation.user_id == user_id)
     ).one_or_none()
     return tuple(row) if row is not None else None
+
+
+def get_owned_for_update(db: Session, *, user_id: int, reservation_id: int) -> Reservation | None:
+    """취소 직렬화를 위해 본인 예약 행을 primary 트랜잭션에서 잠근다."""
+    return db.scalar(
+        select(Reservation)
+        .where(Reservation.reservation_id == reservation_id, Reservation.user_id == user_id)
+        .with_for_update()
+    )
+
+
+def delete_slots(db: Session, *, reservation_id: int) -> int:
+    """취소된 예약의 시간 칸만 지우고 삭제한 행 수를 반환한다."""
+    return db.execute(
+        delete(ReservationSlot).where(ReservationSlot.reservation_id == reservation_id)
+    ).rowcount
+
+
+def complete_ended(db: Session, *, today: date, now_hour: int) -> int:
+    """종료 시각이 지난 확정 예약을 한 번에 완료 처리한다.
+
+    상태 조건을 UPDATE에 포함해 취소와 경합해도 취소된 예약을 되살리지 않는다.
+    완료된 예약의 시간 칸은 점유율 분석을 위해 유지한다.
+    """
+    result = db.execute(
+        update(Reservation)
+        .where(
+            Reservation.status == "confirmed",
+            or_(
+                Reservation.reserve_date < today,
+                and_(Reservation.reserve_date == today, Reservation.end_hour <= now_hour),
+            ),
+        )
+        .values(status="completed")
+        .execution_options(synchronize_session=False)
+    )
+    return int(result.rowcount or 0)

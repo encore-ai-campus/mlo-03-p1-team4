@@ -13,7 +13,6 @@ import RoomCard from '@/components/domain/RoomCard.vue'
 import RoomCardSkeleton from '@/components/domain/RoomCardSkeleton.vue'
 import CategoryBento from '@/components/domain/CategoryBento.vue'
 import SlotStrip from '@/components/domain/SlotStrip.vue'
-import HourlyChart from '@/components/domain/HourlyChart.vue'
 import { useReveal } from '@/composables/useReveal'
 import { useEventLogger } from '@/composables/useEventLogger'
 import { nextDays, nowInSeoul } from '@/utils/date'
@@ -28,7 +27,6 @@ const newRooms = ref([])
 const newLoading = ref(true)
 const newError = ref('')
 const todaySlots = ref(null)
-const hourly = ref([])
 const reviews = ref([])
 const loadingRooms = ref(true)
 const error = ref('')
@@ -58,7 +56,6 @@ onMounted(async () => {
     api.getRegions().then((r) => { regions.value = r }),
     api.getTodaySlots().then((r) => { todaySlots.value = r }),
     loadNewRooms(),
-    api.getHourlyUsage().then((r) => { hourly.value = r }),
     api.getRecentReviews().then((r) => { reviews.value = r.items }),
     loadRooms(),
   ])
@@ -79,7 +76,6 @@ const tabs = computed(() => [{ value: 'all', label: '전체' }, ...categories.va
 const shown = computed(() => allRooms.value)
 const availableNow = computed(() => allRooms.value.filter((r) => r.slots?.some((s) => !s.taken && s.hour > nowInSeoul().hour)).length)
 const emptyCategory = computed(() => categories.value.find((c) => c.code === tab.value)?.name ?? '')
-const { target: chartTarget, visible: chartVisible } = useReveal()
 const { target: reviewsTarget, visible: reviewsVisible } = useReveal()
 const won = (n) => n.toLocaleString('ko-KR')
 </script>
@@ -127,7 +123,7 @@ const won = (n) => n.toLocaleString('ko-KR')
     <UiCarousel label="새로 문을 연 공간">
       <template v-if="newRooms.length">
         <RouterLink v-for="n in newRooms" :key="n.venue_id" :to="`/venues/${n.venue_id}`" class="new-card">
-          <span class="new-card__art"><RoomArt :image="n.image" /></span>
+          <span class="new-card__art"><RoomArt :image="n.image" :category="n.category" /></span>
           <span class="new-card__body">
             <span class="new-card__open num">{{ n.registered_on }} 오픈 · {{ n.new_days_left }}일 남음</span>
             <span class="new-card__name">{{ n.name }}</span>
@@ -181,11 +177,6 @@ const won = (n) => n.toLocaleString('ko-KR')
   </section>
 
   <section class="section container insights">
-    <div ref="chartTarget" class="panel reveal" :class="{ 'is-visible': chartVisible }" aria-labelledby="chart-title">
-      <h2 id="chart-title" class="panel__title">몰리는 시간대</h2>
-      <p class="section__sub">최근 4주 평균 예약률 · 평일 (예시 데이터)</p>
-      <HourlyChart v-if="hourly.length" :values="hourly" :visible="chartVisible" />
-    </div>
     <div ref="reviewsTarget" class="panel reveal" :class="{ 'is-visible': reviewsVisible }" aria-labelledby="reviews-title">
       <div class="panel__head">
         <h2 id="reviews-title" class="panel__title">최근 후기</h2>
@@ -357,12 +348,6 @@ const won = (n) => n.toLocaleString('ko-KR')
 .insights {
   display: grid;
   gap: var(--sp-24);
-}
-@media (min-width: 1024px) {
-  .insights {
-    grid-template-columns: 3fr 2fr;
-    align-items: start;
-  }
 }
 .panel {
   padding: var(--sp-24);

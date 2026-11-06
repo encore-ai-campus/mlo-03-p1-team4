@@ -70,13 +70,13 @@ Pro_1/
 │  │  ├─ main.py              [A] 공식 앱 통합, [B] catalog·venues·reservations·internal 라우터 등록
 │  │  ├─ core/                [A] config, db, mongo, security, deps, errors, pagination, events, metrics, logging, clock, synthetic (공식 A 구현)
 │  │  ├─ models/              [A] base, user, review / [B] catalog·reservation·venue 구현 — DDL 대응 모델
-│  │  ├─ routers/             [A] auth, users, reviews, events, health / [B] catalog·venues(조회), reservations(F-30~32), internal(F-61) 구현
-│  │  ├─ schemas/             라우터와 같은 이름 ([B] catalog·venues 조회, reservations 생성, internal 등록/갱신 계약 구현)
-│  │  ├─ services/            [A] auth_service, user_service, review_service / [B] catalog_service·venue_service 조회, reservation_service(F-30~32)·internal_service(F-61) 구현
-│  │  ├─ repositories/        [A] user_repo, review_repo / [B] catalog_repo·reservation_repo(생성·재시도·get_owned·count_cancellable·후기 목록 review_context_query)·venue_repo·slot_repo·payment_repo 구현
-│  │  └─ jobs/                [B] complete_reservations (예정)
+│  │  ├─ routers/             [A] auth, users, reviews, events, health / [B] catalog·venues(조회), reservations(F-30~35), internal(F-61) 구현
+│  │  ├─ schemas/             라우터와 같은 이름 ([B] catalog·venues 조회, reservations 생성·취소, internal 등록/갱신 계약 구현)
+│  │  ├─ services/            [A] auth_service, user_service, review_service / [B] catalog_service·venue_service 조회, reservation_service(F-30~35)·internal_service(F-61) 구현
+│  │  ├─ repositories/        [A] user_repo, review_repo / [B] catalog_repo·reservation_repo(생성·재시도·get_owned·count_cancellable·후기 목록 review_context_query·F-35 완료 배치)·venue_repo·slot_repo·payment_repo 구현
+│  │  └─ jobs/                [B] complete_reservations.py(F-35, api1 hourly cron)
 │  ├─ scripts/                [A] replay_events (예정)
-│  └─ tests/                  [B] test_catalog·test_reservation_dependencies·test_venues·test_reservations·test_concurrency·test_read_routing·test_internal 구현
+│  └─ tests/                  [B] test_catalog·test_reservation_dependencies·test_venues·test_reservations·test_concurrency·test_jobs·test_read_routing·test_internal 구현
 │     └─ check_venue_browser.py·mjs  [B] 별도 실행: 임시 실제 API + Chrome 검색·정렬·NEW·오류·상세·날짜 목록·시간 칸 검증
 │        check_reservation_http.py  [B] 별도 실행: 공식 앱·실제 인증·Postman 예약/재시도·DB 확인, 가상 데이터 정리
 │        check_internal_http.py  [B] 별도 실행: 공식 앱·내부 키·Postman 등록/재전송/갱신·DB 확인, 가상 공간 정리

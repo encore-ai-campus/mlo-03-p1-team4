@@ -68,6 +68,7 @@ infra/nginx/       spacecube.conf         # [B] upstream 2대, /health
 | 이름 | 제공 | 쓰임 |
 | --- | --- | --- |
 | `get_db_write`, `get_db_read`, `get_current_user`, `AppError`, `paginate`, `log_event`, `get_today`, `is_synthetic_request` | A | 전부 |
+| `review_repo.get_review_ids(db, reservation_ids) -> dict[int, int]` | A | 본인 소유로 조회한 현재 페이지 예약 ID만 같은 primary 세션으로 전달해 후기 ID를 SQL 한 번에 조회. 삭제된 후기 ID도 포함하고 미작성은 매핑에 없음. 빈 입력은 SQL 없이 `{}`, commit·rollback 없음. 목록·상세 응답에는 매핑의 ID 또는 `null`을 항상 명시 (#45) |
 | 뷰 `v_venue_rating(venue_id, rating_avg, review_count)` | DB | 평점, 평점순 |
 | 기초 데이터, 생성된 공간·과거 예약 | DB | 조회·테스트 |
 
@@ -216,7 +217,7 @@ F-21 구현 기준(기존 프론트 목업과 동일):
 | 메서드 | 경로 | 인증 | 기능 | 성공 | 주요 오류 |
 | --- | --- | --- | --- | --- | --- |
 | POST | /reservations | 회원 | F-30~F-32 | 201 (같은 요청을 다시 보내면 200) | 400 `OUT_OF_RANGE`·`TOO_MANY_PEOPLE`·`INVALID_METHOD`, 404 `VENUE_NOT_FOUND`, 409 `SLOT_TAKEN` |
-| POST | /reservations/{id}/cancel | 회원 | F-34 | 200 | 404, 409 `NOT_CANCELLABLE`·`ALREADY_CANCELLED` |
+| POST | /reservations/{id}/cancel | 회원 | F-34 | 200 취소 응답 | 404 `RESERVATION_NOT_FOUND`, 409 `NOT_CANCELLABLE`·`ALREADY_CANCELLED` |
 | GET | /reservations/me?status=&page= | 회원 | F-40 | 200 목록 | 401 |
 | GET | /reservations/{id} | 회원 | F-40 | 200 | 404 (남의 예약도 404) |
 
@@ -231,6 +232,11 @@ F-21 구현 기준(기존 프론트 목업과 동일):
 
 // 409 — 먼저 결제한 사람이 있음
 {"code": "SLOT_TAKEN", "message": "다른 분이 먼저 결제한 시간이 있어요.", "detail": {"slots": [14]}}
+
+// POST /reservations/1203/cancel — 200
+{"reservation_id": 1203, "status": "cancelled", "total_price": 20000,
+ "payment": {"method": "card", "status": "refunded", "paid_at": "2026-11-03T14:03:12+09:00",
+             "refunded_at": "2026-11-04T10:00:00+09:00"}, "can_cancel": false}
 ```
 
 | 결제수단 (API = DB 값) | 화면 표시 |
@@ -241,7 +247,9 @@ F-21 구현 기준(기존 프론트 목업과 동일):
 
 예약 생성은 인증 조회 뒤 탈퇴가 확정되는 경합을 막기 위해 primary에서 회원 `users` 행을 `SELECT FOR UPDATE`로 잠그고 활성 상태를 다시 확인한 다음 검증·예약·칸·결제를 같은 세션으로 처리합니다. 탈퇴 서비스도 같은 행을 먼저 잠급니다. 먼저 잠금을 얻은 요청이 커밋한 뒤 대기 요청은 최신 회원 상태를 판정합니다. 슬롯 중복으로 전체 롤백한 경우 잠금이 풀리므로, 충돌·재시도 정보를 읽기 전에 회원 행을 다시 잠그고 활성 상태를 재확인합니다. 탈퇴된 회원이면 401 `UNAUTHORIZED`로 끝내며 예약 재시도 성공으로 처리하지 않습니다. `count_cancellable()`은 시작 전 confirmed 예약 ID를 `FOR UPDATE`로 읽어 오래된 인증 스냅샷을 사용하지 않습니다.
 
-내 예약 목록 항목: 예약 칸 전부 + `venue`(id·이름·유형·지역·이미지) + `payment`(method·status·paid_at·refunded_at) + `can_cancel` + `review_id`(썼으면). `status` 필터는 `confirmed`·`completed`·`cancelled`입니다.
+내 예약 목록·상세 항목: 예약 칸 전부 + `venue`(id·이름·유형·지역·이미지) + `payment`(method·status·paid_at·refunded_at) + `can_cancel` + 필수 nullable `review_id`. `status` 필터는 `confirmed`·`completed`·`cancelled`입니다.
+
+#45 PM 확정: 작성한 적이 없으면 `review_id: null`, 작성 이력이 있으면 삭제 여부와 관계없이 후기 ID를 반환합니다. 새 삭제 상태 필드는 추가하지 않으며 FE는 ID가 있으면 작성 버튼을 숨기고 기존 “후기 작성 완료”를 표시합니다. B는 소유권이 확인된 현재 페이지의 예약 ID만 A의 일괄 조회 함수에 넘기며, #46 병합 뒤에도 B 호출부 연결은 남아 있으며 #49 → #50 처리 뒤 #45 후속으로 실제 후기 ID 연결·DB 검증을 진행합니다.
 
 ## 6. 예약 트랜잭션 (핵심, primary)
 
@@ -291,7 +299,9 @@ POST /reservations/{id}/cancel
  7. COMMIT → 200, log_event(reserve_cancel_ok)
 ```
 
-전액 환불만 합니다.
+전액 환불만 합니다. 성공 응답은 `reservation_id`·`status`·`total_price`·환불 시각을 포함한 `payment`·`can_cancel=false`를 반환합니다. `reserve_cancel_ok` 기록과 `reservation_total{result="cancel"}` 증가는 커밋 뒤에 한 번만 합니다. 예약과 무관한 다른 회원·예약 칸은 삭제하지 않습니다.
+
+`reserve_cancel_ok`에는 최상위 `venue_id`·`category`(공간 유형 코드)와 `payload.reservation_id`를 전달합니다. 유형은 커밋 전 같은 primary 세션에서 읽으며, 비활성 공간의 예약도 취소하고 유형을 기록합니다.
 
 ### 이용 완료 배치 (primary)
 
@@ -351,9 +361,9 @@ UPDATE reservations SET status = 'completed'
 | test_catalog.py | 유형 5개, 시·도 → 시·군·구, 시설 목록 |
 | test_reservation_dependencies.py | 모델 DDL·`get_owned()`·A 후기 작성 연결, `count_cancellable()`의 회원·상태·시작 정각·날짜 경계·0건·복수 예약 집계 및 호출자 트랜잭션 유지 |
 | test_venues.py | 필터 조합, 정렬 4종, 칸 상태(taken·past), 이미지 누락 시 대표·갤러리 group-0, 실제 이미지 순서, NEW 오늘·13일 전 포함 및 14일 전·미래 제외, 비활성 404, 날짜 더보기(offset) |
-| test_reservations.py | 성공 201(3개 표 모두 생김), **10분 안 같은 유효 요청은 200 + 같은 reservation_id(표에 새 행 없음)**, 취소·환불 건 재시도 제외, 취소 후 재예약의 새 ID 반환·타인 선점 409, 본인 예약 충돌의 최소 ID·혼합 소유자 정보 비노출, 결제수단·인원·기간·시간 검증, 지난 시간은 바로 completed, 가상 요청 키 확인, 결제 INSERT 실패 시 전체 롤백 |
-| test_concurrency.py | **다른 회원 50명이 같은 칸을 동시에 요청하면 201 1건·409 49건**, 한 회원의 같은 요청 50건은 201 1건·200 49건, 겹치는 시간 범위는 한 요청만 성공. 양쪽 인증 조회 완료 후 예약·탈퇴 양방향 경쟁, 오래된 스냅샷 뒤 최신 예약 집계, 슬롯 중복 롤백 뒤 재잠금, 검증/결제 실패와 재시도 200 뒤 잠금 해제를 별도 DB 세션으로 검증. 시각은 A·B 모두 고정하고 예약·칸·결제 최종 행을 확인 |
-| check_reservation_http.py (별도 실행) | 공식 앱·실제 가상 회원가입/로그인·Postman 컬렉션으로 OpenAPI 200·무인증 401·생성 201·동일 요청 200, 예약/칸/결제·가상 표시·성공 카운터·가상 데이터 정리 확인 |
+| test_reservations.py | 성공 201(3개 표 모두 생김), **10분 안 같은 유효 요청은 200 + 같은 reservation_id(표에 새 행 없음)**, 취소·환불 건 재시도 제외, 취소 후 재예약의 새 ID 반환·타인 선점 409, 본인 예약 충돌의 최소 ID·혼합 소유자 정보 비노출, 결제수단·인원·기간·시간 검증, 지난 시간은 바로 completed, 가상 요청 키 확인, F-34 소유권·상태·시각 경계·환불·칸 반납·실패 롤백 |
+| test_concurrency.py | **다른 회원 50명이 같은 칸을 동시에 요청하면 201 1건·409 49건**, 한 회원의 같은 요청 50건은 201 1건·200 49건, 겹치는 시간 경쟁, F-34 동시 취소 200 1건·409 1건, F-04 예약/탈퇴 양방향 경합·오래된 스냅샷 뒤 최신 예약 수·롤백 후 재잠금·실패와 재시도 뒤 잠금 해제. DB 행 수·이벤트·카운터 검증 |
+| check_reservation_http.py (별도 실행) | 공식 앱·실제 가상 회원가입/로그인·Postman 컬렉션으로 OpenAPI·F-34 계약·401·생성·재시도·취소 응답, 취소 예약·환불 결제·해제된 칸·예약/취소 카운터와 가상 데이터 정리 확인 |
 | test_jobs.py | 끝나는 시각이 지난 confirmed만 completed(오늘 끝난 것 포함), 두 번 돌려도 같음 |
 | test_internal.py | 키 없음·오류·미설정 401 및 DB 접근 차단, 출처 3종 신규 201·동일 재전송/갱신 200, 같은 ID와 최상위 응답, 시설 무시·중복 제거·목록 교체/비우기, 원래 등록 시각 보존, 입력 오류 400, 신규/갱신 저장 실패 전체 롤백, 같은 출처 동시 8건의 201 1건·200 7건과 시설·그림 정합성 |
 | check_internal_http.py (별도 실행) | 공식 앱·실제 내부 키·Postman으로 OpenAPI 200·키 없음 401·신규 201·재전송 200·갱신 200·출처 오류 400, DB 한 공간·목록 교체·검증 데이터 정리 확인 |
