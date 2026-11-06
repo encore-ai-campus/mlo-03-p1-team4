@@ -1,3 +1,4 @@
+import { uuid } from '@/utils/uuid';
 export const USE_MOCK = import.meta.env.VITE_USE_MOCK !== 'false';
 const BASE_URL = import.meta.env.VITE_API_BASE ?? '/api';
 let unauthorizedHandler = null;
@@ -9,7 +10,7 @@ export function getSessionId() {
     }
     catch { /* 저장소 없이 동작 */
     }
-    sessionId ||= crypto.randomUUID();
+    sessionId ||= uuid();
     try {
       sessionStorage.setItem('spacecube.event-session', sessionId);
     }

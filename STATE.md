@@ -174,6 +174,8 @@ A1~A4는 11-03에 확정했고, **A5~A8은 추후 확정**으로 미뤘다(11-03
 
 ## 최근 변경 (최신이 위)
 
+- 11-06 · 공동(PM 요청) · MongoDB 초기화를 새 구조 하나로 정리. 옛 `docs/db/mongo_init.js`(`spacecube.user_events`)를 삭제하고 #68의 `mongo_init_2.js`를 `mongo_init.js`로 이름 변경(compose·CI 자동 실행 경로 그대로). `db/tests/check_mongo_init.js`를 새 `events`·`event_daily`·`crawl_raw` 기준 24건으로 다시 씀. 로컬에서 mongosh·Docker를 쓰지 않아 실행 검증은 CI로 확인. `산출물_04` 8절·백엔드 A 문서의 `user_events` 설명은 #63에서 DB·A가 고침
+
 - 11-06 · A · F-60 최신 FE PR #59 요청과 A 스키마를 대조해 상품 이름·가격 위조 입력을 거부하고 정상 `product_id`의 서버 스냅샷 보강을 각각 검사하도록 이벤트 테스트 수정. 관련 pytest 21건, 전체 verify Python 372건·Ruff 92파일·FE 62건/빌드 통과. 처음 1045는 실행 중인 `SpacecubeTestMariaDB1` 대신 다른 인스턴스 설정을 읽은 결과였으며 올바른 로컬 `spacecube_test` 설정으로 재검증했다. 별도 원격 테스트 DB 임시 validator에서 15종 15건 저장·동일 ID 재삽입 15건 중복 제외·임시 데이터 정리 확인. 로컬 Mongo 미기동·DB 공식 초기화 #63·B 구형 호출·FE 지역/시설 ID와 예약 문맥 남음. 현재 FE는 상품 이벤트당 한 ID이며, 여러 ID는 B 일괄 조회 계약 전까지 지원하지 않음. 기존 stash와 미추적 항목 보존.
 
 - 11-06 · A · #5·#48·#60 및 PR #58·#59 최신 결정을 반영해 F-60 실행 코드의 대상과 문서 구조를 `space_rental_analytics.events`로 전환. FE 12종·서버 3종, 필수 문맥, 상품 스냅샷, URL query/fragment 제거, 제한된 properties, 파일 우선·새 형식 로그 재적재를 구현. 기존 7개 `log_event` 인자는 보존하고 `products` 키워드 선택 인자만 추가. 공통 계약·이벤트 pytest 21건, Ruff 92파일, FE 단위 56건·린트·빌드 통과. 전체 verify는 로컬 `spacecube_test` 계정 인증 1045로 DB 테스트가 막혀 실패(4 failed, 59 passed, 299 errors); 로컬 Mongo 미기동으로 새 validator 실제 저장 미검증. B 구형 호출/상품값·FE PR #59 남은 작업·DB validator가 연결되기 전까지 F-60 완료 아님. stash·DB/FE/B 구현 파일과 기존 미추적 임시 항목 보존.

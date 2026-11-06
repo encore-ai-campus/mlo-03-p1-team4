@@ -1,6 +1,7 @@
 import { USE_MOCK, mockDelay, request } from './client';
 import { users, tokens, fail } from './mock/db';
 import { todayISO } from '@/utils/date';
+import { uuid } from '@/utils/uuid';
 export function validation(fields) {
   if (fields.length)
     fail('VALIDATION', 400, '입력한 내용을 다시 확인해 주세요.', {
@@ -75,7 +76,7 @@ export async function login(body) {
   const u = users.find(u => !u.deleted && u.email === body.email);
   if (!u || typeof body.password !== 'string' || body.password.length < 8 || (u.password !== null && u.password !== body.password))
     fail('INVALID_CREDENTIALS', 401, '이메일 또는 비밀번호가 맞지 않아요.');
-  const access_token = `mock-${crypto.randomUUID()}`;
+  const access_token = `mock-${uuid()}`;
   tokens.set(access_token, {
     user_id: u.user_id, expires: Date.now() + 3600000
   });

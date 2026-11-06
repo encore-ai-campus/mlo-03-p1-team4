@@ -19,3 +19,13 @@ it('허용된 프론트 이벤트만 보내고 공간·세션을 맞추며 개�
     body: { session_id: 'test-session', events: [expect.objectContaining({ schema_version: 1, event_name: 'rental_slot_select', occurred_at: expect.any(String), user: expect.objectContaining({ session_id: 'test-session', session_sequence: 1 }), products: [{ product_id: '2' }], properties: { hour: 13 } })] },
   }))
 })
+
+it('이벤트를 만들다 실패해도 log()는 오류를 밖으로 던지지 않는다', async () => {
+  setActivePinia(createPinia())
+  const { useEventLogger } = await import('@/composables/useEventLogger')
+  const original = window.matchMedia
+  window.matchMedia = () => { throw new TypeError('broken') }
+  try {
+    expect(() => useEventLogger().log('reservation_start', { venue_id: 1 })).not.toThrow()
+  } finally { window.matchMedia = original }
+})
