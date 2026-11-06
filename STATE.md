@@ -13,7 +13,7 @@
 | --- | --- | --- | --- | --- |
 | 프론트 | 노진산(FE·PM) | FE-1~9 확정안 반영, Claude 시안 대조·FE 오류/모바일 결제/가입 UX 재검토 및 목업·화면 검증. 11-06 C안 화풍(흰 바탕·검은 글자·주칠) + 유형별 일러스트 5장을 화면에 연결(API `art:` 계약 그대로) | A·B 구현 후 실제 API 연결·오류·예약 동시성 통합 검증 | 실제 API 미구현 |
 | FastAPI A | [이름] | 이슈 #2 회원·탈퇴, 후기 작성·목록 #47 develop 병합(#43 직접 import·공개 비활성 공간 제외·내 후기 유지, 관련 테스트 58건 재확인). #45 `review_repo.get_review_ids(db, reservation_ids)` 계약 #55: 삭제된 후기 포함, 페이지당 SQL 1회, 빈 입력 SQL 없음. 관련 pytest 60건·전체 verify 통과 | B의 PR #46에서 목록·상세 실제 ID 연결 및 통합 검증 확인, Swagger에서 실제 데이터로 후기 목록 수동 확인 | 탈퇴와 동시 예약 처리 B 협의, 이벤트 개인정보 정책 합의 대기 |
-| FastAPI B | 이세훈 | #49 병합 develop 55ebd23을 #50 전용 feat/B-F-04-withdraw-race에 반영해 5파일 충돌 해결. 회원 잠금·활성 재확인·롤백 후 재잠금·최신 예약 수와 조회/취소/완료 배치를 모두 보존. 관련 101건·verify 전체 Python 354건·FE 56건·Ruff 90파일·린트/빌드 및 HTTP 7요청/15검증 통과 | #50 푸시·CI·A/PM 리뷰·병합 → 최신 develop에서 #45 실제 후기 ID 연결. api1 cron·생성기 백필 지원은 별도 | #45 호출부 null TODO는 이번 변경에서 유지. 실제 api1 배포·cron은 미검증 |
+| FastAPI B | 이세훈 | #49·#50 develop 병합 완료. 최신 develop `b6a97c6` 기반 `feat/B-F-40-review-ids`에서 #45 목록·상세 실제 후기 ID 연결, 소프트 삭제 이력 보존, 페이지당 A 일괄 조회 검증. 전체 verify Python 362건·FE 56건·Ruff 90파일·린트/빌드 및 실제 HTTP 확인 통과 | #45 PR 생성·CI·A/PM 리뷰·병합 → api1 cron #8과 생성기 백필 지원은 별도 | 실제 api1·replica·브라우저 E2E는 미검증 |
 | DB | [이름] | `0001_init.sql`·`mongo_init.js` 검증(설치형 11.8·compose 11.4 둘 다 29건 통과), seed(유형 5·시설 20·지역 230 → `seed.sql`), `infra/local` compose, 크롤러 시제품(옛 필터). 1차 수집원 2곳+부족분 생성 방향 확정. 별도 Compass DB의 events·event_daily 속성 정리 v1을 docs/db에 공유 | 스페이스클라우드 새 필터·쉐어잇 파서/사이트별 robots 확인 → 속성 기반 시연용 공간 선별·`/internal/venues` 등록(B와) → 부족한 공간·과거 30일 행동 데이터 생성기 | 없음(A2 결정을 팀원에게 공유) |
 
 ## 기능 진행표
@@ -35,7 +35,7 @@
 | F-30~32 | 예약+모의 결제 한 번, 중복 차단 | B | 공식 앱의 POST /reservations 등록·A 공통 가상 키 검증 사용. API 21건·경쟁 3건 포함 전체 MariaDB pytest 241건 통과. PR #39의 취소·환불 재시도 제외 및 취소 후 재예약·타인 선점 회귀 검증 반영. 동시 다른 회원 50명: 201 1건/409 49건, 같은 회원: 201 1건/200 49건. 실제 인증·Postman 4요청/8검증에서 OpenAPI 200·무인증 401·생성 201·재시도 200 확인, DB 3개 표·합성 표시·카운터 검증·테스트 데이터 정리 완료 |
 | F-34 | 예약 취소·환불 | B | #49에서 develop 3a729f2와 코드 충돌 해결. 실제 취소 API 뒤 F-40 목록/상세가 같은 cancelled·refunded 상태인지 검증. 활성/비활성 공간 5개 유형 category 기록과 원자 환불·슬롯 반납·동시 취소·재예약 유지. 관련 94건·전체 347건·HTTP 7요청/15검증·CI 통과 후 #49가 55ebd23으로 develop 병합됨 |
 | F-35 | 이용 완료 배치 | B | #49의 primary 조건부 일괄 UPDATE·get_now 1회·commit/rollback·CLI·완료 뒤 칸/결제 보존을 develop 통합 후 재검증. test_jobs 6건 포함 관련 94건·전체 347건 통과. 실제 api1 시간별 cron 등록·실행은 미완료이므로 #8 유지 |
-| F-40~41 | 내 예약, 내 후기 | B / A | #46 조회·필수 nullable review_id·필드 생략 해제는 develop 병합됨. #49 충돌 해결 때 목록/상세·취소 연동과 기존 테스트 모두 보존. A get_review_ids는 #55로 제공됐으나 B 호출부는 아직 null TODO. 사용자 지시에 따라 #49 → #50 병합 후 #45 후속 브랜치에서 실제 ID 연결·작성/삭제 후기·일괄 SQL 검증. F-41은 A 범위 |
+| F-40~41 | 내 예약, 내 후기 | B / A | #46 조회·필수 nullable review_id·필드 생략 해제는 develop 병합됨. #49·#50 후속 병합도 완료. #45 브랜치에서 A `get_review_ids`를 목록·상세에 연결하고 미작성 null·작성/삭제 이력 ID·페이지당 SQL 1회·소유권 차단을 MariaDB/HTTP로 검증. PR 리뷰·병합 대기. F-41은 A 범위 |
 | F-50 지원 | A 후기 작성용 예약 소유권 조회 | B | 예약·칸·결제 모델 및 `get_owned()`를 이전 프로젝트에서 가져옴. DDL 일치·매퍼 구성 4건, 실제 MariaDB 소유권·A 후기 작성 연결 10건 통과. 예약 생성 API 구현 완료를 뜻하지 않음 |
 | F-51 지원 (#43) | A 후기 목록용 예약·공간·유형 조회식 | B / A 연계 | 검증: B 4열 `review_context_query(*, active_only=True)` PR #44, A 직접 import·공개 비활성 공간 제외·내 후기 유지 PR #47이 develop 병합됨. 로컬 MariaDB 관련 테스트 58건 통과. Swagger 실제 데이터 수동 확인은 별도 |
 | F-50~51 | 후기 작성·조회(후기 모아보기) | A | B get_owned·review_context_query 연결, 작성·목록·수정·삭제 및 탈퇴 후 예약·후기 보존·작성자 익명화 로컬 MariaDB 검증. 공개 비활성 공간 제외·내 후기는 포함. 전체 backend pytest 318건 통과 |
@@ -171,6 +171,8 @@ A1~A4는 11-03에 확정했고, **A5~A8은 추후 확정**으로 미뤘다(11-03
 - 개인 기억(Claude 자동 메모리 등)은 팀에 공유되지 않는다. 팀이 알아야 할 것은 이 파일과 `docs/`에 쓴다.
 
 ## 최근 변경 (최신이 위)
+
+- 11-06 · B · #50 병합 후 최신 origin/develop `b6a97c6`에서 이슈 #45 브랜치 `feat/B-F-40-review-ids` 작업. `reservation_service`의 목록은 본인 현재 페이지 ID만 A `review_repo.get_review_ids`에 한 번 넘기고, 상세는 소유권 확인 후 해당 ID를 넘기도록 연결. 미작성 null·작성/소프트 삭제 ID 유지, 비활성 공간 이력, 타인/없는 예약 같은 404, 빈 페이지 SQL 0회·일반 페이지 후기 SELECT 1회를 MariaDB 테스트 8건으로 추가 검증. 실제 Uvicorn/JWT/Postman 7요청/15검증과 추가 HTTP 후기 생성·삭제·목록/상세 ID 유지·중복 작성 409 확인, 임시 후기/예약 정리. `verify.ps1`: Ruff 90파일·Python 362 passed·FE 56 passed·린트/색 검사/빌드 통과(exit 0); 기존 Starlette 및 Playwright 조건문 경고 각 1건. A 소유 코드·프론트 코드는 수정하지 않음. api1·실 replica·브라우저 E2E 미검증. PR 생성·CI·리뷰 대기.
 
 - 11-06 · DB · F-60 참고용 `docs/db/events_event_daily_컬렉션_속성정리_v1.md` 추가. events 15종·사용자/페이지/가격·테스트/서버 구분·365일 TTL, event_daily 속성·복합 고유 인덱스를 정리. 별도 Compass DB의 설정 기록이며 기존 user_events/API 계약 변경이나 집계 구현을 의미하지 않음. 원본 파일 해시 일치·문서 공백 검사 통과. verify.ps1은 pro_1 환경 부재로 ruff·pytest를 찾지 못하고 Node 활성 버전이 없어 실패; 실행 코드 변경은 없음.
 
