@@ -9,7 +9,7 @@
 | `catalog_repo.py` | B | categories, regions, facilities |
 | `venue_repo.py` | B | venues, venue_facilities, venue_images(조회·F-61 출처별 등록/갱신·시설/그림 전체 교체), `v_venue_rating`(읽기) |
 | `slot_repo.py` | B | reservation_slots (조회·예약 INSERT·충돌 조회) |
-| `reservation_repo.py` | B | reservations (생성·잠금·10분 재시도 조회·`get_owned`·`count_cancellable`·종료 예약 일괄 완료), reservation_slots 취소 삭제, 후기 목록용 예약·공간·유형 조회식 |
+| `reservation_repo.py` | B | reservations (생성·잠금·내역 목록/상세·10분 재시도·get_owned·count_cancellable·종료 예약 일괄 완료), reservation_slots 취소 삭제, payments·venues·categories·regions 조회 및 후기 목록용 조회식 |
 | `payment_repo.py` | B | payments (모의 결제 INSERT·전액 환불) |
 
 - 사용자 이벤트는 표가 아니라 `core/events.py`(로그 파일 + MongoDB)가 씁니다. `crawl_jobs`·MongoDB `crawl_raw`는 크롤러(DB 담당)가 씁니다.
@@ -21,5 +21,8 @@
 | `reservation_repo.get_owned(db, user_id, reservation_id)` | B | A (후기 작성 자격, primary 세션) | `(reservation_id, venue_id, reserve_date, start_hour, end_hour, status, created_at)` 튜플 또는 `None` |
 | `reservation_repo.count_cancellable(db, user_id)` | B | A (탈퇴 전 확인, 같은 primary 세션) | 시작 전 `confirmed` 예약 수(`int`), 시작 정각·이용 중·완료·취소 제외. 커밋은 호출자가 관리 |
 | `reservation_repo.review_context_query(*, active_only: bool = True)` | B | A `review_repo`에서 직접 import (#43) | 예약당 한 행인 `Select`: `reservation_id`, `venue_id`, `venue_name`, `category`(`categories.code`). 기본값은 활성 공간만, 내 후기는 `False`. 실행·commit·rollback 없음 |
+| `review_repo.get_review_ids(db, reservation_ids)` | A | B 내 예약 목록·상세 (#45, 같은 primary 세션) | 삭제된 후기까지 `{reservation_id: review_id}`. 후기가 없으면 매핑 제외, 빈 입력은 SQL 없음. commit·rollback 없음 |
+
+F-40의 `count_owned`, `list_owned`, `get_owned_detail`은 B 서비스 전용 조회 함수입니다. 목록의 페이지 자르기는 SQL에서 수행합니다. #45에서 A `get_review_ids(db, reservation_ids) -> dict[int, int]` 계약은 확정됐으며, A 함수는 #55로 제공됐으며 B 서비스의 본인 예약 ID 조회 연결은 #45 후속입니다. B 리포지토리가 후기 표를 직접 읽거나 단건 함수를 목록에서 반복하지 않습니다.
 
 표·컬럼 이름은 `docs/산출물_04_DB명세서.md`(검증 후 `db/migrations`)가 기준입니다. 바꾸고 싶으면 DB 담당에게 요청합니다.

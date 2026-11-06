@@ -141,7 +141,7 @@ async function pay() {
         </template>
         <template #end>
           <aside class="sum" aria-label="예약 요약">
-            <div class="sum__room"><span class="sum__thumb"><RoomArt :image="venue.image" /></span><div><span class="sum__type">{{ venue.category.name }}</span><strong>{{ venue.name }}</strong><span>{{ venue.region.sido }} {{ venue.region.sigungu }}</span></div></div>
+            <div class="sum__room"><span class="sum__thumb"><RoomArt :image="venue.image" :category="venue.category" /></span><div><span class="sum__type">{{ venue.category.name }}</span><strong>{{ venue.name }}</strong><span>{{ venue.region.sido }} {{ venue.region.sigungu }}</span></div></div>
             <dl class="sum__list">
               <div><dt>날짜</dt><dd class="num">{{ dateLabel(date) }}</dd></div>
               <div><dt>시간</dt><dd class="num">{{ selected.length ? rangeLabel(selected) : '다시 선택해 주세요' }}</dd></div>

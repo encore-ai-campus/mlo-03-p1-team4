@@ -352,7 +352,7 @@ load()
           <template v-else>
             <ul class="cards">
               <li v-for="r in list" :key="r.reservation_id" class="res">
-                <RouterLink :to="`/venues/${r.venue_id}`" class="res__thumb" tabindex="-1" aria-hidden="true"><RoomArt :image="r.venue.image" /></RouterLink>
+                <RouterLink :to="`/venues/${r.venue_id}`" class="res__thumb" tabindex="-1" aria-hidden="true"><RoomArt :image="r.venue.image" :category="r.venue.category" /></RouterLink>
                 <div class="res__body">
                   <div class="res__top"><span class="status" :class="`status--${STATUS[r.status].cls}`">{{ STATUS[r.status].label }}</span><span class="res__no num">예약 {{ r.reservation_id }}</span></div>
                   <RouterLink :to="`/venues/${r.venue_id}`" class="res__name">{{ r.venue.name }}</RouterLink>

@@ -68,6 +68,7 @@ infra/nginx/       spacecube.conf         # [B] upstream 2대, /health
 | 이름 | 제공 | 쓰임 |
 | --- | --- | --- |
 | `get_db_write`, `get_db_read`, `get_current_user`, `AppError`, `paginate`, `log_event`, `get_today`, `is_synthetic_request` | A | 전부 |
+| `review_repo.get_review_ids(db, reservation_ids) -> dict[int, int]` | A | 본인 소유로 조회한 현재 페이지 예약 ID만 같은 primary 세션으로 전달해 후기 ID를 SQL 한 번에 조회. 삭제된 후기 ID도 포함하고 미작성은 매핑에 없음. 빈 입력은 SQL 없이 `{}`, commit·rollback 없음. 목록·상세 응답에는 매핑의 ID 또는 `null`을 항상 명시 (#45) |
 | 뷰 `v_venue_rating(venue_id, rating_avg, review_count)` | DB | 평점, 평점순 |
 | 기초 데이터, 생성된 공간·과거 예약 | DB | 조회·테스트 |
 
@@ -244,7 +245,9 @@ F-21 구현 기준(기존 프론트 목업과 동일):
 | `card` | 카드결제 |
 | `phone` | 휴대폰 |
 
-내 예약 목록 항목: 예약 칸 전부 + `venue`(id·이름·유형·지역·이미지) + `payment`(method·status·paid_at·refunded_at) + `can_cancel` + `review_id`(썼으면). `status` 필터는 `confirmed`·`completed`·`cancelled`입니다.
+내 예약 목록·상세 항목: 예약 칸 전부 + `venue`(id·이름·유형·지역·이미지) + `payment`(method·status·paid_at·refunded_at) + `can_cancel` + 필수 nullable `review_id`. `status` 필터는 `confirmed`·`completed`·`cancelled`입니다.
+
+#45 PM 확정: 작성한 적이 없으면 `review_id: null`, 작성 이력이 있으면 삭제 여부와 관계없이 후기 ID를 반환합니다. 새 삭제 상태 필드는 추가하지 않으며 FE는 ID가 있으면 작성 버튼을 숨기고 기존 “후기 작성 완료”를 표시합니다. B는 소유권이 확인된 현재 페이지의 예약 ID만 A의 일괄 조회 함수에 넘기며, #46 병합 뒤에도 B 호출부 연결은 남아 있으며 #49 → #50 처리 뒤 #45 후속으로 실제 후기 ID 연결·DB 검증을 진행합니다.
 
 ## 6. 예약 트랜잭션 (핵심, primary)
 

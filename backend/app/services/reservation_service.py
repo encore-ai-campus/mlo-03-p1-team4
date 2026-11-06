@@ -1,4 +1,4 @@
-"""F-30~32 예약 검증·단일 예약/결제 트랜잭션과 경쟁 처리."""
+"""F-30~35 예약·취소·완료 배치와 F-40 내 예약 조회."""
 
 from datetime import date, datetime, time, timedelta
 from typing import Literal
@@ -8,9 +8,10 @@ from sqlalchemy.orm import Session
 
 from app.core.clock import as_korean_time, get_now, get_today
 from app.core.config import get_settings
-from app.core.errors import AppError
+from app.core.errors import AppError, fail
 from app.core.events import log_event
 from app.core.metrics import reservation_counter
+from app.core.pagination import Pagination, paginate
 from app.repositories import payment_repo, reservation_repo, slot_repo, venue_repo
 from app.schemas.reservations import (
     PaymentRead,
@@ -18,6 +19,10 @@ from app.schemas.reservations import (
     ReservationCancelRead,
     ReservationCreate,
     ReservationCreateRead,
+    ReservationPaymentRead,
+    ReservationRead,
+    ReservationStatus,
+    ReservationVenueRead,
 )
 
 _METHODS = frozenset({"transfer", "card", "phone"})
@@ -274,6 +279,96 @@ def create_reservation(
             ),
         ),
         201,
+    )
+
+
+def _as_owned_read(
+    row: dict, *, image: str, now: datetime, review_id: int | None
+) -> ReservationRead:
+    """예약 당시 금액과 전달받은 후기 ID(삭제 포함)를 그대로 응답한다."""
+    starts_at = datetime.combine(row["reserve_date"], time(row["start_hour"]))
+    return ReservationRead(
+        reservation_id=row["reservation_id"],
+        status=row["status"],
+        venue_id=row["venue_id"],
+        date=row["reserve_date"],
+        start_hour=row["start_hour"],
+        end_hour=row["end_hour"],
+        headcount=row["headcount"],
+        total_price=row["total_price"],
+        created_at=as_korean_time(row["created_at"]),
+        payment=ReservationPaymentRead(
+            method=row["payment_method"],
+            status=row["payment_status"],
+            paid_at=as_korean_time(row["paid_at"]),
+            refunded_at=(
+                as_korean_time(row["refunded_at"]) if row["refunded_at"] is not None else None
+            ),
+        ),
+        venue=ReservationVenueRead(
+            venue_id=row["venue_id"],
+            name=row["venue_name"],
+            category={"code": row["category_code"], "name": row["category_name"]},
+            region={"sido": row["region_sido"], "sigungu": row["region_sigungu"]},
+            image=image,
+        ),
+        can_cancel=row["status"] == "confirmed" and starts_at > now,
+        review_id=review_id,
+    )
+
+
+def get_my_reservations(
+    db: Session,
+    *,
+    user_id: int,
+    status: ReservationStatus | None,
+    pagination: Pagination,
+) -> dict:
+    """본인 예약을 primary에서 필터·페이지 조회하고 페이지 그림만 묶어 읽는다."""
+    total = reservation_repo.count_owned(db, user_id=user_id, status=status)
+    rows = reservation_repo.list_owned(
+        db,
+        user_id=user_id,
+        status=status,
+        offset=pagination.offset,
+        limit=pagination.size,
+    )
+    images = venue_repo.list_images_by_venues(db, [row["venue_id"] for row in rows])
+    now = get_now()
+    items = [
+        _as_owned_read(
+            row,
+            image=(images.get(row["venue_id"]) or ["art:group-0"])[0],
+            now=now,
+            # TODO(#45): A get_review_ids 제공 후 현재 페이지 매핑의 값으로 연결한다.
+            review_id=None,
+        )
+        for row in rows
+    ]
+    return paginate(items, pagination.page, pagination.size, total)
+
+
+def get_my_reservation(
+    db: Session,
+    *,
+    user_id: int,
+    reservation_id: int,
+) -> ReservationRead:
+    """본인 예약 상세를 조회한다. 읽기 시 상태는 변경하지 않는다."""
+    row = reservation_repo.get_owned_detail(
+        db,
+        user_id=user_id,
+        reservation_id=reservation_id,
+    )
+    if row is None:
+        raise fail("RESERVATION_NOT_FOUND", 404)
+    images = venue_repo.list_images_by_venues(db, [row["venue_id"]])
+    return _as_owned_read(
+        row,
+        image=(images.get(row["venue_id"]) or ["art:group-0"])[0],
+        now=get_now(),
+        # TODO(#45): A get_review_ids 제공 후 본인 예약의 조회 결과로 연결한다.
+        review_id=None,
     )
 
 

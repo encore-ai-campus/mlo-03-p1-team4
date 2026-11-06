@@ -1,7 +1,7 @@
 $kind: http-request
 id: 9d2039c5e9044ea9b2a00ef1
 name: Cancel reservation
-order: 3000
+order: 5000
 url: '{{base_url}}/reservations/{{reservation_id}}/cancel'
 method: POST
 headers:
