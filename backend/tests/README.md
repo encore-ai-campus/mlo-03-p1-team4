@@ -154,6 +154,66 @@ python -m pytest backend/tests/test_catalog.py -q
 
 ## F-50 지원: 예약 소유권·A 후기 작성 연결
 
+### #4 후기 작성·목록 검증
+
+`test_reviews.py`는 작성 자격 판정과 commit·rollback을 단위 테스트합니다.
+`test_review_lists.py`는 실제 앱 라우터와 로컬 MariaDB에서 후기 목록·수정·삭제,
+필터·정렬·페이지, 탈퇴 회원 표기와 비활성 공간 공개/내 후기 구분을 검증합니다.
+목록 테스트는 인증 의존성을 테스트 회원으로 교체하며 실제 로그인은 검사하지 않습니다.
+DB에 삽입한 행은 외부 트랜잭션을 롤백합니다.
+
+저장소 루트에서 기존 `pro_1` 환경과 로컬 테스트 DB를 준비한 후 실행합니다.
+아래 명령은 이 PC의 활성 로컬 DB 설정을 현재 PowerShell에만 불러옵니다.
+
+```powershell
+cd C:\mlo-03-p1-team4
+$pythonExe = "$env:USERPROFILE\miniforge3\envs\pro_1\python.exe"
+$activeDirectory = (Get-Content "$env:LOCALAPPDATA\SpacecubeTestMariaDBActive.txt" -Raw).Trim()
+$entry = Get-Content (Join-Path $activeDirectory '.env') | Where-Object { $_ -match '^CHECK_DB_URL=' } | Select-Object -First 1
+if (-not $entry) { throw '활성 로컬 테스트 DB의 CHECK_DB_URL을 찾지 못했습니다.' }
+$env:CHECK_DB_URL = $entry.Substring('CHECK_DB_URL='.Length).Trim().Trim('"', "'")
+& $pythonExe -m pytest backend/tests/test_reviews.py backend/tests/test_review_lists.py backend/tests/test_reservation_dependencies.py -q
+```
+
+2026-11-05 로컬 MariaDB에서 위 세 파일 **57건 통과**(Starlette 사용 중단 예정 경고 1건).
+B 후기 목록 조회 계약만 골라 실행한 **14건도 통과**했습니다.
+실제 HTTP에서 가입·로그인·예약·후기 작성·내 후기·공개 후기 목록을 확인하고,
+Swagger에서 후기 목록과 공간 별점 정렬의 200 응답을 확인했습니다.
+이후 로컬 `spacecube_test`를 0001 마이그레이션·seed로 초기화했습니다.
+DB 제약 검증(`db/tests/check_ddl.py`)과 실제 HTTP의 가입→예약→후기 작성·수정·삭제를 통과했고,
+최종 시연 공간 3개만 남긴 상태에서 전체 `backend/tests` **317건 통과**했습니다.
+세 공간의 등록 시각은 30일 전으로 두어 `GET /venues/new`의 격리된 개수 검증에 영향을 주지 않습니다.
+기본 pytest 임시 폴더에 접근할 수 없는 PC는 위 명령에 다음 옵션을 추가할 수 있습니다.
+
+```powershell
+$testTemp = Join-Path $env:TEMP ('spacecube-review-' + [guid]::NewGuid().ToString('N'))
+& $pythonExe -m pytest backend/tests -q --basetemp $testTemp
+```
+
+### Swagger에서 직접 확인
+
+위 테스트 DB 설정을 불러온 **같은 터미널**에서 서버의 읽기·쓰기 DB도 로컬 테스트 DB로 지정합니다.
+임시 JWT 키를 생성하므로 서버를 다시 시작하면 이전 토큰은 사용할 수 없습니다.
+
+```powershell
+$env:DB_WRITE_URL = $env:CHECK_DB_URL
+$env:DB_READ_URL = $env:CHECK_DB_URL
+$env:MONGO_URL = 'mongodb://127.0.0.1:1'
+$env:JWT_SECRET = & $pythonExe -c "import secrets; print(secrets.token_urlsafe(48))"
+cd C:\mlo-03-p1-team4\backend
+& $pythonExe -m uvicorn app.main:app --host 127.0.0.1 --port 8001 --reload
+```
+
+1. 브라우저에서 `http://127.0.0.1:8001/docs`를 엽니다. `/auth/signup`에서 테스트 회원을 만들고 `/auth/login`으로 로그인합니다.
+2. 로그인 응답의 `access_token`만 복사해 **Authorize**에 넣습니다(`Bearer`는 붙이지 않음). 기존 회원이라면 원래 평문 비밀번호를 사용합니다.
+3. `GET /venues`와 공간 상세에서 활성 공간의 ID·영업시간·최소 이용시간·최대 인원을 확인합니다. 테스트 DB에 공간이 없으면 먼저 테스트 공간을 준비해야 합니다.
+4. `POST /reservations`에 그 공간과 어제 날짜를 넣습니다. 예시: `{"venue_id": 1, "date": "2026-11-04", "start_hour": 10, "hours": 1, "headcount": 1, "method": "card"}`. ID·날짜·시간·시간 수는 확인한 공간과 실제 날짜에 맞게 바꿉니다. 결제는 모의 결제입니다. 빈 칸이 아니면 다른 시간이나 공간을 선택합니다. 응답에서 `status=completed`와 `reservation_id`를 확인합니다.
+5. `POST /reservations/{reservation_id}/review`에 `{"rating": 5, "content": "테스트 후기입니다."}`를 보내 201과 `review_id`를 확인합니다. 다시 보내면 409 `REVIEW_EXISTS`가 나와야 합니다.
+6. `GET /users/me/reviews`, `GET /venues/{venue_id}/reviews`, `GET /reviews`에서 후기와 마스킹된 작성자 이름을 확인합니다. `category`, `sort`, `page`, `size`도 바꿔 봅니다.
+7. 다른 회원 예약은 404 `RESERVATION_NOT_FOUND`, 완료되지 않은 예약은 403 `NOT_COMPLETED`, 작성 기한이 지난 예약은 403 `REVIEW_PERIOD_OVER`입니다. 테스트 데이터의 예약 생성일도 기한 계산에 쓰입니다.
+
+수동 Swagger 요청으로 만든 회원·예약·후기는 DB에 남습니다. 자동 테스트의 롤백 데이터와 구분해 로컬 테스트 DB에서만 진행합니다. 서버는 실행한 터미널에서 `Ctrl+C`로 종료합니다.
+
 `test_reservation_dependencies.py`는 이전 프로젝트에서 가져온 B 코드의 검증 테스트입니다.
 예약·칸·결제 및 공간·시설 연결·이미지 모델의 컬럼·타입·기본값·키·인덱스·CHECK·외래키를 현재
 `db/migrations/0001_init.sql`과 대조하고, A 모델과 함께 매퍼가 구성되는지 확인합니다.
@@ -165,6 +225,14 @@ python -m pytest backend/tests/test_catalog.py -q
 - 테스트 DB에는 기존 `0001_init.sql`과 `seed.sql`이 적용돼 있어야 합니다. 테스트가 DDL을 자동 실행하지 않습니다.
 - 테스트 행은 외부 트랜잭션에서 롤백하고, A 서비스의 commit은 SAVEPOINT로 격리합니다.
 - 로그인·후기 목록·예약 생성 API·동시 예약은 이 테스트의 검증 범위가 아닙니다.
+
+`test_reviews.py`는 MariaDB 없이 후기 서비스의 자격 판정 순서, 7일 경계, 성공 commit,
+실패 rollback, UNIQUE 경합의 `REVIEW_EXISTS`, 탈퇴 회원 작성자 표기를 검사합니다.
+실제 MariaDB의 `get_owned` 연결과 후기 작성 API는 위 테스트에서 검증합니다.
+
+```bash
+python -m pytest backend/tests/test_reviews.py -q
+```
 
 저장소 루트의 `pro_1` 환경에서 실행합니다.
 

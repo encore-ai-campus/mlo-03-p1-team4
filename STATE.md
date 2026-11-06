@@ -3,7 +3,7 @@
 사람과 에이전트(Codex, Claude Code)가 함께 고치는 진행 기록입니다. 작업을 끝낼 때마다 해당 줄을 고치고 '최근 변경' 맨 위에 한 줄 더합니다. 설계 내용 자체는 `docs/`에, 여기는 상태와 결정만 둡니다.
 
 - 마지막 갱신: 2026-11-06
-- 단계: **11-05 통합일** · 설계 11-03 확정안 + 11-05 회의(탈퇴·A6·A7 확정, A8 보류) · DB 0001·seed·로컬 compose 검증 · 프론트 7화면(목업, 다락큐브·푸터 반영) · GitHub develop 흐름·CI·Project 보드 · **1차 배포 로컬 VM 7대(노트북 4대, 11-05)** · B 조회 #31·예약 #39·내부 공간 등록 #42 develop 병합 완료. **#43 후기 목록용 B 조회 계약 구현·로컬 검증**(예약 의존성 43건·전체 pytest 303건), A 직접 import 연결은 후속
+- 단계: **11-05 통합일** · 설계 11-03 확정안 + 11-05 회의(탈퇴·A6·A7 확정, A8 보류) · DB 0001·seed·로컬 compose 검증 · 프론트 7화면(목업, 다락큐브·푸터 반영) · GitHub develop 흐름·CI·Project 보드 · **1차 배포 로컬 VM 7대(노트북 4대, 11-05)** · B 조회 #31·예약 #39·내부 공간 등록 #42·후기 목록 조회 계약 #44 develop 병합 완료. **A 이슈 #4 후기 작성·목록 연결 및 로컬 검증 완료**, PR 검토 대기
 - 디자인 캔버스(화면 설계 · 시스템 아키텍처 · 글꼴 시안): https://claude.ai/artifact/5dQciCDEaMm8uNjw6sqZpm
 - 실행 환경: Python은 conda `pro_1`(`environment.yml`), 프론트는 `frontend/`의 npm
 
@@ -12,7 +12,7 @@
 | 파트 | 담당자 | 지금 | 다음 할 일 | 막힌 것 |
 | --- | --- | --- | --- | --- |
 | 프론트 | 노진산(FE·PM) | FE-1~9 확정안 반영, Claude 시안 대조·FE 오류/모바일 결제/가입 UX 재검토 및 목업·화면 검증 | A·B 구현 후 실제 API 연결·오류·예약 동시성 통합 검증 | 실제 API 미구현 |
-| FastAPI A | [이름] | 이슈 #2 회원·탈퇴 구현 및 수동 확인, 로컬 전체 pytest 230건·프론트 단위 54건 통과 | 이슈 #2 PR 검토, 후기 목록 연결·테스트 | 탈퇴와 동시 예약 처리 B 협의, 이벤트 개인정보 정책 합의 대기 |
+| FastAPI A | [이름] | 이슈 #2 회원·탈퇴 구현, 이슈 #4 후기 작성·목록 연결·Swagger 확인. 탈퇴 후 기존 예약·후기 보존 및 작성자 익명화 통합 테스트 추가, 전체 backend pytest 318건 통과 | 이슈 #4 PR 검토 | 탈퇴와 동시 예약 처리 B 협의, 이벤트 개인정보 정책 합의 대기 |
 | FastAPI B | [이름] | PR #49 전용 `feat/B-F-34-35-reservations`에서 PM 코멘트의 취소 이벤트 category 누락 보완. 활성/비활성 공간 5개 유형 10건 추가, 관련 pytest 88건·전체 324건·프론트 55건 및 verify.ps1 통과. 실제 HTTP/Postman 5요청·11검증과 events.log 유형 기록 확인. #49 보완분 검증 완료 | #49 리뷰 후 #46 → #49 → #50 병합 순서 유지. 실제 서비스 api1 배포·cron은 환경 준비 후 진행. F-40은 #45에서 확정된 A 일괄 함수 제공 후 연결 | Project 보드는 미확인. F-40 A 일괄 후기 ID 함수 제공 대기 |
 | DB | [이름] | `0001_init.sql`·`mongo_init.js` 검증(설치형 11.8·compose 11.4 둘 다 29건 통과), seed(유형 5·시설 20·지역 230 → `seed.sql`), `infra/local` compose, 크롤러 시제품(옛 필터). 1차 수집원 2곳+부족분 생성 방향 확정 | 스페이스클라우드 새 필터·쉐어잇 파서/사이트별 robots 확인 → 속성 기반 시연용 공간 선별·`/internal/venues` 등록(B와) → 부족한 공간·과거 30일 행동 데이터 생성기 | 없음(A2 결정을 팀원에게 공유) |
 
@@ -37,8 +37,8 @@
 | F-35 | 이용 완료 배치 | B | 구현 완료: primary 조건부 일괄 UPDATE, get_now() 1회 기준, 서비스 commit/rollback, `new_write_session()` CLI와 기존 JSON 로그. 완료된 칸·결제 보존. 로컬·별도 테스트 VM MariaDB 테스트 각 6건 통과, 백엔드 전체 314건 통과. 테스트 VM CLI 스모크에서 임시 완료 예약·칸/결제 보존·JSON 로그 확인 후 합성 데이터 정리. 직접 DB 연결은 호스트 제한으로 거부돼 SSH 터널로 시험, 터널 종료 및 자격 증명 제거. 테스트 VM cron과 실제 서비스 api1은 변경하지 않음. Ruff check·format 81개 파일 통과. F-34와 #8 단일 PR 예정 |
 | F-40~41 | 내 예약, 내 후기 | B / A | B F-40 조회는 Draft PR #46, 후기 ID 연계·삭제 후기 표시는 #45 합의 대기. F-41은 A 범위 |
 | F-50 지원 | A 후기 작성용 예약 소유권 조회 | B | 예약·칸·결제 모델 및 `get_owned()`를 이전 프로젝트에서 가져옴. DDL 일치·매퍼 구성 4건, 실제 MariaDB 소유권·A 후기 작성 연결 10건 통과. 예약 생성 API 구현 완료를 뜻하지 않음 |
-| F-51 지원 (#43) | A 후기 목록용 예약·공간·유형 조회식 | B / A 연계 | B review_context_query(*, active_only=True) 구현·MariaDB 계약 테스트 14건 포함 예약 의존성 43건·전체 pytest 303건 통과. 반환 4열·예약당 한 행·유형 5개·활성 필터·필터/개수/페이지 결합 검증. A 직접 import와 공개 후기 숨김·내 후기 유지 HTTP 검증은 후속 |
-| F-50~51 | 후기 작성·조회(후기 모아보기) | A | B 소유권 조회·공간 정보 연결 전 503 경로 존재, 미검증 |
+| F-51 지원 (#43) | A 후기 목록용 예약·공간·유형 조회식 | B / A 연계 | B `review_context_query()` 계약 및 MariaDB 테스트 14건 완료. A가 직접 import해 공개 목록의 비활성 공간 제외·내 후기 기록 유지와 필터/정렬/페이지를 연결하고 통합 테스트 완료 |
+| F-50~51 | 후기 작성·조회(후기 모아보기) | A | B get_owned·review_context_query 연결, 작성·목록·수정·삭제 및 탈퇴 후 예약·후기 보존·작성자 익명화 로컬 MariaDB 검증. 공개 비활성 공간 제외·내 후기는 포함. 전체 backend pytest 318건 통과 |
 | F-60, F-62~65 | 이벤트(로그 파일 + MongoDB), 가상 데이터, `get_today`, 서버 로그, 지표 | A | 공통 계약·이벤트 pytest 통과. 자유 문자열 개인정보 처리 팀 합의 대기 |
 | F-61 | 크롤링 신규 등록 | DB / B | 진행: B POST /internal/venues 구현·로컬 검증 완료(35건·같은 출처 동시 8건·HTTP 6요청/12검증). DB 크롤러 새 필터·쉐어잇 파서·crawl_raw 연결과 api1 배포는 후속 |
 | #19 생성기 | 시연용 공간 부족분 생성·과거 30일 백필(회원·예약·결제·후기·이벤트)·`event_daily` 집계 | DB (api1 실행 환경 A, 과거 시각 저장 지원 B) | 설계 확정(11-05 #38), 코드 전. 100명으로 먼저 검증 → 11-07까지 규모 확정 |
@@ -59,6 +59,7 @@
 | 11-05 | 로그아웃: 프론트가 헤더 사용자 메뉴·내 메뉴에서 토큰을 지우고, 서버 `POST /auth/logout`(유효 토큰 확인 → 204)도 둠(11-03 "로그아웃 API 없음"을 바꿈). 토큰 폐기 목록은 없음 | PM 결정 · #32·#33·#34, `산출물_01` F-02 |
 | 11-05 | 1차 수집원은 스페이스클라우드·쉐어잇 2곳. 속성 기반 시연용 공간 15~20개를 목표로 선별하되, 30개 목표에서 최종 검토 후 부족한 공간은 생성기(`source_site=synthetic`)로 `/internal/venues`에 등록. 과거 사용자 행동 데이터는 우선 30일분 생성하고 `is_synthetic`으로 실제 로그와 분리. 루북·스파크플러스는 1차 제외, 사진안은 미확정 | 사용자 결정 · `docs/데이터_수집_명세.md` |
 | 11-05 | 데이터 작업 경계(#38): ① 생성기의 예약·칸·결제는 B 저장 로직 재사용(한 트랜잭션, 백필 경로에만 과거 시각), 회원·후기는 생성기가 SQL로 넣되 비밀번호는 A bcrypt 함수 ② 생성기·크롤러는 api1에서 실행, A가 키·접속 정보·cron 설치, 노트북 4는 API·화면·부하 시험 ③ 과거 이벤트는 MongoDB 직접 적재·분석은 `event_daily`, Loki는 실제 로그, 직접 적재분은 API 전달 성공률에서 제외 ④ F-62(A)와 #19 생성기(DB)는 따로 관리 ⑤ 속성 기반 15~20개 + 생성으로 총 30개, 주간 수집은 보충·0건 허용 ⑥ 과거 30일·회원 풀 1,000명(100명 먼저 검증, 11-07 확정). 미정: `/internal/venues` 제공 시각(B), 쉐어잇 표본 위치(DB), 탈퇴·동시 예약 처리(A·B), Grafana의 MongoDB 연결(A·DB) | PM 결정 · 이슈 #38 |
+| 11-06 | **정문 구성 B안**: 사용자 → `gw` HAProxy(:80, api1·api2 라운드로빈, `/health` 2초 능동 확인, `/api/internal`·`/api/metrics` 차단, 통계 8404) → 서버마다 Nginx(:80, Vue 정적 파일 + `/api` → `127.0.0.1:8000`) → FastAPI. A안(Nginx 뒤 HAProxy)은 프록시가 두 겹이고 `gw`에 몰려 확장이 막혀 뺌. `gw` 단일 장애점은 발표 범위에서 허용(실서비스는 HAProxy 2대 + keepalived) | PM 결정 · `docs/figures/haproxy_compare.png`, `로컬_VM_구성.md` |
 | 10-30 | 스터디룸 → 공간대여로 확장, 유형 5개(스터디룸·스튜디오·카페·영화관·파티룸, 11-03에 영화관 → 강의실), 전국 | 회의 · `docs/공간대여_01` |
 | 10-30 | 결제는 '확정 = 결제 완료'인 모의 결제 | 회의 |
 | 10-30 | 예약은 1시간 칸, 중복은 `reservation_slots` 기본키로 DB가 차단 | `docs/공간대여_02` |
@@ -178,6 +179,19 @@ A1~A4는 11-03에 확정했고, **A5~A8은 추후 확정**으로 미뤘다(11-03
 - 11-06 · B · 사용자 요청으로 `feat/B-F-34-cancellation`을 `feat/B-F-34-35-reservations`로 변경, F-34 커밋 `4cb0c26` 보존. worktree 경로는 `.worktrees/feat-B-F-34-cancellation` 유지. #8 열림·댓글 0건 및 B 명세 6절·jobs README·로컬 VM 배치 확인 후 F-35 구현 계획 작성. 예약 리포지토리 조건부 일괄 UPDATE, 서비스 트랜잭션, primary CLI 진입점·JSON 완료 건수 로그, api1 한 대의 시간별 cron 실행 안내를 예정. 고정 한국 시각으로 종료 직전/정각·날짜 경계·상태 필터·반복/중복 실행·취소 경합·칸/결제 보존·실패 롤백·CLI 종료 코드를 로컬 MariaDB에서 검증할 계획. 이번에는 브랜치명·STATE 계획만 변경, F-35 코드·테스트 실행·커밋·푸시·PR 없음.
 
 - 11-05 · B · 최신 origin/develop `bdd6dea`에서 `feat/B-F-34-cancellation` 별도 worktree 생성. F-34 `POST /reservations/{id}/cancel` 구현: primary에서 본인 예약 `FOR UPDATE`, 잠금 뒤 시작 시각 검사, 예약 `cancelled`·해당 예약 칸 삭제·결제 `refunded`를 한 트랜잭션으로 커밋. 취소 전용 200 응답(`reservation_id`, `status`, `total_price`, 결제·환불 시각, `can_cancel=false`)을 B 명세에 기록. `reserve_cancel_ok`·`reservation_total{result="cancel"}`는 커밋 후 한 번 기록. MariaDB 11.4.13 `spacecube_test`의 예약·의존성·동시성 pytest 72건 통과, 전체 pytest 308건 통과, Starlette deprecation 경고 1건. 공식 Uvicorn/Postman 5요청·11검증 통과: OpenAPI·401·생성·재시도·취소, DB 환불·칸 해제·카운터 확인 및 합성 테스트 데이터 정리. Ruff lint·format과 Postman collection lint 통과. `verify.ps1`의 Ruff·pytest 통과; 격리 worktree에 프론트 `node_modules`가 없어 `run-s`를 못 찾았으나 기존 작업 트리에서 프론트 verify(55건·빌드) 통과. 코드·문서 변경은 F-34 branch에 있으며 커밋·푸시·PR은 아직 없음.
+
+- 11-06 · 공동 · 정문 구성 B안 확정(HAProxy 정문 → 서버마다 Nginx → FastAPI): 결정 기록, `로컬_VM_구성`(배치·방화벽·흐름), `infra/vm` 체크리스트, 산출물 02·인프라 검토 안내, 아키텍처 그림(HAProxy 로고 devicon 2.18.0), 비교 그림 `haproxy_compare`(draw.io 원본) 반영. `infra/haproxy`·`infra/nginx` 설정은 B, 설치는 노트북 주인
+- 11-06 · 공동 · README를 강사님 목차(9항목)에 맞춰 221줄 → 112줄로 줄임: 기술 스택 뱃지 11개 한 줄(HAProxy 포함), 팀 소개 역할 칸 비움, 요구사항은 이슈, ERD는 그림만, 주요 프로시저는 위키 링크, 시연 화면은 토글. 긴 설명은 GitHub 위키 5쪽(목표·기술 스택·요구사항·ERD·주요 프로시저)으로
+- 11-06 · FE · #45 결정 반영: 목업 내 예약의 `review_id`가 지운 후기도 포함(예약당 한 번), 지운 뒤에도 '후기 쓰기'가 다시 나오지 않음. 단위 56·E2E 67 통과(재시도 없음)
+- 11-06 · A · 후기 자격·탈퇴 연계 테스트 보완: 실제 `DELETE /users/me` 후 완료 예약·후기 보존, 공개 후기의 `탈퇴한 회원` 표시를 MariaDB 통합 테스트로 확인. `NOT_COMPLETED`·`REVIEW_PERIOD_OVER` 기존 단위·API 테스트 포함 관련 73건, 전체 backend pytest 318건 통과. Ruff 검사·포맷 확인 통과. 시스템 pytest 임시 경로 권한 문제는 프로젝트 전용 임시 경로 지정으로 해결. Swagger의 만료 기한 경계는 API에서 과거 `created_at`을 만들 수 없어 수동 생성에 한계가 있음.
+
+- 11-05 · A · 사용자 승인으로 로컬 33316/spacecube_test 초기화, 0001 스키마와 기준 seed 복구. DB 제약·동시 예약 검증 29건, 전체 backend pytest 317건 통과(Starlette 경고 1건). 실제 HTTP 공간·후기 목록 0건 확인. 앞선 시연 데이터로 인한 NEW 목록 테스트 3건 실패 해소.
+
+- 11-05 · A · 사용자 요청으로 로컬 `127.0.0.1:33316/spacecube_test`만 삭제·재생성하고 0001·seed를 적용. 기존 회원·공간·예약·후기 등 시연 데이터를 모두 제거. 백엔드 전체 pytest 317건, Ruff 린트·포맷, DB 제약 검사, 임시 실제 HTTP 가입→예약→후기 작성·중복·수정·삭제 통과. HTTP 시험 데이터도 다시 제거한 뒤 B 내부 API로 가상 공간 3개만 등록하고 30일 전 등록 시각으로 설정. 최종 회원·예약·결제·후기 0건, 공간 3건이며 이 상태에서 전체 pytest 317건 재통과. 사용자가 실행한 8002 서버의 공개 공간 3건·후기 0건 조회 확인.
+
+- 11-05 · A · 이슈 #4 재검토: B 후기 목록 계약 14건, 관련 57건, Ruff 린트·포맷 통과. 실제 서버 HTTP에서 공개 후기 목록·공간별 목록 200, Swagger에서 후기·공간 별점 정렬 200 확인. 전체 backend pytest는 314건 통과·B `GET /venues/new` 3건 실패: 로컬 `spacecube_test`에 수동 시연용 최근 공간 6건이 남아 테스트의 고정 개수 가정과 충돌. 시연 데이터는 보존하고 테스트용 DB 분리가 후속 과제.
+
+- 11-05 · A · 이슈 #4: B 후기 목록 조회 계약 연결, 작성 자격·트랜잭션·목록 API 테스트 보강. 로컬 MariaDB 관련 57건 통과, 2건 추가 전 전체 backend pytest 315건 통과. 임시 서버의 OpenAPI·공개 목록 HTTP 확인, Swagger 수동 검증은 미실시.
 
 - 11-05 · B · #43 PM 제안 및 B 동의에 따라 최신 develop(87de174, #41·#42 병합)에서 feat/B-F-51-review-context 생성·기준 커밋 확인 후 구현. review_context_query(*, active_only=True)가 예약·공간·유형을 조인한 4열 Select를 반환하며 예약 상태·후기 작성 자격은 거르지 않음. 기본값은 비활성 공간 제외, False는 포함. A 코드·main.py·DDL·API·이벤트 변경 없이 루트 약속·A/B 명세 3절·리포지토리/테스트 안내·구조에 계약 반영. pro_1·격리된 loopback MariaDB 11.4.13의 spacecube_test(0001·seed)에서 계약 14건 추가 포함 예약 의존성 43건·전체 pytest 303건 통과. verify.ps1 구성요소를 설치된 Miniforge pro_1·Node 경로로 실행해 Ruff 린트/포맷 및 프론트 린트·색 검사·단위 55건·빌드 통과. Starlette 사용 중단 예정·pytest 캐시 경로 권한·기존 FE 조건문 경고 각 1건. 테스트 데이터 6개 표 모두 0건 확인, 임시 DB 종료·정리. 후기 목록 HTTP·실제 replica·E2E·DDL 전용 검증은 이번에 실행하지 않았으며 A 직접 import 연결 후 통합 검증 예정. 커밋·푸시·PR은 아직 하지 않음.
 

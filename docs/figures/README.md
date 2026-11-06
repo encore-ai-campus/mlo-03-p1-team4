@@ -5,7 +5,8 @@
 | 그림 | 원본 | 쓰는 문서 |
 | --- | --- | --- |
 | `erd_mariadb.png` / `.svg` | `src/erd_mariadb.mmd` | `산출물_04_DB명세서.md` |
-| `architecture.png` | `src/architecture.html` (아이콘 `../architecture/icons/`) — 1차 구성(로컬 VM: 노트북 4대 · VM 7대, 11-05) | `README.md`, `산출물_02_시스템아키텍처_흐름도.md`, `로컬_VM_구성.md` |
+| `architecture.png` | `src/architecture.html` (아이콘 `../architecture/icons/`) — 1차 구성(로컬 VM: 노트북 4대 · VM 7대, 11-05 · 정문 HAProxy, 서버마다 Nginx 11-06) | `README.md`, `산출물_02_시스템아키텍처_흐름도.md`, `로컬_VM_구성.md` |
+| `haproxy_compare.png` | `src/haproxy_compare.drawio` — 정문 구성 A안·B안 비교(11-06 B안 확정). draw.io 데스크톱으로 `draw.io -x -f png -s 2 -b 16 -o docs/figures/haproxy_compare.png docs/figures/src/haproxy_compare.drawio` | `로컬_VM_구성.md`, `인프라_트래픽_안정성_검토.md` |
 | `architecture_aws.png` | `src/architecture_aws.html` — AWS 참고안(C안, EC2 3대 + RDS, 11-04) | `산출물_02_시스템아키텍처_흐름도.md` |
 | `architecture_expanded.png` | `src/architecture_expanded.html` — 확장안(EC2 5대 + RDS 2대 + 모니터링 EC2) | `산출물_02_시스템아키텍처_흐름도.md` 5·6절 |
 | `service_screen_map.png` | `src/service_screen_map.mmd` | `산출물_03_서비스흐름도.md` |

@@ -103,7 +103,8 @@ Pro_1/
 │
 ├─ infra/
 │  ├─ local/                  [DB] docker compose: MariaDB 11.4(3308) + MongoDB 7, 첫 실행 때 0001·seed·mongo_init 자동 (11-04)
-│  ├─ nginx/                  [B] spacecube.conf (README에 초안)
+│  ├─ haproxy/                [B] 정문 haproxy.cfg: api1·api2 분산, /health 확인 (11-06 B안, 예정)
+│  ├─ nginx/                  [B] 서버마다: 정적 파일 + /api → 127.0.0.1:8000 (11-06 B안, README에 초안)
 │  ├─ monitoring/             [A] docker-compose, alloy.config, grafana/dashboards (예정)
 │  ├─ vm/                     [공동] 로컬 VM 7대 설치 체크리스트 (11-05, 1차 배포)
 │  └─ aws/                    [공동] 팀원별 AWS 체크리스트 (참고안)
