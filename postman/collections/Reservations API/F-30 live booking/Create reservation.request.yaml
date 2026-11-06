@@ -5,6 +5,8 @@ order: 1000
 url: '{{base_url}}/reservations'
 method: POST
 headers:
+  - key: X-Session-Id
+    value: '{{session_id}}'
   - key: Accept
     value: application/json
   - key: Content-Type
@@ -33,6 +35,9 @@ scripts:
   - type: beforeRequest
     language: text/javascript
     code: |-
+      if (!pm.environment.get('session_id')) {
+        pm.environment.set('session_id', pm.variables.replaceIn('{{$guid}}'));
+      }
       const required = [
         'access_token', 'venue_id', 'booking_date', 'start_hour',
         'hours', 'headcount', 'method', 'synthetic_api_key'

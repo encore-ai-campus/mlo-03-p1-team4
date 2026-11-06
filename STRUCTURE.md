@@ -82,6 +82,7 @@ Pro_1/
 │     └─ check_venue_browser.py·mjs  [B] 별도 실행: 임시 실제 API + Chrome 검색·정렬·NEW·오류·상세·날짜 목록·시간 칸 검증
 │        check_reservation_http.py  [B] 별도 실행: 공식 앱·실제 인증·Postman 예약/재시도·DB 확인, 가상 데이터 정리
 │        check_internal_http.py  [B] 별도 실행: 공식 앱·내부 키·Postman 등록/재전송/갱신·DB 확인, 가상 공간 정리
+│        check_reservation_events_mongo.py [B] 선택적 CHECK_MONGO_URL: 실제 예약 결과 3종·중복 재적재·문맥 null 정책 확인, 가상 이벤트 ID 정리
 │
 ├─ postman/                   [B] Git-native v3 예약·내부 공간 등록 컬렉션·로컬 환경 (CLI 테스트)
 │  ├─ README.md               안전한 실행 방법과 F-30·61 쓰기 요청 안내

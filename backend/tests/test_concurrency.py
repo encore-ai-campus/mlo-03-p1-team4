@@ -510,8 +510,8 @@ def test_same_slot_with_fifty_simultaneous_users_has_one_winner(concurrency_envi
         reservation_counter.labels(result="conflict")._value.get()
         == state["before_conflict"] + REQUEST_COUNT - 1
     )
-    assert sum(event[0] == "reserve_ok" for event in state["events"]) == 1
-    assert sum(event[0] == "reserve_conflict" for event in state["events"]) == REQUEST_COUNT - 1
+    assert sum(event[0] == "reservation_complete" for event in state["events"]) == 1
+    assert sum(event[0] == "reservation_conflict" for event in state["events"]) == REQUEST_COUNT - 1
 
 
 def test_same_user_retries_sent_simultaneously_share_one_reservation(concurrency_environment):
@@ -547,7 +547,7 @@ def test_same_user_retries_sent_simultaneously_share_one_reservation(concurrency
 
     assert reservation_counter.labels(result="ok")._value.get() == state["before_ok"] + 1
     assert reservation_counter.labels(result="conflict")._value.get() == state["before_conflict"]
-    assert [event[0] for event in state["events"]] == ["reserve_ok"]
+    assert [event[0] for event in state["events"]] == ["reservation_complete"]
 
 
 def test_simultaneous_overlapping_windows_leave_one_booking(concurrency_environment):
@@ -587,7 +587,10 @@ def test_simultaneous_overlapping_windows_leave_one_booking(concurrency_environm
     assert (
         reservation_counter.labels(result="conflict")._value.get() == state["before_conflict"] + 1
     )
-    assert sorted(event[0] for event in state["events"]) == ["reserve_conflict", "reserve_ok"]
+    assert sorted(event[0] for event in state["events"]) == [
+        "reservation_complete",
+        "reservation_conflict",
+    ]
 
 
 def test_two_simultaneous_cancellations_commit_once(concurrency_environment):
@@ -633,4 +636,4 @@ def test_two_simultaneous_cancellations_commit_once(concurrency_environment):
         )
 
     assert reservation_counter.labels(result="cancel")._value.get() == before_cancel + 1
-    assert sum(event[0] == "reserve_cancel_ok" for event in state["events"]) == 1
+    assert sum(event[0] == "reservation_cancel_complete" for event in state["events"]) == 1
