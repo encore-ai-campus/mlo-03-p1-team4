@@ -4,10 +4,11 @@ import { DEMO_USER, fixClock, loginFirst } from './helpers'
 
 test.beforeEach(async ({ page }) => fixClock(page))
 
+// '예약 내역'처럼 헤더와 내 메뉴에 같은 이름의 링크가 있으면 보이는 첫 링크를 누른다. 폰은 내 메뉴 드로어를 연다.
 async function openMenu(page, label) {
-  const link = page.getByRole('link', { name: label, exact: true })
-  if (!(await link.isVisible())) await page.getByRole('button', { name: '내 메뉴', exact: true }).click()
-  await page.getByRole('link', { name: label, exact: true }).click()
+  const visible = page.getByRole('link', { name: label, exact: true }).filter({ visible: true })
+  if (!(await visible.count())) await page.getByRole('button', { name: '내 메뉴', exact: true }).click()
+  await visible.first().click()
 }
 
 test('가입 필수 동의와 만 14세 검증 뒤 가입하고 로그인한다', async ({ page }) => {
@@ -167,4 +168,10 @@ test('내가 쓴 후기를 고치고, 지우기 창은 지우지 않기에 초�
   await del.getByRole('button', { name: '후기 지우기', exact: true }).click()
   await expect(del).toBeHidden()
   await expect(page.getByText('조용하고 의자가 편했어요.', { exact: true })).toHaveCount(0)
+  // #45: 지운 후기도 예약당 한 번으로 남아, 예약 내역에서 다시 '후기 쓰기'가 나오지 않는다
+  await openMenu(page, '예약 내역')
+  await page.getByRole('tab', { name: /이용 완료/ }).click()
+  const booking = page.getByRole('listitem').filter({ hasText: '예약 1003' })
+  await expect(booking.getByText('후기 작성 완료')).toBeVisible()
+  await expect(booking.getByRole('button', { name: '후기 쓰기', exact: true })).toHaveCount(0)
 })

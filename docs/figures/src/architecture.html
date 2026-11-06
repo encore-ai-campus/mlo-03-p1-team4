@@ -47,7 +47,7 @@
 </head>
 <body>
   <div class="title">다락큐브 시스템 아키텍처 · 1차 구성(로컬 VM)</div>
-  <div class="sub">팀 노트북 4대(16코어 · 32GB) · VirtualBox 브리지 · 서버 VM 7대(Ubuntu Server 24.04, systemd, Docker 없음) · 팀 공유기 한 대 · 2026-11-05 · IP는 예시</div>
+  <div class="sub">팀 노트북 4대(16코어 · 32GB) · VirtualBox 브리지 · 서버 VM 7대(Ubuntu Server 24.04, systemd, Docker 없음) · 팀 공유기 한 대 · 2026-11-06(정문 HAProxy, 서버마다 Nginx) · IP는 예시</div>
 
   <div class="box router"><div class="box-label">
     <svg viewBox="0 0 24 24" fill="none" stroke="#0369a1" stroke-width="2" aria-hidden="true"><rect x="3" y="13" width="18" height="7" rx="2"/><path d="M7 17h.01M11 17h.01M8 9a6 6 0 0 1 8 0M5 6a10 10 0 0 1 14 0"/></svg>
@@ -57,7 +57,7 @@
   <div class="box lap client" style="left:60px; top:150px; width:260px; height:970px"><div class="box-label">노트북 4 · FE·PM</div><div class="spec">VM 없음</div>
     <div class="tool" style="top:50px"><img src="../../architecture/icons/vuejs.svg" alt=""><b>브라우저 (사용자·시연)</b><span>화면 · Grafana · 녹화</span></div>
     <div class="tool" style="top:230px"><img src="../../architecture/icons/locust.png" alt=""><b>Locust</b><span>부하 · SameSlotRush<br>서버 끄기 시험 · 8089</span></div>
-    <div class="tool" style="top:420px"><img src="../../architecture/icons/python.svg" alt=""><b>데이터 생성기</b><span>90일 백필 → API<br>X-Synthetic + 키</span></div>
+    <div class="tool" style="top:420px"><img src="../../architecture/icons/python.svg" alt=""><b>Locust 페르소나</b><span>매일 자동 실행(작업 스케줄러)<br>X-Synthetic + 키</span></div>
     <div class="tool" style="top:610px"><img src="../../architecture/icons/playwright.svg" alt=""><b>Playwright E2E</b><span>실제 API로 화면 흐름</span></div>
     <div class="panel" style="left:22px; top:790px; width:216px"><h4>모든 VM 공통</h4>chrony · Asia/Seoul<br>ufw: 표의 포트만<br>systemd · logrotate 7일<br>/etc/hosts에 VM 이름</div>
   </div>
@@ -65,10 +65,10 @@
   <!-- 노트북 1 -->
   <div class="box lap" style="left:350px; top:150px; width:470px; height:970px"><div class="box-label">노트북 1 · DB 전희정 · 정문 + 데이터</div><div class="spec">VM 3 · 5c / 8GB</div></div>
   <div class="vm" style="left:380px; top:200px; width:410px; height:200px">
-    <div class="hd">정문 <code>gw</code></div><div class="ip">192.168.0.11 · 1c / 1GB</div>
-    <div class="icons"><div><img src="../../architecture/icons/nginx.svg" alt="">Nginx</div><div><img src="../../architecture/icons/vuejs.svg" alt="">Vue 빌드</div></div>
-    <p>정적 파일 · /api → api1·api2 라운드로빈<br>max_fails=2 · GET만 다시 보냄 · stub_status</p>
-    <div class="chips"><span class="chip fw">80 ← 공유기 전체</span><span class="chip al">Alloy</span></div>
+    <div class="hd">정문 <code>gw</code> · 로드밸런서</div><div class="ip">192.168.0.11 · 1c / 1GB</div>
+    <div class="icons"><div><img src="../../architecture/icons/haproxy.svg" alt="">HAProxy</div></div>
+    <p>api1·api2 라운드로빈 · /health 2초 능동 확인<br>/api/internal · /api/metrics 차단 · 통계 8404</p>
+    <div class="chips"><span class="chip fw">80 ← 공유기 전체</span><span class="chip fw">8404 ← mon</span><span class="chip al">Alloy</span></div>
   </div>
   <div class="vm" style="left:380px; top:470px; width:410px; height:200px">
     <div class="hd">MariaDB primary <code>db1</code></div><div class="ip">192.168.0.12 · 2c / 4GB</div>
@@ -87,9 +87,9 @@
   <div class="box lap" style="left:890px; top:150px; width:860px; height:420px"><div class="box-label">노트북 2 · A 이자연 · 앱 #1 + 관측</div><div class="spec">VM 2 · 4c / 6GB</div></div>
   <div class="vm" style="left:920px; top:200px; width:380px; height:230px">
     <div class="hd">FastAPI #1 <code>api1</code></div><div class="ip">192.168.0.21 · 2c / 2GB</div>
-    <div class="icons"><div><img src="../../architecture/icons/fastapi.svg" alt="">FastAPI</div><div><img src="../../architecture/icons/python.svg" alt="">cron</div></div>
-    <p>uvicorn 워커 2 · /metrics · app.log · events.log<br>cron: 이용 완료 배치(1시간) · 크롤러(주 1회)<br>replay_events.py</p>
-    <div class="chips"><span class="chip fw">8000 ← gw · mon</span><span class="chip al">Alloy</span></div>
+    <div class="icons"><div><img src="../../architecture/icons/nginx.svg" alt="">Nginx</div><div><img src="../../architecture/icons/fastapi.svg" alt="">FastAPI</div><div><img src="../../architecture/icons/python.svg" alt="">cron</div></div>
+    <p>Nginx: Vue 정적 파일 · /api → 127.0.0.1:8000(uvicorn 2)<br>cron: 이용 완료(1시간) · 크롤러(주 1회) · event_daily<br>생성기(30일, 수동) · replay_events.py</p>
+    <div class="chips"><span class="chip fw">80 ← gw</span><span class="chip fw">8000 ← mon</span><span class="chip al">Alloy</span></div>
   </div>
   <div class="vm" style="left:1350px; top:200px; width:370px; height:300px">
     <div class="hd">모니터링 <code>mon</code></div><div class="ip">192.168.0.22 · 2c / 4GB</div>
@@ -103,9 +103,9 @@
   <div class="box lap" style="left:890px; top:600px; width:860px; height:390px"><div class="box-label">노트북 3 · B 이세훈 · 앱 #2 + 복제</div><div class="spec">VM 2 · 4c / 6GB</div></div>
   <div class="vm" style="left:920px; top:650px; width:380px; height:200px">
     <div class="hd">FastAPI #2 <code>api2</code></div><div class="ip">192.168.0.31 · 2c / 2GB</div>
-    <div class="icons"><div><img src="../../architecture/icons/fastapi.svg" alt="">FastAPI</div></div>
-    <p>api1과 같은 코드 · cron 없음 · /metrics<br>노트북 3을 꺼도 api1이 받음</p>
-    <div class="chips"><span class="chip fw">8000 ← gw · mon</span><span class="chip al">Alloy</span></div>
+    <div class="icons"><div><img src="../../architecture/icons/nginx.svg" alt="">Nginx</div><div><img src="../../architecture/icons/fastapi.svg" alt="">FastAPI</div></div>
+    <p>api1과 같은 Nginx·코드 · cron 없음 · /metrics<br>노트북 3을 꺼도 HAProxy가 api1로만 보냄</p>
+    <div class="chips"><span class="chip fw">80 ← gw</span><span class="chip fw">8000 ← mon</span><span class="chip al">Alloy</span></div>
   </div>
   <div class="vm" style="left:1350px; top:650px; width:370px; height:200px">
     <div class="hd">MariaDB replica <code>db2</code></div><div class="ip">192.168.0.32 · 2c / 4GB</div>
@@ -148,7 +148,7 @@
     </g>
     <text class="lbl" x="306" y="250">HTTP 80</text>
     <text class="lbl" x="305" y="470">부하</text>
-    <text class="lbl" x="808" y="238">/api 라운드로빈</text>
+    <text class="lbl" x="808" y="238">HTTP 80 라운드로빈</text>
     <text class="lbl" x="950" y="470" style="fill:#c2410c">쓰기 · 인증 · 내 것</text>
     <text class="lbl" x="1290" y="470" style="fill:#2563eb">공개 조회</text>
     <text class="lbl" x="1000" y="1006" style="fill:#c2410c">비동기 복제 (GTID, 노트북 1 → 3)</text>

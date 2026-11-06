@@ -14,3 +14,9 @@ fastapi.svg와 nginx.svg는 원본이 단색이라 각각 #009688, #009639를 �
 | --- | --- | --- |
 | mongodb.svg, prometheus.svg, vuejs.svg | [devicon 2.16.0](https://github.com/devicons/devicon) | MIT (상표권은 각 회사) |
 | loki.png | [grafana/loki](https://github.com/grafana/loki) `docs/sources/logo.png` | AGPL-3.0 저장소의 로고 (상표권은 Grafana Labs) |
+
+## 11-06 추가
+
+| 파일 | 출처 | 라이선스 |
+| --- | --- | --- |
+| haproxy.svg | [devicon 2.18.0](https://github.com/devicons/devicon) `icons/haproxy/haproxy-original.svg` | MIT (상표권은 HAProxy Technologies) |
