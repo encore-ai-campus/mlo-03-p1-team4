@@ -1,12 +1,11 @@
 <script setup>
-import { computed, ref } from 'vue'
-import { toast } from 'vue-sonner'
-import { Heart, Star } from '@lucide/vue'
+import { computed } from 'vue'
+import { Star } from '@lucide/vue'
 import RoomArt from './RoomArt.vue'
 import { nowInSeoul } from '@/utils/date'
 import { useEventLogger } from '@/composables/useEventLogger'
 
-// 공간 카드. 카드 전체가 상세로 가는 링크이고(제목 링크를 카드 크기로 늘림), 찜 버튼은 따로 누를 수 있다.
+// 공간 카드. 카드 전체가 상세로 가는 링크(제목 링크를 카드 크기로 늘림). 찜은 API가 없어 11-06에 뺐다.
 const props = defineProps({
   room: { type: Object, required: true },
   rank: { type: Number, default: 0 }, // 1~3이면 '인기 n위'를 글자로
@@ -15,23 +14,14 @@ const props = defineProps({
 
 const available = computed(() => props.room.slots?.some((s) => !s.taken && s.hour > nowInSeoul().hour))
 const next = computed(() => props.room.slots?.find((s) => !s.taken && s.hour > nowInSeoul().hour)?.hour)
-const saved = ref(false)
 const { log } = useEventLogger()
-
-function toggleSave() {
-  saved.value = !saved.value
-  toast(saved.value ? '찜 목록에 담았어요' : '찜 목록에서 뺐어요')
-}
 const won = (n) => n.toLocaleString('ko-KR')
 </script>
 
 <template>
   <article class="card" :style="{ '--i': Math.min(index, 7) }">
     <div class="card__media">
-      <RoomArt :image="room.image" />
-      <button type="button" class="save" :class="{ 'is-on': saved }" :aria-pressed="saved" :aria-label="saved ? '찜 해제' : '찜하기'" @click="toggleSave">
-        <Heart :size="20" aria-hidden="true" />
-      </button>
+      <RoomArt :image="room.image" :category="room.category" />
     </div>
 
     <div class="card__body">
@@ -91,38 +81,6 @@ const won = (n) => n.toLocaleString('ko-KR')
   position: relative;
   border-radius: var(--r-lg) var(--r-lg) 0 0;
   overflow: hidden;
-}
-/* 찜: 카드 링크 위로 올라와 따로 눌린다 */
-.save {
-  position: absolute;
-  right: var(--sp-8);
-  top: var(--sp-8);
-  z-index: 2;
-  display: grid;
-  place-items: center;
-  width: var(--tap);
-  height: var(--tap);
-  border: 0;
-  border-radius: 50%;
-  background: var(--c-surface);
-  color: var(--c-muted);
-  cursor: pointer;
-  transition:
-    transform var(--t-fast) var(--ease-out),
-    color var(--t-fast);
-}
-.save:active {
-  transform: scale(0.95);
-}
-.save :deep(svg) {
-  fill: transparent;
-  transition: fill var(--t-fast);
-}
-.save.is-on {
-  color: var(--c-heart);
-}
-.save.is-on :deep(svg) {
-  fill: currentColor;
 }
 .card__body {
   display: flex;
