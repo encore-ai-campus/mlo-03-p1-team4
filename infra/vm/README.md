@@ -18,12 +18,13 @@
 - [ ] `db1`: `0001_init.sql` → `seed.sql` 적용, `db/tests/check_ddl.py`를 `CHECK_DB_URL`로 한 번 돌려 확인(`spacecube_test`)
 - [ ] `db1`: 백업 cron(하루 1회 `mariadb-dump --single-transaction`, 7개 보관)
 - [ ] `mongo`: MongoDB 7.0, 인증 켬, WiredTiger 캐시 1GB, `docs/db/mongo_init.js`, `db/tests/check_mongo_init.js`, 백업 cron(`mongodump`, 7개)
-- [ ] `gw`: Nginx, Vue 빌드(`frontend`에서 `npm run build` → `dist/`) 복사, `infra/nginx/README.md` 설정(upstream `api1:8000`·`api2:8000`, `max_fails=2`), `stub_status` + nginx exporter
+- [ ] `gw`: HAProxy(apt), `infra/haproxy/README.md` 설정(80 → `api1:80`·`api2:80` 라운드로빈, `/health` 확인 `inter 2s fall 2 rise 2`, `/api/internal`·`/api/metrics` 차단, 통계·Prometheus 지표 8404), Alloy가 8404 수집 (11-06 B안)
 - [ ] 세 VM 모두 Alloy(로그 → `mon:3100`, 지표 → `mon:9090`), `ufw` 규칙
 
 ## 2. 노트북 2 (A 이자연)
 
 - [ ] `api1`: Python 3.12 venv + `environment.yml`의 pip 버전, `backend/.env`(`DB_WRITE_URL=…@db1`, `DB_READ_URL=…@db2`, `MONGO_URL=…@mongo`, `SERVER_NAME=api-1`, `SYNTHETIC_API_KEY` 등), uvicorn systemd(`--workers 2`, 8000)
+- [ ] `api1`: Nginx(apt), Vue 빌드(`frontend`에서 `npm run build` → `dist/`) 복사, `infra/nginx/README.md` 서버용 설정(정적 파일 + `/api` → `127.0.0.1:8000`), `stub_status` + nginx exporter (11-06 B안)
 - [ ] `api1`: cron — 이용 완료 배치(1시간), 크롤러(주 1회, `crawler/AGENTS.md` 규칙), `replay_events.py`, `event_daily` 집계(매일 새벽)
 - [ ] `api1`: 크롤러·생성기 실행 환경과 키(`INTERNAL_API_KEY`, DB·MongoDB 접속 정보)는 A가 설치(11-05 #38). 생성기 과거 30일 백필은 수동으로 한 번, 먼저 회원 100명으로 검증
 - [ ] `mon`: Prometheus(15일, 원격 쓰기 받기 켬), Loki(14일), Grafana(3000) + 대시보드 4장(서비스·예약·DB·이벤트) + 경보(복제 지연 5초, 오류율)
@@ -31,7 +32,7 @@
 
 ## 3. 노트북 3 (B 이세훈)
 
-- [ ] `api2`: `api1`과 같은 코드·설정(`SERVER_NAME=api-2`, cron 없음)
+- [ ] `api2`: `api1`과 같은 Nginx·코드·설정(`SERVER_NAME=api-2`, cron 없음)
 - [ ] `db2`: MariaDB 11.4, `server_id=2`, `read_only=ON`, GTID 복제(`CHANGE MASTER TO MASTER_HOST='db1', MASTER_USE_GTID=slave_pos`), `SHOW SLAVE STATUS`에서 지연 확인
 - [ ] 두 VM 모두 Alloy(mysqld exporter 포함), `ufw` 규칙
 

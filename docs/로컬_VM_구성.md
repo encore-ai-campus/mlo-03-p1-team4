@@ -19,12 +19,12 @@
 
 | 노트북 (주인) | VM | vCPU / 메모리 / 디스크 | 올리는 것 | 열 포트 ← 받는 곳 |
 | --- | --- | --- | --- | --- |
-| **1** (DB 전희정) | `gw` 정문 | 1c / 1GB / 10GB | Nginx(Vue 빌드 정적 파일, `/api` → api1·api2 라운드로빈), `stub_status` + nginx exporter, Alloy | 80 ← 공유기 전체 |
+| **1** (DB 전희정) | `gw` 정문 | 1c / 1GB / 10GB | **HAProxy**(80 → api1·api2 라운드로빈, `/health` 2초 능동 확인, `/api/internal`·`/api/metrics` 차단, 통계·지표 8404), Alloy | 80 ← 공유기 전체, 8404 ← mon |
 | | `db1` MariaDB primary | 2c / 4GB / 20GB | MariaDB 11.4(STRICT `sql_mode`, `+09:00`, utf8mb4), 백업 cron, mysqld exporter, Alloy | 3306 ← api1·api2·db2 |
 | | `mongo` | 2c / 3GB / 20GB | MongoDB 7(인증 켬, `docs/db/mongo_init.js`), 백업 cron, mongodb exporter, Alloy | 27017 ← api1·api2 |
-| **2** (A 이자연) | `api1` FastAPI #1 | 2c / 2GB / 15GB | FastAPI(uvicorn 워커 2), cron: 이용 완료 배치(1시간)·크롤러(주 1회)·`replay_events.py`·`event_daily` 집계(매일 새벽), 데이터 생성기(과거 30일 백필, 수동 실행), `app.log`·`events.log`, `/metrics`, Alloy | 8000 ← gw·mon |
+| **2** (A 이자연) | `api1` FastAPI #1 | 2c / 2GB / 15GB | **Nginx**(80: Vue 정적 파일 + `/api` → `127.0.0.1:8000`) + FastAPI(uvicorn 워커 2), cron: 이용 완료 배치(1시간)·크롤러(주 1회)·`replay_events.py`·`event_daily` 집계(매일 새벽), 데이터 생성기(과거 30일 백필, 수동 실행), `app.log`·`events.log`, `/metrics`, nginx exporter, Alloy | 80 ← gw, 8000 ← mon(지표) |
 | | `mon` 모니터링 | 2c / 4GB / 30GB | Prometheus(15일), Loki(14일), Grafana(대시보드 4장 + 경보) | 3000·9090 ← 공유기, 3100·지표 받기 ← 모든 VM |
-| **3** (B 이세훈) | `api2` FastAPI #2 | 2c / 2GB / 15GB | api1과 같은 코드(cron 없음), `/metrics`, Alloy | 8000 ← gw·mon |
+| **3** (B 이세훈) | `api2` FastAPI #2 | 2c / 2GB / 15GB | api1과 같은 Nginx·코드(cron 없음), `/metrics`, nginx exporter, Alloy | 80 ← gw, 8000 ← mon(지표) |
 | | `db2` MariaDB replica | 2c / 4GB / 20GB | MariaDB replica(`read_only`, GTID 복제), mysqld exporter, Alloy | 3306 ← api1·api2 |
 | **4** (FE·PM 노진산) | VM 없음 | — | Locust(부하·`SameSlotRush`·서버 끄기 시험), Playwright E2E(실제 API), 발표 브라우저·녹화 | Locust 웹 8089 ← 노트북 4 안에서만 |
 
@@ -62,12 +62,23 @@
 | VM | 허용 |
 | --- | --- |
 | 전부 | 22 ← 팀 노트북 4대의 IP만, 나머지 들어오는 것 거부 |
-| `gw` | 80 ← 공유기 대역 |
-| `api1`·`api2` | 8000 ← `gw`, `mon` |
+| `gw` | 80 ← 공유기 대역, 8404 ← `mon` |
+| `api1`·`api2` | 80 ← `gw`, 8000 ← `mon`(지표만) |
 | `db1` | 3306 ← `api1`, `api2`, `db2` |
 | `db2` | 3306 ← `api1`, `api2` |
 | `mongo` | 27017 ← `api1`, `api2` |
 | `mon` | 3000·9090 ← 공유기 대역, 3100·9090 ← 모든 VM(Alloy) |
+
+## 4-1. 정문 구성 (11-06 B안)
+
+```
+브라우저 ─▶ gw: HAProxy :80 ─▶ api1: Nginx :80 ─▶ FastAPI 127.0.0.1:8000
+                            └▶ api2: Nginx :80 ─▶ FastAPI 127.0.0.1:8000
+```
+
+- HAProxy가 진입과 분산을 맡고, `GET /health`를 2초마다 확인해 2번 실패한 서버를 먼저 뺍니다(무료 Nginx는 요청이 실패해야 뺌). 결제(POST)는 다시 보내지 않습니다.
+- 서버마다 Nginx가 화면 파일과 `/api` 전달을 맡아, 서버를 늘리면 HAProxy에 한 줄 더해 확장합니다.
+- `gw` 한 대는 단일 장애점으로 남습니다(발표 범위에서 허용). 비교: [`figures/haproxy_compare.png`](figures/haproxy_compare.png), 원본 `figures/src/haproxy_compare.drawio`.
 
 ## 5. 11-05 결정과 바뀌는 점
 
