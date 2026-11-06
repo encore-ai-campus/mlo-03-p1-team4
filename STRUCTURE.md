@@ -26,6 +26,8 @@ Pro_1/
 ├─ environment.yml            [공동] conda 환경 pro_1 (Python 3.12)
 ├─ ruff.toml · verify.ps1     [공동] 파이썬 린트 규칙, 커밋 전 전체 검증
 ├─ pytest.ini                 [공동] pytest 공통 설정(테스트 폴더, backend import 경로)
+├─ conftest.py                [공동] #78 공유 테스트 DB의 pytest session 잠금·소유권 확인
+├─ tests/                     [공동] 테스트 DB 실행 잠금과 프로세스 간 회귀 검증
 ├─ .gitignore                 [공동] .env·node_modules·글꼴 원본 등 제외
 │
 ├─ docs/                      설계 문서 (docs/README.md)
