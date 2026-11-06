@@ -1,56 +1,56 @@
 /* 디자인 토큰. 색·간격·반경·움직임은 여기 값만 쓴다.
-   11-05 AI 티 빼기(강사님 코멘트): 보라 → 올리브(#38450f) on 뼈색(#ecebe7), 알약 배지·그림자·빗금 없앰, 반경 4~6px. */
+   11-05 AI 티 빼기(강사님 코멘트): 알약 배지·그림자·빗금 없앰, 반경 4~6px.
+   11-06 C안(PM): 흰 바탕 + 검은 글자 + 주칠(#a8441e) 한 색. 주칠은 버튼·선택·NEW·링크에만, 회색은 검정을 옅게 쓴 값. */
 :root {
   /* 색 */
-  --c-ink: #2f3a0d;          /* 본문 글자 */
-  --c-ink-2: #2f3a0d;
-  --c-muted: #4f5a2c;        /* 보조 글자 (흰 바탕 대비 8:1) */
-  --c-subtle: #57613a;       /* 작은 설명 (흰 바탕 대비 6:1) */
-  --c-paper: #ecebe7;        /* 페이지 바탕 */
-  --c-surface: #f6f6f4;      /* 카드 바탕 */
-  --c-line: #d9d7cf;
-  --c-line-strong: #c9c7be;
-  --c-brand: #38450f;        /* 주 색: 버튼·선택 */
-  --c-brand-hover: #2a340a;
-  --c-brand-ink: #38450f;    /* 연한 바탕 위 강조 글자 */
-  --c-brand-soft: #e1dfd9;
-  --c-danger: #a8261b;
-  --c-danger-soft: #f3e3df;
-  --c-danger-line: #e2b8b0;
-  --c-success-line: #c3cba3;
-  --c-success: #38450f;
-  --c-success-soft: #e1dfd9;
-  --c-slot-taken: #d6d4cc;
-  --c-disabled-ink: #8a8f78; /* 고를 수 없는 날짜 글자 */
+  --c-ink: #111111;          /* 본문 글자 */
+  --c-ink-2: #111111;
+  --c-muted: #4d4d4d;        /* 보조 글자 (흰 바탕 대비 8.5:1) */
+  --c-subtle: #5c5c5c;       /* 작은 설명 (흰 바탕 대비 6.7:1) */
+  --c-paper: #ffffff;        /* 페이지 바탕 */
+  --c-surface: #f7f7f7;      /* 카드 바탕 */
+  --c-line: #e6e6e6;
+  --c-line-strong: #cfcfcf;
+  --c-brand: #a8441e;        /* 주 색: 버튼·선택 */
+  --c-brand-hover: #8a3716;
+  --c-brand-ink: #a8441e;    /* 연한 바탕 위 강조 글자 */
+  --c-brand-soft: #f6ebe6;
+  --c-danger: #b3132b;
+  --c-danger-soft: #fbe7ea;
+  --c-danger-line: #efb9c1;
+  --c-success-line: #e3c3b5;
+  --c-success: #a8441e;
+  --c-success-soft: #f6ebe6;
+  --c-slot-taken: #e6e6e6;
+  --c-disabled-ink: #8c8c8c; /* 고를 수 없는 날짜 글자 */
 
-  /* 짙은 바탕·올리브 바탕(버튼·선택된 칩·요약 바·툴팁·푸터) 위 */
-  --c-on-dark: #ecebe7;
-  --c-on-dark-2: #d5d9c2;     /* 보조 글자 */
-  --c-on-dark-3: #bfc5a6;     /* 더 약한 글자 */
-  --c-on-dark-faint: #a7ae8c; /* 마감 칸 글자 */
-  --c-dark-2: #45531a;        /* 짙은 바탕 위 칸 */
-  --c-dark-line: #5d683a;
-  --c-dark-taken: #2c360b;    /* 짙은 바탕 마감 칸 */
-  --c-danger-on-dark: #ffd2c9;
-  --c-now-on-dark: #d5e59a;
+  /* 검은 바탕·주칠 바탕(버튼·선택된 칩·요약 바·툴팁·푸터) 위 */
+  --c-on-dark: #ffffff;
+  --c-on-dark-2: #e6e6e6;     /* 보조 글자 */
+  --c-on-dark-3: #cccccc;     /* 더 약한 글자 */
+  --c-on-dark-faint: #9e9e9e; /* 마감 칸 글자 */
+  --c-dark-2: #2b2b2b;        /* 짙은 바탕 위 칸 */
+  --c-dark-line: #444444;
+  --c-dark-taken: #1d1d1d;    /* 짙은 바탕 마감 칸 */
+  --c-danger-on-dark: #ffc7cf;
+  --c-now-on-dark: #f3b79c;
 
   /* 브랜드 보조 */
-  --c-brand-light: #6f7b45;   /* 차트 막대, 선택 테두리 (흰 바탕 대비 3:1 이상) */
-  --c-brand-ring: #c9cfae;    /* 입력 포커스 링 */
-  --c-on-brand-2: #d5d9c2;    /* 올리브 바탕 위 보조 글자 */
+  --c-brand-light: #d0805c;   /* 선택·포커스 테두리 (흰 바탕 대비 3:1 이상) */
+  --c-brand-ring: #ebc6b6;    /* 입력 포커스 링 */
+  --c-on-brand-2: #f6dccf;    /* 주칠 바탕 위 보조 글자 (대비 4.5:1) */
 
   /* 상태 · 표시 */
-  --c-now: #38450f;           /* 지금 이용 가능 점 */
-  --c-dot-off: #a7ab98;
-  --c-heart: #a8261b;         /* 찜 */
-  --c-star: #38450f;          /* 별 아이콘 채움 */
-  --c-star-ink: #38450f;      /* 별 아이콘 글자색 */
-  --c-star-off: #c9c7be;
+  --c-now: #a8441e;           /* 지금 이용 가능 점 */
+  --c-dot-off: #b3b3b3;
+  --c-star: #a8441e;          /* 별 아이콘 채움 */
+  --c-star-ink: #a8441e;      /* 별 아이콘 글자색 */
+  --c-star-off: #cfcfcf;
   --c-saturday: #2f4f9e;
 
   /* 옅은 채움 (막대 바탕·태그·스켈레톤) */
-  --c-fill: #e1dfd9;
-  --c-fill-soft: #e6e4df;
+  --c-fill: #f0f0f0;
+  --c-fill-soft: #f4f4f4;
 
   /* 글자 크기 (1.25 배율) */
   --fs-12: 0.8125rem;
@@ -79,8 +79,8 @@
 
   --shadow-card: none;
   --shadow-lift: none;
-  --c-overlay: rgba(47, 58, 13, 0.45); /* 창·드로어 뒤 어두운 배경(올리브 잉크 45%) */
-  --shadow-pop: 0 16px 40px rgba(47, 58, 13, 0.18);
+  --c-overlay: rgba(17, 17, 17, 0.45); /* 창·드로어 뒤 어두운 배경(검정 45%) */
+  --shadow-pop: 0 16px 40px rgba(17, 17, 17, 0.18);
 
   /* 움직임 */
   /* 기준: emilkowalski/skills review-animations — UI는 300ms 이하, 들어오고 나갈 때 ease-out, 닫힘은 열림보다 빠르게 */

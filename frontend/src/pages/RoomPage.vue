@@ -1,8 +1,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { toast } from 'vue-sonner'
-import { Check, Clock, Heart, Star, Users, Wallet } from '@lucide/vue'
+import { Check, Clock, Star, Users, Wallet } from '@lucide/vue'
 import SplitLayout from '@/components/layout/SplitLayout.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import UiAccordion from '@/components/ui/UiAccordion.vue'
@@ -38,7 +37,6 @@ const slots = ref([])
 const slotsLoading = ref(false)
 const hours = ref([])
 const people = ref('2')
-const saved = ref(false)
 const offset = ref(0)
 const minOffset = ref(-365)
 const maxOffset = ref(365)
@@ -141,10 +139,6 @@ const guide = computed(() =>
     : [],
 )
 
-function toggleSave() {
-  saved.value = !saved.value
-  toast(saved.value ? '찜 목록에 담았어요' : '찜 목록에서 뺐어요')
-}
 function submit() {
   if (!summary.value || summary.value.short) return
   book({ venue_id: room.value.venue_id, date: date.value, hours: hours.value, people: people.value })
@@ -191,13 +185,12 @@ function scrollToBooking() {
         <p class="head__meta">{{ room.category.name }} · 최대 {{ room.capacity_max }}명 · {{ room.region.sido }} {{ room.region.sigungu }}<template v-if="room.is_new"> · 새로 연 공간</template></p>
         <p class="head__meta"><Star :size="16" class="star" fill="currentColor" aria-hidden="true" /><strong class="num">{{ avg }}</strong> 후기 {{ room.review_count }}개</p>
       </div>
-      <button type="button" class="save" :class="{ 'is-on': saved }" :aria-pressed="saved" :aria-label="saved ? '찜 해제' : '찜하기'" @click="toggleSave"><Heart :size="22" aria-hidden="true" /></button>
     </header>
 
     <SplitLayout ratio="3fr 2fr" sticky-end>
       <template #start>
         <UiCarousel label="공간 이미지">
-          <div v-for="(g, i) in gallery" :key="i" class="shot"><RoomArt :image="g" /></div>
+          <div v-for="(g, i) in gallery" :key="i" class="shot"><RoomArt :image="g" :category="room.category" /></div>
         </UiCarousel>
 
         <ul class="glance" aria-label="한눈에 보기">
@@ -356,29 +349,6 @@ function scrollToBooking() {
 }
 .head__meta strong {
   color: var(--c-ink);
-}
-.save {
-  flex: none;
-  display: grid;
-  place-items: center;
-  width: var(--tap);
-  height: var(--tap);
-  border: 0;
-  border-radius: 50%;
-  background: var(--c-surface);
-  color: var(--c-muted);
-  cursor: pointer;
-  transition: transform var(--t-fast);
-}
-.save:active {
-  transform: scale(0.95);
-}
-.save.is-on {
-  color: var(--c-heart);
-  border-color: currentColor;
-}
-.save.is-on :deep(svg) {
-  fill: currentColor;
 }
 .promo {
   display: flex;
