@@ -397,6 +397,16 @@ replica를 넣은 이유(읽기 분산)가 실제로 효과가 있었는지 이 
 
 ## 10. 확인 필요
 
+### #75 생성기 서비스 연결 (11-06 PM 결정)
+
+- B는 `simulator/generator/` 본체·세션·예약 흐름을 구현한다. api1의 별도 프로세스에서 A `auth_service.signup`·`review_service.create_review`, B 예약·취소 서비스를 직접 호출한다. 새 HTTP API·DDL·기존 함수 인자 변경은 없다.
+- 생성기 실행 중에만 서비스의 시간 참조를 과거로 치환하고 예약 운영 이벤트·카운터 호출을 억제한다. `get_event_time`은 실제 시각을 유지하고 `build_document`에 과거 `occurred_at`을 전달한다.
+- `reservation_repo.find_generator_booking`은 정확한 생성 시각·소유자·이용 조건·결제를 대조해 취소/완료 예약까지 복구한다. 슬롯 UNIQUE만으로 취소된 예약의 재실행을 판정하지 않는다.
+- 내부 전용 `reservation_service.complete_generator_reservation(db, *, user_id, reservation_id)`는 잠근 본인 가상 예약 한 건만 종료 시각 이후 완료 처리한다. 운영 완료 배치와 HTTP 계약은 유지한다.
+- 설정·재실행·담당별 후속 산출물은 [생성기 README](../simulator/generator/README.md)를 따른다. 집계·CSV·정리 스크립트는 DB 담당이며, 운영 DB 대량 삭제는 기존 규칙대로 사람이 실행한다.
+
+### 기존 확인 목록
+
 | # | 질문 | 이 문서의 가정 |
 | --- | --- | --- |
 | 1 | status 3개 값 | `confirmed`·`completed`·`cancelled` |

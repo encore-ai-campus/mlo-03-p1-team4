@@ -101,7 +101,8 @@ Pro_1/
 │  └─ data/                   기준선·표본 (지우지 않음)
 │
 ├─ simulator/
-│  ├─ generator/              [DB] 과거 데이터 백필 (예정)
+│  ├─ generator/              [B 본체·A 연결 확인·DB 후속] #75 서비스 호출 기반 과거 백필 CLI
+│  │  └─ tests/              고정 방문량·시각·부분 실패·실제 MariaDB 서비스/재개 검증
 │  └─ locust/                 [B] 부하·동시성 (예정)
 │
 ├─ infra/

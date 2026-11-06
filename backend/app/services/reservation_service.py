@@ -534,3 +534,21 @@ def complete_ended_reservations(db: Session) -> int:
         db.rollback()
         raise
     return completed
+
+
+def complete_generator_reservation(db: Session, *, user_id: int, reservation_id: int) -> None:
+    """#75의 해당 가상 예약만 완료한다. 다른 회원·운영 예약은 갱신하지 않는다."""
+    try:
+        reservation = reservation_repo.get_owned_for_update(
+            db, user_id=user_id, reservation_id=reservation_id
+        )
+        if reservation is None or not reservation.is_synthetic:
+            raise ValueError("생성기 소유의 가상 예약이 아닙니다.")
+        ends_at = datetime.combine(reservation.reserve_date, time(reservation.end_hour))
+        if ends_at > get_now() or reservation.status == "cancelled":
+            raise ValueError("완료 처리할 수 없는 예약입니다.")
+        reservation.status = "completed"
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
