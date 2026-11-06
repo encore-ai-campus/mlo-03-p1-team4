@@ -64,8 +64,9 @@ async function pay() {
   if (paying.value || !validSelection.value) return
   if (!form.agree) { errors.agree = '이용 규칙과 환불 규정에 동의해야 결제할 수 있어요.'; return }
   paying.value = true
-  log('reservation_start', { venue_id: venue.value.venue_id, date: date.value, start_hour: selected.value[0], hours: selected.value.length })
   try {
+    // 기록 실패가 결제 요청·로딩 해제를 막지 않게 try 안에서 따로 감싼다(http 배포 주소의 randomUUID 없음 사례).
+    try { log('reservation_start', { venue_id: venue.value.venue_id, date: date.value, start_hour: selected.value[0], hours: selected.value.length }) } catch { /* 관측 오류 무시 */ }
     result.value = await createReservation({ venue_id: venue.value.venue_id, date: date.value, start_hour: selected.value[0], hours: selected.value.length, headcount: Number(people.value), method: form.method }, token.value)
     toast.success('모의 결제를 마쳤어요.')
     window.scrollTo({ top: 0 })
