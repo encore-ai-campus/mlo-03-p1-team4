@@ -80,6 +80,7 @@ infra/monitoring/  alloy.config                # [A] 로그 파일 → Loki, 로
 | `get_db_write()` | primary 세션. 쓰기, '내 것' 조회, 인증 | A·B |
 | `get_db_read()` | replica 세션. 공개 조회만. replica 연결이 안 되면 primary로 대체하고 서버 로그에 경고 | A·B |
 | `get_current_user()` | → `CurrentUser(user_id)`. 토큰 없음·틀림·탈퇴 회원이면 401. **primary**에서 확인 | B 예약 API |
+| `review_repo.get_review_ids(db, reservation_ids) -> dict[int, int]` | B가 본인 소유로 확인한 현재 페이지의 예약 ID 목록과 primary 세션을 전달. A가 삭제된 후기를 포함해 `reviews`에서 SQL 한 번으로 `{reservation_id: review_id}`를 반환. 후기가 없으면 매핑에서 제외, 빈 입력은 SQL 없이 `{}`. commit·rollback 없음 (#45) | B 내 예약 목록·상세의 `review_id` |
 | `get_optional_user()` | 토큰 없으면 `None` | 이벤트 |
 | `AppError(code, message, status, detail=None)` | `{"code","message","detail"}`로 바뀌는 예외 | A·B |
 | `paginate()` | `{"items","page","size","total"}` | A·B |

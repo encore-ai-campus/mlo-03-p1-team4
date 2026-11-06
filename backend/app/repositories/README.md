@@ -21,6 +21,7 @@
 | `reservation_repo.get_owned(db, user_id, reservation_id)` | B | A (후기 작성 자격, primary 세션) | `(reservation_id, venue_id, reserve_date, start_hour, end_hour, status, created_at)` 튜플 또는 `None` |
 | `reservation_repo.count_cancellable(db, user_id)` | B | A (탈퇴 전 확인, 같은 primary 세션) | 시작 전 `confirmed` 예약 수(`int`), 시작 정각·이용 중·완료·취소 제외. 커밋은 호출자가 관리 |
 | `reservation_repo.review_context_query(*, active_only: bool = True)` | B | A `review_repo`에서 직접 import (#43) | 예약당 한 행인 `Select`: `reservation_id`, `venue_id`, `venue_name`, `category`(`categories.code`). 기본값은 활성 공간만, 내 후기는 `False`. 실행·commit·rollback 없음 |
+| `review_repo.get_review_ids(db, reservation_ids)` | A | B 내 예약 목록·상세 (#45, 같은 primary 세션) | 삭제된 후기까지 `{reservation_id: review_id}`. 후기가 없으면 매핑 제외, 빈 입력은 SQL 없음. commit·rollback 없음 |
 
 F-40의 `count_owned`, `list_owned`, `get_owned_detail`은 B 서비스 전용 조회 함수입니다. 목록의 페이지 자르기는 SQL에서 수행합니다. #45에서 A `get_review_ids(db, reservation_ids) -> dict[int, int]` 계약은 확정됐으며, A 함수 제공 후 B 서비스가 본인 예약 ID로 호출해 후기 ID를 연결합니다. B 리포지토리가 후기 표를 직접 읽거나 단건 함수를 목록에서 반복하지 않습니다.
 
