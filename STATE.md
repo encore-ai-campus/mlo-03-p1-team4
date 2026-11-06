@@ -3,7 +3,7 @@
 사람과 에이전트(Codex, Claude Code)가 함께 고치는 진행 기록입니다. 작업을 끝낼 때마다 해당 줄을 고치고 '최근 변경' 맨 위에 한 줄 더합니다. 설계 내용 자체는 `docs/`에, 여기는 상태와 결정만 둡니다.
 
 - 마지막 갱신: 2026-11-06
-- 단계: **11-05 통합일** · 설계 11-03 확정안 + 11-05 회의(탈퇴·A6·A7 확정, A8 보류) · DB 0001·seed·로컬 compose 검증 · 프론트 7화면(목업, 다락큐브·푸터 반영) · GitHub develop 흐름·CI·Project 보드 · **1차 배포 로컬 VM 7대(노트북 4대, 11-05)** · B 조회 #31·예약 #39·내부 공간 등록 #42·후기 목록 조회 계약 #44 develop 병합 완료. **A 이슈 #4 후기 작성·목록 연결 및 로컬 검증 완료**, PR 검토 대기
+- 단계: **11-06 통합 점검** · 설계 11-03 확정안 + 11-05 회의(탈퇴·A6·A7 확정, A8 보류) · DB 0001·seed·로컬 compose 검증 · 프론트 7화면(목업, 다락큐브·푸터 반영) · GitHub develop 흐름·CI·Project 보드 · **1차 배포 로컬 VM 7대(노트북 4대, 11-05)** · B 조회 #31·예약 #39·내부 공간 등록 #42·후기 목록 조회 계약 #44·A 후기 작성·목록 #47 develop 병합 완료. #43 계약과 로컬 MariaDB 관련 테스트 재확인 완료, Swagger 수동 확인은 별도
 - 디자인 캔버스(화면 설계 · 시스템 아키텍처 · 글꼴 시안): https://claude.ai/artifact/5dQciCDEaMm8uNjw6sqZpm
 - 실행 환경: Python은 conda `pro_1`(`environment.yml`), 프론트는 `frontend/`의 npm
 
@@ -12,8 +12,8 @@
 | 파트 | 담당자 | 지금 | 다음 할 일 | 막힌 것 |
 | --- | --- | --- | --- | --- |
 | 프론트 | 노진산(FE·PM) | FE-1~9 확정안 반영, Claude 시안 대조·FE 오류/모바일 결제/가입 UX 재검토 및 목업·화면 검증 | A·B 구현 후 실제 API 연결·오류·예약 동시성 통합 검증 | 실제 API 미구현 |
-| FastAPI A | [이름] | 이슈 #2 회원·탈퇴, 이슈 #4 후기 작성·목록 연결. #45 `review_repo.get_review_ids(db, reservation_ids)` 계약 구현·로컬 MariaDB 검증: 삭제된 후기 포함, 페이지당 SQL 1회, 빈 입력 SQL 없음. 관련 pytest 60건·전체 verify 통과 | B의 PR #46에서 목록·상세 실제 ID 연결 및 통합 검증 확인 | 탈퇴와 동시 예약 처리 B 협의, 이벤트 개인정보 정책 합의 대기 |
-| FastAPI B | [이름] | develop를 origin/develop(87de174, A #41·F-61 #42 포함)로 최신화하고 feat/B-F-51-review-context 생성. #43 PM 승인 review_context_query(*, active_only=True)와 계약 테스트 14건 추가. MariaDB 예약 의존성 43건·전체 pytest 303건, Ruff·프론트 린트/단위 55건/빌드 통과 | #43 B 함수 검토·병합 → A review_repo 직접 import·후기 목록 통합 검증. F-61 api1 제공·크롤러/생성기 연동, 내 예약·취소·완료 배치는 별도 | api1 실제 제공 시각은 배포 협의 후 확정. 탈퇴·동시 예약 잠금은 별도 후속 작업 |
+| FastAPI A | [이름] | 이슈 #2 회원·탈퇴, 후기 작성·목록 #47 develop 병합(#43 직접 import·공개 비활성 공간 제외·내 후기 유지, 관련 테스트 58건 재확인). #45 `review_repo.get_review_ids(db, reservation_ids)` 계약 #55: 삭제된 후기 포함, 페이지당 SQL 1회, 빈 입력 SQL 없음. 관련 pytest 60건·전체 verify 통과 | B의 PR #46에서 목록·상세 실제 ID 연결 및 통합 검증 확인, Swagger에서 실제 데이터로 후기 목록 수동 확인 | 탈퇴와 동시 예약 처리 B 협의, 이벤트 개인정보 정책 합의 대기 |
+| FastAPI B | [이름] | #43 `review_context_query(*, active_only=True)` 4열 조회 계약과 MariaDB 테스트가 PR #44로 develop 병합됨. A의 직접 import·후기 목록 통합도 PR #47로 병합됨 | F-61 api1 제공·크롤러/생성기 연동, 내 예약·취소·완료 배치는 별도 | api1 실제 제공 시각은 배포 협의 후 확정. 탈퇴·동시 예약 잠금은 별도 후속 작업 |
 | DB | [이름] | `0001_init.sql`·`mongo_init.js` 검증(설치형 11.8·compose 11.4 둘 다 29건 통과), seed(유형 5·시설 20·지역 230 → `seed.sql`), `infra/local` compose, 크롤러 시제품(옛 필터). 1차 수집원 2곳+부족분 생성 방향 확정 | 스페이스클라우드 새 필터·쉐어잇 파서/사이트별 robots 확인 → 속성 기반 시연용 공간 선별·`/internal/venues` 등록(B와) → 부족한 공간·과거 30일 행동 데이터 생성기 | 없음(A2 결정을 팀원에게 공유) |
 
 ## 기능 진행표
@@ -36,7 +36,7 @@
 | F-34~35 | 취소, 이용 완료 배치 | B | 설계 확정, 사용자 요청으로 구현 보류 |
 | F-40~41 | 내 예약, 내 후기 | B / A | #45 A 후기 ID 일괄 조회 계약·MariaDB 테스트 완료. B의 내 예약 목록·상세 PR #46은 Draft이며 A 함수 실제 연결·후기 없음/작성/삭제 응답 통합 검증 전. FE 삭제 후기 ID 유지 목업 반영. #45 전체는 미완료 |
 | F-50 지원 | A 후기 작성용 예약 소유권 조회 | B | 예약·칸·결제 모델 및 `get_owned()`를 이전 프로젝트에서 가져옴. DDL 일치·매퍼 구성 4건, 실제 MariaDB 소유권·A 후기 작성 연결 10건 통과. 예약 생성 API 구현 완료를 뜻하지 않음 |
-| F-51 지원 (#43) | A 후기 목록용 예약·공간·유형 조회식 | B / A 연계 | B `review_context_query()` 계약 및 MariaDB 테스트 14건 완료. A가 직접 import해 공개 목록의 비활성 공간 제외·내 후기 기록 유지와 필터/정렬/페이지를 연결하고 통합 테스트 완료 |
+| F-51 지원 (#43) | A 후기 목록용 예약·공간·유형 조회식 | B / A 연계 | 검증: B 4열 `review_context_query(*, active_only=True)` PR #44, A 직접 import·공개 비활성 공간 제외·내 후기 유지 PR #47이 develop 병합됨. 로컬 MariaDB 관련 테스트 58건 통과. Swagger 실제 데이터 수동 확인은 별도 |
 | F-50~51 | 후기 작성·조회(후기 모아보기) | A | B get_owned·review_context_query 연결, 작성·목록·수정·삭제 및 탈퇴 후 예약·후기 보존·작성자 익명화 로컬 MariaDB 검증. 공개 비활성 공간 제외·내 후기는 포함. 전체 backend pytest 318건 통과 |
 | F-60, F-62~65 | 이벤트(로그 파일 + MongoDB), 가상 데이터, `get_today`, 서버 로그, 지표 | A | 공통 계약·이벤트 pytest 통과. 자유 문자열 개인정보 처리 팀 합의 대기 |
 | F-61 | 크롤링 신규 등록 | DB / B | 진행: B POST /internal/venues 구현·로컬 검증 완료(35건·같은 출처 동시 8건·HTTP 6요청/12검증). DB 크롤러 새 필터·쉐어잇 파서·crawl_raw 연결과 api1 배포는 후속 |
@@ -50,7 +50,7 @@
 | 날짜 | 결정 | 근거 |
 | --- | --- | --- |
 | 11-06 | #45 내 예약의 `review_id`는 삭제된 후기 ID도 유지하고, 미작성만 `null`로 표시한다. A는 `get_review_ids(db, reservation_ids)`로 본인 예약 페이지 ID를 SQL 한 번에 조회해 B에 매핑을 제공하며 트랜잭션은 종료하지 않는다. 새 삭제 상태 필드는 추가하지 않는다 | #45 A·B·PM 합의 · `AGENTS.md` 약속 · `백엔드_A·B` 3절 |
-| 11-05 | #43 후기 목록은 B review_context_query(*, active_only=True)의 4열 Select를 A review_repo가 직접 import해 결합한다. 공개 목록은 비활성 공간 후기 숨김, 내 후기는 False로 유지. 세션 실행·후기 조인·마스킹은 A, review_create는 프론트만 전송. B 구현·검증 완료, A 연결·통합은 후속 | #43 PM 승인 댓글 및 B 동의 · `AGENTS.md` 약속 · `백엔드_A·B` 3절 |
+| 11-05 | #43 후기 목록은 B review_context_query(*, active_only=True)의 4열 Select를 A review_repo가 직접 import해 결합한다. 공개 목록은 비활성 공간 후기 숨김, 내 후기는 False로 유지. 세션 실행·후기 조인·마스킹은 A, review_create는 프론트만 전송. B PR #44와 A PR #47 병합·로컬 MariaDB 통합 검증 완료 | #43 PM 승인 댓글 및 B·A 동의 · `AGENTS.md` 약속 · `백엔드_A·B` 3절 |
 | 11-05 | F-30~32에서 본인 예약 여러 건과 모두 겹치면 `SLOT_TAKEN.detail.reservation_id`는 겹친 예약 ID 중 최솟값으로 반환한다. 자동 증가 ID는 실제 커밋 순서를 보장하지 않는다고 구분한다 | 사용자 승인 · `docs/백엔드_B` 6절 · `docs/오류코드.md` |
 | 11-05 | F-21은 offset 기본 0·음수 허용, days 기본 14·1~31. 시작 범위 밖은 OUT_OF_RANGE, 마지막 페이지 뒷부분은 최대 날짜에서 자르고 응답 days는 요청값 유지. free는 빈 칸 총수, bookable은 연속 빈 칸 ≥ min_hours이며 지난 칸 포함 | 사용자 승인 계획 · 기존 FE venuesApi 목업 · `백엔드_B` 5-2절 |
 | 11-05 | F-22 날짜는 필수 `YYYY-MM-DD` 실제 날짜. 형식·누락은 `VALIDATION`, 설정 범위 밖은 `OUT_OF_RANGE`와 날짜 양끝 detail 반환. 지난 칸·완료 점유 유지, F-20과 시간 칸 조합 함수 공유 | 사용자 승인 구현 계획 · `백엔드_B` 5-2절 · `오류코드` |
@@ -168,6 +168,8 @@ A1~A4는 11-03에 확정했고, **A5~A8은 추후 확정**으로 미뤘다(11-03
 - 개인 기억(Claude 자동 메모리 등)은 팀에 공유되지 않는다. 팀이 알아야 할 것은 이 파일과 `docs/`에 쓴다.
 
 ## 최근 변경 (최신이 위)
+
+- 11-06 · A · develop의 PR #44·#47에서 #43 계약과 A 직접 import·공개 비활성 공간 숨김·내 후기 유지를 확인. 로컬 MariaDB `spacecube_test`에서 `test_reservation_dependencies.py`·`test_reviews.py`·`test_review_lists.py` 58건 통과(Starlette 사용 중단 예정 경고 1건). 기능 코드 변경 없음. Swagger 실제 데이터 수동 확인은 남음.
 
 - 11-06 · A · #45 `review_repo.get_review_ids(db, reservation_ids) -> dict[int, int]` 구현. 삭제된 후기 포함·빈 입력 SQL 없음·중복 ID에도 SQL 1회·호출자 트랜잭션 유지 로컬 MariaDB 테스트 2건 추가. 관련 pytest 60건 통과, `verify.ps1` 전체 통과: Ruff 88파일, pytest 320건, 프론트 단위 56건·린트·색 검사·빌드 통과. Starlette 경고와 기존 FE E2E 조건문 경고 각 1건. B PR #46의 실제 호출 연결·목록/상세 통합 검증은 남음.
 
