@@ -2,12 +2,12 @@
 
 from datetime import date, datetime
 
-from sqlalchemy import Select, and_, func, or_, select
+from sqlalchemy import Select, and_, delete, func, or_, select, update
 from sqlalchemy.orm import Session
 
 from app.core.clock import get_now
 from app.models.catalog import Category, Region
-from app.models.reservation import Payment, Reservation
+from app.models.reservation import Payment, Reservation, ReservationSlot
 from app.models.venue import Venue
 
 
@@ -230,3 +230,40 @@ def get_owned(
         ).where(Reservation.reservation_id == reservation_id, Reservation.user_id == user_id)
     ).one_or_none()
     return tuple(row) if row is not None else None
+
+
+def get_owned_for_update(db: Session, *, user_id: int, reservation_id: int) -> Reservation | None:
+    """취소 직렬화를 위해 본인 예약 행을 primary 트랜잭션에서 잠근다."""
+    return db.scalar(
+        select(Reservation)
+        .where(Reservation.reservation_id == reservation_id, Reservation.user_id == user_id)
+        .with_for_update()
+    )
+
+
+def delete_slots(db: Session, *, reservation_id: int) -> int:
+    """취소된 예약의 시간 칸만 지우고 삭제한 행 수를 반환한다."""
+    return db.execute(
+        delete(ReservationSlot).where(ReservationSlot.reservation_id == reservation_id)
+    ).rowcount
+
+
+def complete_ended(db: Session, *, today: date, now_hour: int) -> int:
+    """종료 시각이 지난 확정 예약을 한 번에 완료 처리한다.
+
+    상태 조건을 UPDATE에 포함해 취소와 경합해도 취소된 예약을 되살리지 않는다.
+    완료된 예약의 시간 칸은 점유율 분석을 위해 유지한다.
+    """
+    result = db.execute(
+        update(Reservation)
+        .where(
+            Reservation.status == "confirmed",
+            or_(
+                Reservation.reserve_date < today,
+                and_(Reservation.reserve_date == today, Reservation.end_hour <= now_hour),
+            ),
+        )
+        .values(status="completed")
+        .execution_options(synchronize_session=False)
+    )
+    return int(result.rowcount or 0)

@@ -13,7 +13,8 @@ routers와 같은 이름으로 파일을 나눕니다(`auth.py`, `venues.py` …
 | `Page[T]` | 목록 응답 | `{"items": [T], "page", "size", "total"}` (core에서 제공) |
 
 - 필드 이름은 [백엔드_A·B 5절](../../../docs/백엔드_B_공간_예약_결제_크롤링.md)의 JSON 예시를 그대로 씁니다. 프론트가 이 이름을 씁니다.
-- `ReservationRead`는 F-40 목록·상세가 공유하며 예약·결제·공간·취소 가능 정보를 담습니다. `review_id`는 필수 nullable 필드입니다. #45 확정 계약은 작성 이력이 없으면 null, 삭제 여부와 관계없이 작성 이력이 있으면 ID입니다. 현재는 A `get_review_ids` 연결 전의 B 준비 단계여서 목록·상세 호출부가 null을 전달하며, 작성·삭제 후기가 있는 실제 데이터의 응답은 아직 완성되지 않았습니다.
+- F-34 취소 응답은 `ReservationCancelRead`이며 예약 ID·상태·결제 금액·환불 결제 정보와 취소 불가 상태(`can_cancel=false`)를 반환합니다.
+- `ReservationRead`는 F-40 목록·상세가 공유하며 예약·결제·공간·취소 가능 정보를 담습니다. `review_id`는 필수 nullable 필드입니다. #45 확정 계약은 작성 이력이 없으면 null, 삭제 여부와 관계없이 작성 이력이 있으면 ID입니다. A 함수는 #55로 제공됐으나 B 호출부는 null TODO 상태입니다. 실제 ID 연결과 작성·삭제 후기 검증은 #49 → #50 병합 뒤 #45 후속으로 진행합니다.
 - 날짜는 `date`, 칸은 `int`(9~22), 금액은 원 단위 `int`, 결제수단 응답은 `Literal["transfer", "card", "phone"]`. 예약 요청은 `INVALID_METHOD` 오류를 보존하도록 수단을 먼저 문자열로 받아 서비스에서 검증합니다.
 - 응답에 `password_hash`, 다른 사람의 이메일·휴대폰은 절대 넣지 않습니다. 후기 작성자는 `김**`처럼 가린 이름만 넣습니다.
 - `internal.py`는 F-61의 `InternalVenueUpsert`(출처 3종·DDL 범위·일러스트 코드 검증)와 `InternalVenueRead`(최상위 `venue_id`·`ignored_facilities`)를 정의합니다.
