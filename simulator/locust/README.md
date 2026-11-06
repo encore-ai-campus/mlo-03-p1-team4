@@ -39,3 +39,46 @@
 ## Playwright와 나누는 일
 
 Locust는 HTTP만 보내 수백~수천 명을 만들고, Playwright는 진짜 브라우저라 한 대에서 수십 명이 한계입니다. 그래서 **트래픽은 Locust**, Playwright는 부하 중에 실제 화면 흐름 2~5명분(검색 → 칸 → 결제 → 후기)을 돌려 화면 지연·오류·프론트 이벤트를 확인합니다. Playwright 요청에도 `extraHTTPHeaders`로 `X-Synthetic`(과 내부 키)을 붙입니다. 근거: `docs/인프라_트래픽_안정성_검토.md` 4절.
+
+## #20 페르소나별 매일 실행
+
+`daily_locustfile.py`는 위의 50·200명 성능 판정과 별개입니다. 네 페르소나 클래스 중 **한 번에 하나**를 선택해 정문 `/api`로 실제 요청을 보냅니다. 검색 → 상세 → 날짜별 칸 조회 후, 탐색만 제외한 클래스는 빈 칸이 있으면 예약합니다. `SLOT_TAKEN` 409를 받으면 다른 공간을 최대 두 번 시도합니다. 가상 회원은 실행 전에 준비하고, 각 동시 사용자에게 서로 다른 계정을 배정합니다. 요청 사이 대기는 1~5초입니다.
+
+| 클래스 | 문서의 실행 요일·시간대 (Asia/Seoul) | 동시 사용자 | 행동 |
+| --- | --- | ---: | --- |
+| `Student` | 평일 14:00–18:00 | 20 | 스터디룸·강의실, 1~2시간 |
+| `Worker` | 평일 19:00–22:00, 주말 10:00–12:00 | 15 | 스터디룸·스튜디오, 1~2시간 |
+| `Gathering` | 주말 13:00–18:00 | 10 | 파티룸·카페·강의실, 2~4시간·6명 |
+| `Explorer` | 위 시간대에 섞음 | 5 | 검색·상세·칸 조회, 예약 없음 |
+
+시간대는 `docs/산출물_05_구현_운영_계획.md` 4-2절의 범위입니다. **정확한 시작 시각과 반복 횟수는 작업 스케줄러가 관리합니다.** 코드와 README에는 고정 시각을 중복 저장하지 않습니다. PM이 노트북 4의 Windows 작업 스케줄러에 등록하고, 서버를 켜 둔 측정·시연 기간에만 작업을 활성화합니다. 노트북 4의 시간대를 한국 표준시로 맞춥니다. Ubuntu VM으로 실행 위치를 변경한다면 해당 VM의 시간대를 `Asia/Seoul`로 맞춘 뒤 동일한 명령을 `cron`에 등록합니다. VM 설정 변경은 소유자가 수행합니다.
+
+### 실행 준비와 명령
+
+`pro_1` 환경에 고정 버전 `locust==2.43.1`이 필요합니다. 계정 파일은 커밋하지 않는 경로에 `[{"email":"…","password":"…"}]` 형태로 준비합니다. 가상 회원은 최소 해당 동시 사용자 수만큼 서로 달라야 합니다. 키·계정·토큰은 명령 인자나 실행 기록에 쓰지 않습니다. 다음 환경변수는 노트북 4에서 작업 실행 계정에만 설정합니다.
+
+| 환경변수 | 값 |
+| --- | --- |
+| `SYNTHETIC_API_KEY` | 서버의 가상 데이터 키. 모든 요청에 `X-Synthetic: 1`, `X-Synthetic-Key`로 전달 |
+| `LOCUST_ACCOUNTS_FILE` | 가상 회원 JSON 파일의 절대 경로. `Explorer`에는 필요 없음 |
+| `LOCUST_DATES` | 서버 예약 범위 안의 실제 날짜 `YYYY-MM-DD`, 여러 날짜는 쉼표로 구분 |
+| `LOCUST_RUN_LOG` | 실행 요약 JSONL 경로. 생략하면 `simulator/locust/logs/daily-runs.jsonl` |
+| `LOCUST_LOKI_PUSH_URL` | `mon`의 Loki push API 주소 (`http://<mon 주소>:3100/loki/api/v1/push`) |
+
+저장소 루트를 **시작 위치**로 지정한 작업 스케줄러의 실행 명령 예시는 아래와 같습니다. `Student`와 `-u 20`을 해당 행의 클래스·인원으로 바꾸어 네 작업을 만듭니다. `-t 10m`는 한 번 실행할 길이의 예시이며 PM이 작업 스케줄러에 등록할 때 정합니다. 시간대와 실행 길이가 정해지지 않은 상태에서 코드는 특정 시각을 가정하지 않습니다. 아래 Python 경로는 노트북 4의 실제 `pro_1` 경로로 바꿉니다.
+
+```text
+프로그램: C:\Users\<계정>\miniforge3\envs\pro_1\python.exe
+인수: -m locust -f simulator/locust/daily_locustfile.py --headless --host http://<gw 주소> -u 20 -r 4 -t 10m Student
+시작 위치: C:\<저장소 경로>
+```
+
+Nginx가 `/api`를 FastAPI로 전달하는 정문 주소를 `--host`에 넣습니다. 작업마다 한 클래스만 선택합니다. 실행 전에 `gw`와 `mon`에 접근할 수 있는지 확인합니다. 작업 스케줄러에서 **시작 위치**와 작업 실행 계정의 환경변수가 맞는지도 확인합니다. 실제 등록된 요일·시각은 작업 스케줄러의 트리거 탭에서 확인합니다. Ubuntu에서는 `crontab -l`로 확인합니다.
+
+### 실행 기록과 Grafana
+
+종료 때 `daily_locust_run` JSON 한 줄을 로컬 JSONL 파일에 추가하고 같은 내용을 Loki로 보냅니다. 항목은 `run_id`, 페르소나, 한국시간 시작·종료, 목표 사용자 수, 전체 요청·실패 건수, HTTP 상태별 건수, 시나리오 문제, 성공/실패와 Loki 전달 결과입니다. 이메일·비밀번호·JWT·키·요청 본문은 기록하지 않습니다. Grafana에서 Loki `{job="locust_daily"}`로 실행 목록을 보고, `profile` 라벨로 페르소나별 요청 건수를 구분합니다. Loki 전송 실패는 명령 종료 코드 1로 표시하고 로컬 JSONL은 남깁니다. **`LOCUST_LOKI_PUSH_URL`을 설정하지 않은 로컬 점검은 Grafana 완료 검증이 아닙니다.**
+
+PM이 실제 등록을 마치면 작업 스케줄러의 마지막 실행 결과와 Grafana의 같은 `run_id`를 대조합니다. `mon`의 Loki 접속·보존·대시보드 설정은 모니터링 담당 A와 함께 확인합니다. 별도 50명 `SameSlotRush`는 매일 작업에 넣지 않습니다.
+
+로컬 검증: `python -m pytest -q simulator/locust/tests/test_daily_locustfile.py`와 `python -m locust -f simulator/locust/daily_locustfile.py --list`. 이 점검은 실제 예약을 만들지 않으며, 노트북 4 작업 스케줄러·정문·Grafana 전송 확인을 대신하지 않습니다.

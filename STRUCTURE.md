@@ -101,7 +101,9 @@ Pro_1/
 │
 ├─ simulator/
 │  ├─ generator/              [DB] 과거 데이터 백필 (예정)
-│  └─ locust/                 [B] 부하·동시성 (예정)
+│  └─ locust/                 [B] 부하·동시성, #20 매일 페르소나 실행
+│     ├─ daily_locustfile.py  네 페르소나 HTTP 시나리오·실행 요약·Loki 전달
+│     └─ tests/               매일 실행의 날짜·칸·요약 검증 (README.md)
 │
 ├─ infra/
 │  ├─ local/                  [DB] docker compose: MariaDB 11.4(3308) + MongoDB 7, 첫 실행 때 0001·seed·mongo_init 자동 (11-04)

@@ -21,4 +21,5 @@ dependencies:
       - pyjwt==2.15.1
       - bcrypt==5.0.0                               # 72바이트 넘는 비밀번호는 ValueError → 가입 검증에서 막음
       - prometheus-fastapi-instrumentator==8.1.0
+      - locust==2.43.1       # #20 페르소나별 실제 API 매일 실행
       - pytest==9.2.0
