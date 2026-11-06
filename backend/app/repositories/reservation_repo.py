@@ -11,6 +11,34 @@ from app.models.reservation import Payment, Reservation, ReservationSlot
 from app.models.venue import Venue
 
 
+def find_generator_booking(db: Session, *, user_id: int, body, created_at: datetime) -> dict | None:
+    """#75 커밋 직후 중단된 작업을 취소·완료 상태까지 포함해 찾는다."""
+    row = (
+        db.execute(
+            select(
+                Reservation.reservation_id,
+                Reservation.total_price,
+                Payment.method,
+                Payment.paid_at,
+            )
+            .join(Payment, Payment.reservation_id == Reservation.reservation_id)
+            .where(
+                Reservation.user_id == user_id,
+                Reservation.is_synthetic.is_(True),
+                Reservation.venue_id == body.venue_id,
+                Reservation.reserve_date == body.date,
+                Reservation.start_hour == body.start_hour,
+                Reservation.end_hour == body.start_hour + body.hours,
+                Reservation.headcount == body.headcount,
+                Reservation.created_at == created_at,
+            )
+        )
+        .mappings()
+        .one_or_none()
+    )
+    return dict(row) if row is not None else None
+
+
 def review_context_query(*, active_only: bool = True) -> Select:
     """A가 후기·회원과 결합할 예약당 한 행의 조회식만 만든다(#43).
 

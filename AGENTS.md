@@ -36,7 +36,8 @@ Codex와 Claude Code가 함께 읽는 작업 지침입니다. 사람이 채팅�
 | `frontend/` | 프론트 |
 | `backend/app/core/`, `backend/app/main.py`, A 파일(`auth`·`users`·`reviews`·`events`·`health`), `backend/scripts/`, `infra/monitoring/` | FastAPI A |
 | B 파일(`catalog`·`venues`·`reservations`·`internal`, `slot_repo`·`payment_repo`), `backend/app/jobs/`, `simulator/locust/`, `infra/nginx/`, `infra/haproxy/` | FastAPI B |
-| `db/`, `docs/db/`, `crawler/`, `simulator/generator/`, `infra/local/` | DB |
+| `db/`, `docs/db/`, `crawler/`, `infra/local/` | DB |
+| `simulator/generator/` | B 본체·세션·예약, A 회원·후기 연결 확인, DB 공간 보충·집계·정리·CSV (#75 PM 결정) |
 | `docs/`(위 제외), `infra/aws/`, `STATE.md`, `STRUCTURE.md` | 공동 |
 
 - 요청받은 파트의 파일만 고친다. 다른 파트 파일을 고쳐야 하면 멈추고 무엇을 왜 고쳐야 하는지 알린다.
