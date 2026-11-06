@@ -14,7 +14,7 @@
 | 프론트 | 노진산(FE·PM) | FE-1~9 확정안 반영, Claude 시안 대조·FE 오류/모바일 결제/가입 UX 재검토 및 목업·화면 검증. 11-06 C안 화풍(흰 바탕·검은 글자·주칠) + 유형별 일러스트 5장을 화면에 연결(API `art:` 계약 그대로) | A·B 구현 후 실제 API 연결·오류·예약 동시성 통합 검증 | 실제 API 미구현 |
 | FastAPI A | [이름] | 이슈 #2 회원·탈퇴, 후기 작성·목록 #47 develop 병합(#43 직접 import·공개 비활성 공간 제외·내 후기 유지, 관련 테스트 58건 재확인). #45 `review_repo.get_review_ids(db, reservation_ids)` 계약 #55: 삭제된 후기 포함, 페이지당 SQL 1회, 빈 입력 SQL 없음. 관련 pytest 60건·전체 verify 통과 | B의 PR #46에서 목록·상세 실제 ID 연결 및 통합 검증 확인, Swagger에서 실제 데이터로 후기 목록 수동 확인 | 탈퇴와 동시 예약 처리 B 협의, 이벤트 개인정보 정책 합의 대기 |
 | FastAPI B | 이세훈 | #49 병합 develop 55ebd23을 #50 전용 feat/B-F-04-withdraw-race에 반영해 5파일 충돌 해결. 회원 잠금·활성 재확인·롤백 후 재잠금·최신 예약 수와 조회/취소/완료 배치를 모두 보존. 관련 101건·verify 전체 Python 354건·FE 56건·Ruff 90파일·린트/빌드 및 HTTP 7요청/15검증 통과 | #50 푸시·CI·A/PM 리뷰·병합 → 최신 develop에서 #45 실제 후기 ID 연결. api1 cron·생성기 백필 지원은 별도 | #45 호출부 null TODO는 이번 변경에서 유지. 실제 api1 배포·cron은 미검증 |
-| DB | [이름] | `0001_init.sql`·`mongo_init.js` 검증(설치형 11.8·compose 11.4 둘 다 29건 통과), seed(유형 5·시설 20·지역 230 → `seed.sql`), `infra/local` compose, 크롤러 시제품(옛 필터). 1차 수집원 2곳+부족분 생성 방향 확정 | 스페이스클라우드 새 필터·쉐어잇 파서/사이트별 robots 확인 → 속성 기반 시연용 공간 선별·`/internal/venues` 등록(B와) → 부족한 공간·과거 30일 행동 데이터 생성기 | 없음(A2 결정을 팀원에게 공유) |
+| DB | [이름] | `0001_init.sql`·`mongo_init.js` 검증(설치형 11.8·compose 11.4 둘 다 29건 통과), seed(유형 5·시설 20·지역 230 → `seed.sql`), `infra/local` compose, 크롤러 시제품(옛 필터). 1차 수집원 2곳+부족분 생성 방향 확정. 별도 Compass DB의 events·event_daily 속성 정리 v1을 docs/db에 공유 | 스페이스클라우드 새 필터·쉐어잇 파서/사이트별 robots 확인 → 속성 기반 시연용 공간 선별·`/internal/venues` 등록(B와) → 부족한 공간·과거 30일 행동 데이터 생성기 | 없음(A2 결정을 팀원에게 공유) |
 
 ## 기능 진행표
 
@@ -39,7 +39,7 @@
 | F-50 지원 | A 후기 작성용 예약 소유권 조회 | B | 예약·칸·결제 모델 및 `get_owned()`를 이전 프로젝트에서 가져옴. DDL 일치·매퍼 구성 4건, 실제 MariaDB 소유권·A 후기 작성 연결 10건 통과. 예약 생성 API 구현 완료를 뜻하지 않음 |
 | F-51 지원 (#43) | A 후기 목록용 예약·공간·유형 조회식 | B / A 연계 | 검증: B 4열 `review_context_query(*, active_only=True)` PR #44, A 직접 import·공개 비활성 공간 제외·내 후기 유지 PR #47이 develop 병합됨. 로컬 MariaDB 관련 테스트 58건 통과. Swagger 실제 데이터 수동 확인은 별도 |
 | F-50~51 | 후기 작성·조회(후기 모아보기) | A | B get_owned·review_context_query 연결, 작성·목록·수정·삭제 및 탈퇴 후 예약·후기 보존·작성자 익명화 로컬 MariaDB 검증. 공개 비활성 공간 제외·내 후기는 포함. 전체 backend pytest 318건 통과 |
-| F-60, F-62~65 | 이벤트(로그 파일 + MongoDB), 가상 데이터, `get_today`, 서버 로그, 지표 | A | 공통 계약·이벤트 pytest 통과. 자유 문자열 개인정보 처리 팀 합의 대기 |
+| F-60, F-62~65 | 이벤트(로그 파일 + MongoDB), 가상 데이터, `get_today`, 서버 로그, 지표 | A | 공통 계약·이벤트 pytest 통과. 자유 문자열 개인정보 처리 팀 합의 대기. DB 참고 문서 `docs/db/events_event_daily_컬렉션_속성정리_v1.md` 공유: 별도 `space_rental_analytics` 설정이며 기존 `spacecube.user_events` 계약·초기화 코드는 변경하지 않음 |
 | F-61 | 크롤링 신규 등록 | DB / B | 진행: B POST /internal/venues 구현·로컬 검증 완료(35건·같은 출처 동시 8건·HTTP 6요청/12검증). DB 크롤러 새 필터·쉐어잇 파서·crawl_raw 연결과 api1 배포는 후속 |
 | #19 생성기 | 시연용 공간 부족분 생성·과거 30일 백필(회원·예약·결제·후기·이벤트)·`event_daily` 집계 | DB (api1 실행 환경 A, 과거 시각 저장 지원 B) | 설계 확정(11-05 #38), 코드 전. 100명으로 먼저 검증 → 11-07까지 규모 확정 |
 | F-70 | 헬스체크 3단계 | A | 설계 확정 |
@@ -50,6 +50,7 @@
 
 | 날짜 | 결정 | 근거 |
 | --- | --- | --- |
+| 11-06 | 사용자 이벤트 저장 구조는 DB가 만든 `space_rental_analytics`의 `events`·`event_daily`(`docs/db/events_event_daily_컬렉션_속성정리_v1.md`)를 기준으로 채택. 행동 이름 15종·중첩 필드로 바꾸고, 백엔드 A·B·FE·`mongo_init.js`·`산출물_04` 9절을 이 문서에 맞춘다(대응표: PR #58 코멘트). 서버 이벤트의 화면 정보 전달 방식 등 4가지는 11-07 오전까지 결정 | PM 결정 · PR #58 |
 | 11-06 | #46 병합 이후 후속 처리는 #49 충돌 해결·검증·병합 → #50 최신 develop 통합·검증·병합 → #45 실제 후기 ID 연결 순서. #8은 실제 api1 시간별 cron 등록·실행 확인 전까지 유지 | 사용자 지시 · PR #49 PM 댓글 issuecomment-6674796150 |
 | 11-06 | #45 내 예약의 `review_id`는 삭제된 후기 ID도 유지하고, 미작성만 `null`로 표시한다. A는 `get_review_ids(db, reservation_ids)`로 본인 예약 페이지 ID를 SQL 한 번에 조회해 B에 매핑을 제공하며 트랜잭션은 종료하지 않는다. 새 삭제 상태 필드는 추가하지 않는다 | #45 A·B·PM 합의 · `AGENTS.md` 약속 · `백엔드_A·B` 3절 |
 | 11-05 | #43 후기 목록은 B review_context_query(*, active_only=True)의 4열 Select를 A review_repo가 직접 import해 결합한다. 공개 목록은 비활성 공간 후기 숨김, 내 후기는 False로 유지. 세션 실행·후기 조인·마스킹은 A, review_create는 프론트만 전송. B PR #44와 A PR #47 병합·로컬 MariaDB 통합 검증 완료 | #43 PM 승인 댓글 및 B·A 동의 · `AGENTS.md` 약속 · `백엔드_A·B` 3절 |
@@ -170,6 +171,8 @@ A1~A4는 11-03에 확정했고, **A5~A8은 추후 확정**으로 미뤘다(11-03
 - 개인 기억(Claude 자동 메모리 등)은 팀에 공유되지 않는다. 팀이 알아야 할 것은 이 파일과 `docs/`에 쓴다.
 
 ## 최근 변경 (최신이 위)
+
+- 11-06 · DB · F-60 참고용 `docs/db/events_event_daily_컬렉션_속성정리_v1.md` 추가. events 15종·사용자/페이지/가격·테스트/서버 구분·365일 TTL, event_daily 속성·복합 고유 인덱스를 정리. 별도 Compass DB의 설정 기록이며 기존 user_events/API 계약 변경이나 집계 구현을 의미하지 않음. 원본 파일 해시 일치·문서 공백 검사 통과. verify.ps1은 pro_1 환경 부재로 ruff·pytest를 찾지 못하고 Node 활성 버전이 없어 실패; 실행 코드 변경은 없음.
 
 - 11-06 · B · #49 병합 확인 후 #50 전용 worktree feat/B-F-04-withdraw-race에서 PM 원격 1676499를 fast-forward하고 develop 55ebd23 병합. STATE·예약 리포지토리/서비스·테스트 README·B 명세 5파일 충돌 해결. #50의 create_reservation·_lock_active_user·count_cancellable AST와 #49의 조회/취소/완료 함수 AST를 각각 보존했으며 양쪽 동시성 테스트 함수 누락 없음 확인. 관련 MariaDB pytest 101 passed(예약/탈퇴 양방향·오래된 스냅샷·롤백 재잠금·실패/재시도 뒤 잠금 해제·50건 예약 경쟁·동시 취소·완료 배치), 실제 Uvicorn/JWT/Postman 7요청/15검증 통과 및 임시 데이터 정리. verify.ps1 전체 Ruff 90파일·Python 354 passed·FE 56 passed·린트/색 검사/빌드 통과(exit 0). 기존 Starlette·FE 조건문 경고 각 1건. lock 파일 동일성 확인, 기존 프론트 의존성 재사용. A 공통/회원·라우터·스키마·배치·Postman·FE는 최신 develop 내용 그대로이며 루트 #46 STATE 미커밋 변경 및 #49 작업 트리 보존. 실제 api1 배포·cron·브라우저 E2E는 미실행, #45 후기 ID 실제 연결은 #50 병합 뒤 별도 후속.
 
