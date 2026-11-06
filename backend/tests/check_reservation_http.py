@@ -117,6 +117,9 @@ def main() -> None:
             category = db.scalar(text("SELECT MIN(category_id) FROM categories"))
             region = db.scalar(text("SELECT MIN(region_id) FROM regions"))
             assert category is not None and region is not None, "기존 seed.sql 적용이 필요합니다."
+            category_code = db.scalar(
+                text("SELECT code FROM categories WHERE category_id=:id"), {"id": category}
+            )
             venue_id = db.execute(
                 text(
                     "INSERT INTO venues "
@@ -276,9 +279,23 @@ def main() -> None:
                     metrics = client.get("/metrics").text
                     assert 'reservation_total{result="ok"} 1.0' in metrics
                     assert 'reservation_total{result="cancel"} 1.0' in metrics
+                    events = [
+                        json.loads(line)
+                        for line in (Path(temp) / "logs/events.log")
+                        .read_text(encoding="utf-8")
+                        .splitlines()
+                    ]
+                    cancelled_events = [
+                        item for item in events if item["event_type"] == "reserve_cancel_ok"
+                    ]
+                    assert len(cancelled_events) == 1
+                    assert cancelled_events[0]["category"] == category_code
+                    assert cancelled_events[0]["venue_id"] == venue_id
+                    assert cancelled_events[0]["payload"] == {"reservation_id": reservation_id}
+                    assert cancelled_events[0]["is_synthetic"] is True
                     print(
                         "HTTP/DB verified: one synthetic cancelled reservation, refunded payment, "
-                        "released slots, booking and cancellation counters"
+                        "released slots, booking and cancellation counters, cancellation event category"
                     )
             finally:
                 process.terminate()

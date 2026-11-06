@@ -11,7 +11,7 @@
 | `test_models_match_db.py` | A | `app/models`의 표·컬럼 이름·NULL 여부가 `spacecube_test`의 실제 표와 같은지 (SQLAlchemy `inspect`) |
 | `test_health.py`, `test_db_routing.py`, `test_metrics.py` | A | primary 끊김 503 / replica·MongoDB 끊김 200 degraded, replica 주소가 틀려도 공개 조회 성공 |
 | `test_catalog.py`, `test_venues.py` | B | 기준정보 필터·캐시, 공간 검색·정렬·상세·이미지·NEW·시간 칸·예약 가능 날짜 |
-| `test_reservations.py` | B | 예약·칸·모의결제 201, 10분 재시도 200, 409 소유권·대표 ID, 기간·시간·인원·수단 검증, 지난 시간 `completed`, 키 있는 가상 요청, F-34 취소 권한·시간 경계·환불·칸 반납·재예약·실패 롤백 |
+| `test_reservations.py` | B | 예약·칸·모의결제 201, 10분 재시도 200, 409 소유권·대표 ID, 기간·시간·인원·수단 검증, 지난 시간 `completed`, 키 있는 가상 요청, F-34 취소 권한·시간 경계·환불·칸 반납·재예약·실패 롤백·활성/비활성 공간 5개 유형의 취소 이벤트 category |
 | `test_concurrency.py` | B | **다른 회원 50명이 같은 칸을 동시 요청 → 201 1건·409 49건**, 한 회원의 같은 요청 50건은 201 1건·200 49건, 겹치는 시간 경쟁, F-34 동시 취소 200 1건·409 1건. DB 행 수·이벤트·카운터 확인 |
 | `test_jobs.py` | B | F-35 종료 정각·날짜 경계·멱등·칸/결제 보존·실패 롤백·두 배치 중복 실행·취소 경합·CLI 로그/종료 코드 |
 | `test_internal.py`, `test_read_routing.py` | B | upsert 201·200·400, 공개 조회만 `get_db_read` |
@@ -213,6 +213,7 @@ CHECK_DB_URL에 기존 DDL·seed가 있는 로컬 spacecube_test 접속 정보�
 공식 앱을 임시 포트에 띄우고 가상 회원가입·실제 로그인 후 Postman 컬렉션 5개 요청을 실행합니다.
 **5개 요청·11개 검증 통과**: OpenAPI 200·F-34 경로, 무인증 401, 생성 201, 재시도 200, 취소 200.
 DB 취소 예약 1건·해제된 칸·환불 결제, 가상 표시와 예약·취소 카운터를 확인합니다.
+임시 `events.log`에서 `reserve_cancel_ok`가 정확히 한 번 기록되고 공간 ID·유형 코드·예약 ID·가상 표시가 맞는지도 확인합니다.
 종료 시 서버·임시 비밀 환경과 생성한 ID의 회원·공간·예약을 정리합니다.
 Postman CLI와 Node가 필요하며 컬렉션 5개 요청 파일 lint도 오류·경고 0건입니다.
 프론트 화면 전체의 실제 예약 API 연결과 실제 replica 장애·복제 지연 시험은 포함하지 않습니다.

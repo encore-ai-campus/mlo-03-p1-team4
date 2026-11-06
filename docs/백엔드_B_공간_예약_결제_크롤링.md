@@ -294,6 +294,8 @@ POST /reservations/{id}/cancel
 
 전액 환불만 합니다. 성공 응답은 `reservation_id`·`status`·`total_price`·환불 시각을 포함한 `payment`·`can_cancel=false`를 반환합니다. `reserve_cancel_ok` 기록과 `reservation_total{result="cancel"}` 증가는 커밋 뒤에 한 번만 합니다. 예약과 무관한 다른 회원·예약 칸은 삭제하지 않습니다.
 
+`reserve_cancel_ok`에는 최상위 `venue_id`·`category`(공간 유형 코드)와 `payload.reservation_id`를 전달합니다. 유형은 커밋 전 같은 primary 세션에서 읽으며, 비활성 공간의 예약도 취소하고 유형을 기록합니다.
+
 ### 이용 완료 배치 (primary)
 
 ```sql

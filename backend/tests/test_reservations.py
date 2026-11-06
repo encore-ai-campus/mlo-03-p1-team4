@@ -542,6 +542,43 @@ def test_cancel_refunds_and_releases_only_owned_reservation_slots(connection, sa
     assert count_reservation_slots(connection, rebooked.json()["reservation_id"]) == 2
 
 
+@pytest.mark.parametrize("category", ["studyroom", "studio", "cafe", "lectureroom", "partyroom"])
+@pytest.mark.parametrize("is_active", [True, False])
+def test_cancel_event_includes_category_for_active_and_inactive_venues(
+    connection, sample, api, category, is_active
+):
+    """F-34 취소 이벤트는 비활성 공간을 포함한 모든 유형의 코드를 기록한다."""
+    connection.execute(
+        text(
+            "UPDATE venues SET category_id=(SELECT category_id FROM categories WHERE code=:code) "
+            "WHERE venue_id=:venue"
+        ),
+        {"code": category, "venue": sample["venue_id"]},
+    )
+    created = api.post("/reservations", json=booking(sample["venue_id"]))
+    assert created.status_code == 201
+    reservation_id = created.json()["reservation_id"]
+    connection.execute(
+        text("UPDATE venues SET is_active=:active WHERE venue_id=:venue"),
+        {"active": is_active, "venue": sample["venue_id"]},
+    )
+
+    response = api.post(f"/reservations/{reservation_id}/cancel")
+
+    assert response.status_code == 200
+    assert [item for item in api.app.state.booking_events if item[0] == "reserve_cancel_ok"] == [
+        (
+            "reserve_cancel_ok",
+            {
+                "venue_id": sample["venue_id"],
+                "category": category,
+                "payload": {"reservation_id": reservation_id},
+                "is_synthetic": False,
+            },
+        )
+    ]
+
+
 def test_cancel_reports_hidden_ownership_and_documented_state_errors(connection, sample, api):
     future = api.post("/reservations", json=booking(sample["venue_id"]))
     at_start = api.post(

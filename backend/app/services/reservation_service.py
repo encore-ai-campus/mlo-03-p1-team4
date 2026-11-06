@@ -299,6 +299,11 @@ def cancel_reservation(
         if reservation.status != "confirmed" or starts_at <= now:
             raise AppError("NOT_CANCELLABLE", "이용이 시작된 예약은 취소할 수 없어요.", 409)
 
+        # 비활성 공간도 취소할 수 있으므로 활성 여부로 거르지 않고 유형을 읽는다.
+        venue = venue_repo.get_booking_info(db, reservation.venue_id)
+        if venue is None:
+            raise RuntimeError("예약에 연결된 공간 정보가 없습니다.")
+
         reservation.status = "cancelled"
         if reservation_repo.delete_slots(db, reservation_id=reservation_id) <= 0:
             raise RuntimeError("확정 예약에 연결된 시간 칸이 없습니다.")
@@ -315,6 +320,7 @@ def cancel_reservation(
         user_id,
         "reserve_cancel_ok",
         venue_id=reservation.venue_id,
+        category=venue["category_code"],
         payload={"reservation_id": reservation_id},
         is_synthetic=reservation.is_synthetic,
     )
