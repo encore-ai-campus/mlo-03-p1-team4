@@ -114,11 +114,10 @@ def find_recent_matching(
 
 
 def count_cancellable(db: Session, user_id: int) -> int:
-    """primary 세션에서 시작 전 confirmed 예약 수를 센다. 시작 정각은 제외한다."""
+    """primary에서 최신 행을 잠가 시작 전 confirmed 예약 수를 센다."""
     now = get_now()
     query = (
-        select(func.count())
-        .select_from(Reservation)
+        select(Reservation.reservation_id)
         .where(
             Reservation.user_id == user_id,
             Reservation.status == "confirmed",
@@ -130,8 +129,9 @@ def count_cancellable(db: Session, user_id: int) -> int:
                 ),
             ),
         )
+        .with_for_update()
     )
-    return int(db.scalar(query) or 0)
+    return len(db.scalars(query).all())
 
 
 def count_owned(db: Session, *, user_id: int, status: str | None = None) -> int:

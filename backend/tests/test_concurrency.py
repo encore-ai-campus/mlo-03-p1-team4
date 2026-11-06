@@ -1,25 +1,27 @@
-"""F-32: 실제 MariaDB 기본키가 50개 동시 요청 중 한 요청만 확정하는지 확인한다."""
+"""F-04·32: 실제 MariaDB에서 예약 경쟁과 탈퇴 직렬화를 검증한다."""
 
 import os
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime, timedelta
-from threading import Barrier, Lock
+from threading import Barrier, Event, Lock, get_ident
 from uuid import uuid4
 
 import pytest
 from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, select, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import NullPool
 
 from app.core.db import get_db_write
 from app.core.deps import CurrentUser, get_current_user
-from app.core.errors import register_error_handlers
+from app.core.errors import AppError, register_error_handlers
 from app.core.metrics import reservation_counter
+from app.models.user import User
+from app.repositories import reservation_repo
 from app.routers.reservations import router
-from app.services import reservation_service
+from app.services import reservation_service, user_service
 
 TODAY = date(2026, 11, 5)
 NOW = datetime.fromisoformat("2026-11-05T12:00:00")
@@ -157,6 +159,8 @@ def concurrency_environment(monkeypatch):
         test_app, event_log, record_event = _create_app(engine)
         monkeypatch.setattr(reservation_service, "get_today", lambda: TODAY)
         monkeypatch.setattr(reservation_service, "get_now", lambda: NOW)
+        monkeypatch.setattr(reservation_repo, "get_now", lambda: NOW)
+        monkeypatch.setattr(user_service, "get_now", lambda: NOW)
         monkeypatch.setattr(reservation_service, "log_event", record_event)
         yield {
             "engine": engine,
@@ -190,6 +194,281 @@ def _reservation_count(engine, venue_id):
             text("SELECT COUNT(*) FROM reservations WHERE venue_id=:venue"),
             {"venue": venue_id},
         )
+
+
+def _authenticate(db, user_id, authenticated=None, before_service=None):
+    """실제 인증 의존성으로 스냅샷을 열고 양쪽 요청의 인증 완료를 맞춘다."""
+    request = Request({"type": "http", "headers": []})
+    assert get_current_user(request, user_id, db).user_id == user_id
+    if authenticated is not None:
+        authenticated.wait(timeout=10)
+    if before_service is not None:
+        assert before_service.wait(10)
+
+
+def _create_booking(state, user_id, body, authenticated=None, before_service=None):
+    with Session(bind=state["engine"]) as db:
+        _authenticate(db, user_id, authenticated, before_service)
+        return reservation_service.create_reservation(
+            db,
+            reservation_service.ReservationCreate.model_validate(body),
+            user_id=user_id,
+            session_id=None,
+            is_synthetic=False,
+        )
+
+
+def _withdraw(state, user_id, authenticated=None, before_service=None):
+    with Session(bind=state["engine"]) as db:
+        try:
+            _authenticate(db, user_id, authenticated, before_service)
+            user_service.withdraw(db, user_id)
+            return None
+        except AppError as error:
+            return error
+
+
+def _reservation_rows_for_user(engine, user_id):
+    with engine.connect() as connection:
+        return connection.scalar(
+            text("SELECT COUNT(*) FROM reservations WHERE user_id=:user"), {"user": user_id}
+        )
+
+
+def _assert_booking_rows(state, user_id, expected):
+    """다른 연결에서 예약·칸·결제의 최종 커밋 결과를 확인한다."""
+    with state["engine"].connect() as connection:
+        for query in (
+            "SELECT COUNT(*) FROM reservations WHERE user_id=:user",
+            "SELECT COUNT(*) FROM reservation_slots s JOIN reservations r "
+            "ON r.reservation_id=s.reservation_id WHERE r.user_id=:user",
+            "SELECT COUNT(*) FROM payments p JOIN reservations r "
+            "ON r.reservation_id=p.reservation_id WHERE r.user_id=:user",
+        ):
+            assert connection.scalar(text(query), {"user": user_id}) == expected
+
+
+def test_booking_lock_makes_withdrawal_observe_committed_reservation(
+    concurrency_environment, monkeypatch
+):
+    """예약이 회원 잠금을 먼저 잡으면 탈퇴가 커밋된 예약을 보고 409를 반환한다."""
+    state = concurrency_environment
+    user_id = state["user_ids"][0]
+    body = _booking(state["venue_id"])
+    authenticated = Barrier(2)
+    booking_paused = Event()
+    release_booking = Event()
+    withdraw_lock_attempted = Event()
+    booking_thread_id = {}
+    original_create = reservation_service.reservation_repo.create
+    original_get_active = user_service.user_repo.get_active
+
+    def pause_booking_after_member_lock(*args, **kwargs):
+        booking_paused.set()
+        assert release_booking.wait(10)
+        return original_create(*args, **kwargs)
+
+    def observe_withdraw_lock(db, user_id, *, for_update=False):
+        if for_update:
+            if "id" not in booking_thread_id:
+                booking_thread_id["id"] = get_ident()
+            elif get_ident() != booking_thread_id["id"]:
+                withdraw_lock_attempted.set()
+        return original_get_active(db, user_id, for_update=for_update)
+
+    monkeypatch.setattr(
+        reservation_service.reservation_repo, "create", pause_booking_after_member_lock
+    )
+    monkeypatch.setattr(user_service.user_repo, "get_active", observe_withdraw_lock)
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        booking = pool.submit(_create_booking, state, user_id, body, authenticated)
+        withdrawal = pool.submit(_withdraw, state, user_id, authenticated, booking_paused)
+        assert booking_paused.wait(10)
+        assert withdraw_lock_attempted.wait(10)
+        release_booking.set()
+        _, booking_status = booking.result(timeout=15)
+        withdrawal_error = withdrawal.result(timeout=15)
+
+    assert booking_status == 201
+    assert isinstance(withdrawal_error, AppError)
+    assert withdrawal_error.code == "HAS_UPCOMING_RESERVATION"
+    assert withdrawal_error.status == 409
+    assert withdrawal_error.detail == {"count": 1}
+    _assert_booking_rows(state, user_id, 1)
+
+
+def test_withdrawal_lock_makes_waiting_booking_reject_inactive_user(
+    concurrency_environment, monkeypatch
+):
+    """탈퇴가 회원 잠금을 먼저 잡으면 대기 중인 예약은 최신 탈퇴 상태로 401이다."""
+    state = concurrency_environment
+    user_id = state["user_ids"][0]
+    body = _booking(state["venue_id"])
+    authenticated = Barrier(2)
+    withdrawal_paused = Event()
+    release_withdrawal = Event()
+    booking_lock_attempted = Event()
+    withdrawal_thread_id = {}
+    original_count = reservation_repo.count_cancellable
+    original_get_active = reservation_service.user_repo.get_active
+
+    def pause_withdraw_after_member_lock(db, locked_user_id):
+        withdrawal_thread_id["id"] = get_ident()
+        count = original_count(db, locked_user_id)
+        withdrawal_paused.set()
+        assert release_withdrawal.wait(10)
+        return count
+
+    def observe_booking_lock(db, locked_user_id, *, for_update=False):
+        if for_update and get_ident() != withdrawal_thread_id.get("id"):
+            booking_lock_attempted.set()
+        return original_get_active(db, locked_user_id, for_update=for_update)
+
+    monkeypatch.setattr(reservation_repo, "count_cancellable", pause_withdraw_after_member_lock)
+    monkeypatch.setattr(reservation_service.user_repo, "get_active", observe_booking_lock)
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        withdrawal = pool.submit(_withdraw, state, user_id, authenticated)
+        booking = pool.submit(
+            _create_booking, state, user_id, body, authenticated, withdrawal_paused
+        )
+        assert withdrawal_paused.wait(10)
+        assert booking_lock_attempted.wait(10)
+        release_withdrawal.set()
+        assert withdrawal.result(timeout=15) is None
+        try:
+            booking_error = booking.result(timeout=15)
+        except AppError as error:
+            booking_error = error
+
+    assert isinstance(booking_error, AppError)
+    assert booking_error.code == "UNAUTHORIZED"
+    assert booking_error.status == 401
+    _assert_booking_rows(state, user_id, 0)
+
+
+def test_count_cancellable_uses_current_read_after_old_snapshot(
+    concurrency_environment, monkeypatch
+):
+    """먼저 열린 일관 읽기 스냅샷 뒤에 커밋된 예약도 탈퇴 집계가 본다."""
+    state = concurrency_environment
+    user_id = state["user_ids"][0]
+    monkeypatch.setattr(reservation_repo, "get_now", lambda: NOW)
+    with Session(bind=state["engine"]) as db:
+        assert db.scalar(select(User).where(User.user_id == user_id)) is not None
+        with state["engine"].begin() as writer:
+            writer.execute(
+                text(
+                    "INSERT INTO reservations "
+                    "(user_id,venue_id,reserve_date,start_hour,end_hour,headcount,total_price,status,is_synthetic) "
+                    "VALUES (:user,:venue,:date,13,14,2,11000,'confirmed',FALSE)"
+                ),
+                {"user": user_id, "venue": state["venue_id"], "date": TODAY + timedelta(days=1)},
+            )
+        assert reservation_repo.count_cancellable(db, user_id) == 1
+
+
+def test_duplicate_slot_rollback_rechecks_user_before_retry_result(
+    concurrency_environment, monkeypatch
+):
+    """슬롯 충돌 롤백으로 회원 잠금이 풀린 사이 탈퇴하면 재시도는 401이다."""
+    state = concurrency_environment
+    winner_id, losing_user_id = state["user_ids"][:2]
+    body = _booking(state["venue_id"])
+    _create_booking(state, winner_id, body)
+
+    relock_reached = Event()
+    release_relock = Event()
+    booking_thread_id = None
+    lock_calls = 0
+    original_get_active = reservation_service.user_repo.get_active
+
+    def pause_relock_after_rollback(db, user_id, *, for_update=False):
+        nonlocal booking_thread_id, lock_calls
+        if for_update and user_id == losing_user_id:
+            if booking_thread_id is None:
+                booking_thread_id = get_ident()
+            if get_ident() == booking_thread_id:
+                lock_calls += 1
+                if lock_calls == 2:
+                    relock_reached.set()
+                    assert release_relock.wait(10)
+        return original_get_active(db, user_id, for_update=for_update)
+
+    monkeypatch.setattr(reservation_service.user_repo, "get_active", pause_relock_after_rollback)
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        booking = pool.submit(_create_booking, state, losing_user_id, body)
+        assert relock_reached.wait(10)
+        withdrawal = pool.submit(_withdraw, state, losing_user_id)
+        assert withdrawal.result(timeout=15) is None
+        release_relock.set()
+        try:
+            booking_error = booking.result(timeout=15)
+        except AppError as error:
+            booking_error = error
+
+    assert isinstance(booking_error, AppError)
+    assert booking_error.code == "UNAUTHORIZED"
+    _assert_booking_rows(state, losing_user_id, 0)
+    assert _reservation_rows_for_user(state["engine"], winner_id) == 1
+
+
+@pytest.mark.parametrize("failure", ["validation", "payment"])
+def test_booking_failure_rolls_back_rows_and_releases_member_lock(
+    concurrency_environment, monkeypatch, failure
+):
+    """실패한 서비스의 세션이 열린 상태에서도 뒤 탈퇴가 잠금을 얻어 성공한다."""
+    state = concurrency_environment
+    user_id = state["user_ids"][0]
+    body = _booking(state["venue_id"])
+    if failure == "validation":
+        body["method"] = "invalid"
+        expected = AppError
+    else:
+
+        def fail_payment(*args, **kwargs):
+            raise RuntimeError("테스트 결제 저장 실패")
+
+        monkeypatch.setattr(reservation_service.payment_repo, "create", fail_payment)
+        expected = RuntimeError
+    with Session(bind=state["engine"]) as db:
+        _authenticate(db, user_id)
+        with pytest.raises(expected):
+            reservation_service.create_reservation(
+                db,
+                reservation_service.ReservationCreate.model_validate(body),
+                user_id=user_id,
+                session_id=None,
+                is_synthetic=False,
+            )
+        assert not db.in_transaction()
+        _assert_booking_rows(state, user_id, 0)
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            assert pool.submit(_withdraw, state, user_id).result(timeout=10) is None
+
+
+def test_successful_retry_releases_member_lock(concurrency_environment):
+    """재시도 200도 트랜잭션을 닫아 뒤 탈퇴의 잠금 획득을 막지 않는다."""
+    state = concurrency_environment
+    user_id = state["user_ids"][0]
+    body = _booking(state["venue_id"])
+    first, _ = _create_booking(state, user_id, body)
+    with Session(bind=state["engine"]) as db:
+        _authenticate(db, user_id)
+        retry, status = reservation_service.create_reservation(
+            db,
+            reservation_service.ReservationCreate.model_validate(body),
+            user_id=user_id,
+            session_id=None,
+            is_synthetic=False,
+        )
+        assert status == 200
+        assert retry.reservation_id == first.reservation_id
+        assert not db.in_transaction()
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            error = pool.submit(_withdraw, state, user_id).result(timeout=10)
+        assert isinstance(error, AppError)
+        assert error.code == "HAS_UPCOMING_RESERVATION"
+    _assert_booking_rows(state, user_id, 1)
 
 
 def test_same_slot_with_fifty_simultaneous_users_has_one_winner(concurrency_environment):

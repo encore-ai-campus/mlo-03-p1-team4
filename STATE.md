@@ -13,7 +13,7 @@
 | --- | --- | --- | --- | --- |
 | 프론트 | 노진산(FE·PM) | FE-1~9 확정안 반영, Claude 시안 대조·FE 오류/모바일 결제/가입 UX 재검토 및 목업·화면 검증. 11-06 C안 화풍(흰 바탕·검은 글자·주칠) + 유형별 일러스트 5장을 화면에 연결(API `art:` 계약 그대로) | A·B 구현 후 실제 API 연결·오류·예약 동시성 통합 검증 | 실제 API 미구현 |
 | FastAPI A | [이름] | 이슈 #2 회원·탈퇴, 후기 작성·목록 #47 develop 병합(#43 직접 import·공개 비활성 공간 제외·내 후기 유지, 관련 테스트 58건 재확인). #45 `review_repo.get_review_ids(db, reservation_ids)` 계약 #55: 삭제된 후기 포함, 페이지당 SQL 1회, 빈 입력 SQL 없음. 관련 pytest 60건·전체 verify 통과 | B의 PR #46에서 목록·상세 실제 ID 연결 및 통합 검증 확인, Swagger에서 실제 데이터로 후기 목록 수동 확인 | 탈퇴와 동시 예약 처리 B 협의, 이벤트 개인정보 정책 합의 대기 |
-| FastAPI B | 이세훈 | #49 전용 feat/B-F-34-35-reservations에서 PM 커밋 1d0bf5d와 develop 3a729f2를 반영해 13파일 충돌 해결. 기존 목록/상세·취소/완료 배치·category 기록 보존. 관련 94건, verify.ps1 전체 Python 347건·FE 56건·Ruff 90파일·린트/빌드, 실제 HTTP 7요청/15검증 통과 | #49 푸시·CI·PM 리뷰/병합 → #50 브랜치 최신화·충돌 해결·검증/병합 → #45 실제 후기 ID 연결. api1 cron은 별도 | #45 후기 ID 호출부는 null TODO로 후속 유지. 실제 api1 시간 배치 cron 미등록·미검증. Project 보드 미확인 |
+| FastAPI B | 이세훈 | #49 병합 develop 55ebd23을 #50 전용 feat/B-F-04-withdraw-race에 반영해 5파일 충돌 해결. 회원 잠금·활성 재확인·롤백 후 재잠금·최신 예약 수와 조회/취소/완료 배치를 모두 보존. 관련 101건·verify 전체 Python 354건·FE 56건·Ruff 90파일·린트/빌드 및 HTTP 7요청/15검증 통과 | #50 푸시·CI·A/PM 리뷰·병합 → 최신 develop에서 #45 실제 후기 ID 연결. api1 cron·생성기 백필 지원은 별도 | #45 호출부 null TODO는 이번 변경에서 유지. 실제 api1 배포·cron은 미검증 |
 | DB | [이름] | `0001_init.sql`·`mongo_init.js` 검증(설치형 11.8·compose 11.4 둘 다 29건 통과), seed(유형 5·시설 20·지역 230 → `seed.sql`), `infra/local` compose, 크롤러 시제품(옛 필터). 1차 수집원 2곳+부족분 생성 방향 확정 | 스페이스클라우드 새 필터·쉐어잇 파서/사이트별 robots 확인 → 속성 기반 시연용 공간 선별·`/internal/venues` 등록(B와) → 부족한 공간·과거 30일 행동 데이터 생성기 | 없음(A2 결정을 팀원에게 공유) |
 
 ## 기능 진행표
@@ -23,7 +23,7 @@
 | F-ID | 기능 | 담당 | 상태 |
 | --- | --- | --- | --- |
 | F-01~04 | 회원가입·로그인·내 정보·로그아웃·탈퇴 | A | 가입·회원·탈퇴 구현 및 수동 확인, 전체 pytest 230건 통과. 탈퇴와 동시 예약은 B 협의 대기 |
-| F-04 지원 | 탈퇴 전 취소 가능 예약 수 | B / A 연계 | count_cancellable(db, user_id) → int 구현. 시작 전 confirmed만 포함, 시작 정각·날짜 경계·상태·회원·0건·복수 집계 12건 통과. A 탈퇴 서비스의 503 해제·호출 연결은 A 후속 작업 |
+| F-04 지원 | 탈퇴 전 취소 가능 예약 수 | B / A 연계 | #50에서 예약 전 회원 FOR UPDATE·활성 재확인, 슬롯 충돌 롤백 후 재잠금, 재시도 200 커밋·잠금 해제, count_cancellable의 FOR UPDATE 최신 읽기를 유지. #49 병합 develop 통합 뒤 예약/탈퇴 양방향 경합·인증 스냅샷·실패/재시도 잠금 해제 및 취소 경합 포함 관련 101건·전체 354건·FE 56건·HTTP 7요청/15검증 통과. CI·리뷰/병합 대기 |
 | F-10 | 공간 유형 목록 조회 | B | 검증: 11-05 로컬 MariaDB `localhost:3306/spacecube_test`에서 pytest 5건 통과(공개 읽기·실제 DB 응답·5분 캐시·오류 처리) |
 | F-11·기준 정보 | 지역·시설 목록 조회 | B | 검증: 활성 지역 필터·시도/시군구 응답·시설 전체 조회·공유 스냅샷·5분 캐시·공개 읽기·검증 오류. 기존 F-10 포함 test_catalog 19건 통과 |
 | F-12 | 공간 검색 | B | 검증: GET `/venues`. q·유형·지역·날짜·시간·인원·복수 시설 필터, 검색 뒤 페이지 total, replica 조회. MariaDB 전용 테스트와 실제 HTTP 검색 계약·입력 오류 확인 |
@@ -33,7 +33,7 @@
 | F-21 | 예약 가능 날짜 | B | 검증: 공개 available-dates API 구현. 빈 칸 총수·min_hours 이상 연속 빈 칸 판정, 음수 offset·days 1~31·기간 양끝·0일 설정·마지막 페이지 잘림·큰 offset·점유 분리·재조회·SQL 2회·400/404·읽기 의존성 등 48건 추가. test_venues 114건, 전체 pytest 153건, 실제 HTTP Chrome 1건 통과. FE 전체 연결은 별도 |
 | F-22 | 날짜별 시간 칸 | B | 검증: 공개 GET /venues/{venue_id}/slots?date=YYYY-MM-DD 구현. 엄격한 날짜·설정 범위 양끝·0일 설정, 공간/날짜별 점유·완료 칸·past·F-20 일치·재조회·400/404·읽기 의존성 등 38건 추가. test_venues 총 66건, 전체 pytest 105건, 실제 HTTP Chrome 1건 통과 |
 | F-30~32 | 예약+모의 결제 한 번, 중복 차단 | B | 공식 앱의 POST /reservations 등록·A 공통 가상 키 검증 사용. API 21건·경쟁 3건 포함 전체 MariaDB pytest 241건 통과. PR #39의 취소·환불 재시도 제외 및 취소 후 재예약·타인 선점 회귀 검증 반영. 동시 다른 회원 50명: 201 1건/409 49건, 같은 회원: 201 1건/200 49건. 실제 인증·Postman 4요청/8검증에서 OpenAPI 200·무인증 401·생성 201·재시도 200 확인, DB 3개 표·합성 표시·카운터 검증·테스트 데이터 정리 완료 |
-| F-34 | 예약 취소·환불 | B | #49에서 develop 3a729f2와 코드 충돌 해결. 실제 취소 API 뒤 F-40 목록/상세가 같은 cancelled·refunded 상태인지 검증. 활성/비활성 공간 5개 유형 category 기록과 원자 환불·슬롯 반납·동시 취소·재예약 유지. 관련 94건·전체 347건·HTTP 7요청/15검증 통과. CI·PM 리뷰/병합 대기 |
+| F-34 | 예약 취소·환불 | B | #49에서 develop 3a729f2와 코드 충돌 해결. 실제 취소 API 뒤 F-40 목록/상세가 같은 cancelled·refunded 상태인지 검증. 활성/비활성 공간 5개 유형 category 기록과 원자 환불·슬롯 반납·동시 취소·재예약 유지. 관련 94건·전체 347건·HTTP 7요청/15검증·CI 통과 후 #49가 55ebd23으로 develop 병합됨 |
 | F-35 | 이용 완료 배치 | B | #49의 primary 조건부 일괄 UPDATE·get_now 1회·commit/rollback·CLI·완료 뒤 칸/결제 보존을 develop 통합 후 재검증. test_jobs 6건 포함 관련 94건·전체 347건 통과. 실제 api1 시간별 cron 등록·실행은 미완료이므로 #8 유지 |
 | F-40~41 | 내 예약, 내 후기 | B / A | #46 조회·필수 nullable review_id·필드 생략 해제는 develop 병합됨. #49 충돌 해결 때 목록/상세·취소 연동과 기존 테스트 모두 보존. A get_review_ids는 #55로 제공됐으나 B 호출부는 아직 null TODO. 사용자 지시에 따라 #49 → #50 병합 후 #45 후속 브랜치에서 실제 ID 연결·작성/삭제 후기·일괄 SQL 검증. F-41은 A 범위 |
 | F-50 지원 | A 후기 작성용 예약 소유권 조회 | B | 예약·칸·결제 모델 및 `get_owned()`를 이전 프로젝트에서 가져옴. DDL 일치·매퍼 구성 4건, 실제 MariaDB 소유권·A 후기 작성 연결 10건 통과. 예약 생성 API 구현 완료를 뜻하지 않음 |
@@ -170,6 +170,10 @@ A1~A4는 11-03에 확정했고, **A5~A8은 추후 확정**으로 미뤘다(11-03
 - 개인 기억(Claude 자동 메모리 등)은 팀에 공유되지 않는다. 팀이 알아야 할 것은 이 파일과 `docs/`에 쓴다.
 
 ## 최근 변경 (최신이 위)
+
+- 11-06 · B · #49 병합 확인 후 #50 전용 worktree feat/B-F-04-withdraw-race에서 PM 원격 1676499를 fast-forward하고 develop 55ebd23 병합. STATE·예약 리포지토리/서비스·테스트 README·B 명세 5파일 충돌 해결. #50의 create_reservation·_lock_active_user·count_cancellable AST와 #49의 조회/취소/완료 함수 AST를 각각 보존했으며 양쪽 동시성 테스트 함수 누락 없음 확인. 관련 MariaDB pytest 101 passed(예약/탈퇴 양방향·오래된 스냅샷·롤백 재잠금·실패/재시도 뒤 잠금 해제·50건 예약 경쟁·동시 취소·완료 배치), 실제 Uvicorn/JWT/Postman 7요청/15검증 통과 및 임시 데이터 정리. verify.ps1 전체 Ruff 90파일·Python 354 passed·FE 56 passed·린트/색 검사/빌드 통과(exit 0). 기존 Starlette·FE 조건문 경고 각 1건. lock 파일 동일성 확인, 기존 프론트 의존성 재사용. A 공통/회원·라우터·스키마·배치·Postman·FE는 최신 develop 내용 그대로이며 루트 #46 STATE 미커밋 변경 및 #49 작업 트리 보존. 실제 api1 배포·cron·브라우저 E2E는 미실행, #45 후기 ID 실제 연결은 #50 병합 뒤 별도 후속.
+
+- 11-06 · B / A 연계 · #38 동시성 변경을 최신 origin/develop `bdd6dea`와 대조. 예약 전 회원 행 잠금·활성 재확인, 슬롯 충돌 롤백 뒤 재잠금, `count_cancellable()` 최신 행 읽기 구현. A·B 시각을 고정하고 실제 회원 인증 의존성 조회를 양쪽에서 완료한 후 예약/탈퇴 선행 경합, 오래된 스냅샷, 검증/결제 실패 및 재시도 200 뒤 잠금 해제를 독립 MariaDB 연결로 검증(신규 7건). `verify.ps1` 전체 통과: Ruff 85파일·pytest 310건·FE 단위 55건/린트/빌드. 실제 Uvicorn·Postman 4요청/8검증 및 DB 원자 저장·임시 데이터 정리 통과. 기존 Starlette·FE E2E 조건문 경고 각 1건. 백필과 #49 코드는 이번 범위에 포함하지 않으며 #38 전체 종료는 하지 않음.
 
 - 11-06 · B · 사용자 지시에 따라 PR #49 전용 worktree에서 원격 1d0bf5d를 fast-forward한 뒤 develop 3a729f2를 병합. 리포지토리·서비스·라우터·스키마·테스트·HTTP 검증기·README·Postman 정의·STATE 13파일의 충돌을 양쪽 기능 보존으로 해결. 공통 예약 생성 함수 AST 동일성을 확인하고 #49 취소/완료 함수와 develop 목록/상세 함수를 결합, 취소 이벤트 category 수정을 유지. 기존 SQL 취소 fixture를 실제 취소 API로 바꾸고 취소 뒤 목록 항목과 상세 응답 일치 검증. Postman은 목록/상세 뒤 마지막에 취소하도록 order 5000으로 조정해 7요청/15검증 통과, 실제 MariaDB 11.4.13 환불·칸 반환·카운터·events.log category/단 1회 기록·임시 데이터 정리 확인. 관련 pytest 94 passed, verify.ps1 전체 Ruff 90파일·Python 347 passed·FE 56 passed·린트/색 검사/빌드 통과(exit 0). 기존 Starlette·FE 조건문 경고 각 1건. lock 파일 동일성 확인 후 기존 프론트 node_modules를 junction으로 재사용. A·FE 파일은 upstream과 동일하며 수동 변경 없음, 루트 #46의 기존 STATE 미커밋 변경과 #50 worktree 보존. 실제 api1 배포·cron·브라우저 E2E는 미실행. #49 푸시/CI 확인 뒤 PM 병합, 이후 #50 → #45 순서 유지.
 

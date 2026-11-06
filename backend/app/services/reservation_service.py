@@ -12,7 +12,7 @@ from app.core.errors import AppError, fail
 from app.core.events import log_event
 from app.core.metrics import reservation_counter
 from app.core.pagination import Pagination, paginate
-from app.repositories import payment_repo, reservation_repo, slot_repo, venue_repo
+from app.repositories import payment_repo, reservation_repo, slot_repo, user_repo, venue_repo
 from app.schemas.reservations import (
     PaymentRead,
     ReservationCancelPaymentRead,
@@ -112,6 +112,12 @@ def _duplicate_key(error: IntegrityError) -> bool:
     return bool(arguments) and arguments[0] == 1062
 
 
+def _lock_active_user(db: Session, user_id: int) -> None:
+    """탈퇴와 예약을 같은 회원 행 잠금으로 직렬화한다."""
+    if user_repo.get_active(db, user_id, for_update=True) is None:
+        raise fail("UNAUTHORIZED", 401)
+
+
 def _slot_taken(detail: dict, *, mine: bool = False) -> AppError:
     message = (
         "이미 내 예약과 겹치는 시간이에요." if mine else "다른 분이 먼저 결제한 시간이 있어요."
@@ -187,14 +193,16 @@ def create_reservation(
     is_synthetic: bool,
 ) -> tuple[ReservationCreateRead, int]:
     """검증 후 예약·칸·모의 결제를 커밋하고, 슬롯 경쟁만 명세대로 409 처리한다."""
-    venue_row = venue_repo.get_booking_info(db, body.venue_id)
-    if venue_row is None:
-        raise AppError("VENUE_NOT_FOUND", "공간을 찾을 수 없어요.", 404)
-    venue = dict(venue_row)
-    end_hour, status, now, _ = _validate(body, venue=venue)
-    total_price = venue["price_per_hour"] * body.hours
-
     try:
+        # 인증 조회 뒤 탈퇴가 끝났거나 동시에 진행 중일 수 있으므로 primary에서 다시 잠근다.
+        _lock_active_user(db, user_id)
+        venue_row = venue_repo.get_booking_info(db, body.venue_id)
+        if venue_row is None:
+            raise AppError("VENUE_NOT_FOUND", "공간을 찾을 수 없어요.", 404)
+        venue = dict(venue_row)
+        end_hour, status, now, _ = _validate(body, venue=venue)
+        total_price = venue["price_per_hour"] * body.hours
+
         reservation = reservation_repo.create(
             db,
             user_id=user_id,
@@ -222,19 +230,21 @@ def create_reservation(
                 raise
             db.rollback()
             try:
-                return (
-                    _handle_slot_conflict(
-                        db,
-                        user_id=user_id,
-                        venue=venue,
-                        body=body,
-                        end_hour=end_hour,
-                        session_id=session_id,
-                        is_synthetic=is_synthetic,
-                    ),
-                    200,
+                # rollback이 회원 잠금도 해제하므로 재시도 응답 전에 다시 확인한다.
+                _lock_active_user(db, user_id)
+                duplicate = _handle_slot_conflict(
+                    db,
+                    user_id=user_id,
+                    venue=venue,
+                    body=body,
+                    end_hour=end_hour,
+                    session_id=session_id,
+                    is_synthetic=is_synthetic,
                 )
-            except AppError:
+                db.commit()
+                return duplicate, 200
+            except Exception:
+                db.rollback()
                 raise
 
         payment = payment_repo.create(
