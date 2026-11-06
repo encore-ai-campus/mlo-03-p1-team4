@@ -7,6 +7,7 @@
 | `test_auth.py` | A | 가입 입력·필수 동의·이메일 중복 409 `EMAIL_TAKEN`, 프론트 휴대폰 형식, 만 14세 제한, 로그인·로그아웃 204, Swagger Bearer 계약 |
 | `test_users.py` | A | 내 정보 응답 필드·시간대, 조회 인증, 프로필 수정·잘못된 입력, 비밀번호 변경·현재 비밀번호 오류·길이 제한·bcrypt 저장, 취소 가능 예약 탈퇴 차단·개인정보 익명화·이메일 재가입 |
 | `test_reviews.py` | A | 후기 자격 404·403·403·409, 작성 직후 내 후기에 보임 |
+| `test_review_repo_ids.py` | A | #45 내 예약용 후기 ID 일괄 조회: 빈 입력 SQL 없음, 활성·삭제 후기 포함, 중복 ID에도 SELECT 한 번, 호출자 트랜잭션 보존 (로컬 MariaDB) |
 | `test_events.py` | A | 51건 400, MongoDB가 꺼져도 202이고 `events.log`에는 남음, replay해도 중복 없음 |
 | `test_models_match_db.py` | A | `app/models`의 표·컬럼 이름·NULL 여부가 `spacecube_test`의 실제 표와 같은지 (SQLAlchemy `inspect`) |
 | `test_health.py`, `test_db_routing.py`, `test_metrics.py` | A | primary 끊김 503 / replica·MongoDB 끊김 200 degraded, replica 주소가 틀려도 공개 조회 성공 |

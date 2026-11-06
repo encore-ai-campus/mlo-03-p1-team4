@@ -16,6 +16,17 @@ def get_by_reservation(db: Session, reservation_id: int):
     return db.scalar(select(Review).where(Review.reservation_id == reservation_id))
 
 
+def get_review_ids(db: Session, reservation_ids) -> dict[int, int]:
+    """본인 예약 페이지의 후기 ID를 삭제 이력까지 한 번에 조회한다(#45)."""
+    ids = tuple(dict.fromkeys(reservation_ids))
+    if not ids:
+        return {}
+    rows = db.execute(
+        select(Review.reservation_id, Review.review_id).where(Review.reservation_id.in_(ids))
+    )
+    return dict(rows.all())
+
+
 def get_active(db: Session, review_id: int, *, for_update: bool = False):
     query = select(Review).where(Review.review_id == review_id, Review.deleted_at.is_(None))
     if for_update:
