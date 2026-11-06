@@ -136,6 +136,6 @@ export function reservationItem(r) {
   return {
     ...base, venue: {
       venue_id: v.venue_id, name: v.name, category: v.category, region: v.region, image: v.image
-    }, can_cancel: r.status === 'confirmed' && (r.date > todayISO() || (r.date === todayISO() && r.start_hour > seoulHour())), review_id: reviews.find(x => x.reservation_id === r.reservation_id && !x.deleted)?.review_id ?? null
+    }, can_cancel: r.status === 'confirmed' && (r.date > todayISO() || (r.date === todayISO() && r.start_hour > seoulHour())), review_id: reviews.find(x => x.reservation_id === r.reservation_id)?.review_id ?? null // 지운 후기도 포함(#45): 예약당 한 번만 쓸 수 있다
   };
 }
