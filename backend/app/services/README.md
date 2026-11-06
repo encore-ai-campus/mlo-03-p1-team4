@@ -6,8 +6,10 @@
 | `user_service.py` | A | 탈퇴 = `deleted_at` 기록(예약·후기는 보존) |
 | `review_service.py` | A | 자격 4단계: 내 예약(`get_owned`) → `completed` → 기한 안(`max(이용일, 예약한 날)`부터 7일) → 아직 안 씀 |
 | `venue_service.py` | B | 검색 조건 → 공간 + 그날 칸(`slots`는 한 번에 읽어 붙임), 예약 가능 날짜(이어진 빈 칸 ≥ `min_hours`) |
-| `reservation_service.py` | B | F-30~32 예약+모의결제 한 트랜잭션, 재시도·중복 경쟁 처리; F-34 취소 예정 |
+| `reservation_service.py` | B | F-30~32 예약+모의결제 한 트랜잭션, F-40 내 예약 목록·상세 조회; F-34 취소 예정 |
 | `internal_service.py` | B | F-61 크롤러·생성 공간 등록/갱신: 신규 201·같은 출처 재전송/갱신 200, 최상위 ID·무시한 시설, 공간·시설·그림 한 트랜잭션, 모르는 지역·유형은 400 |
+
+F-40의 `_as_owned_read`는 `review_id`를 명시적으로 전달받아 null 또는 삭제를 포함한 후기 ID를 그대로 응답합니다. 현재 목록·상세 호출부의 null은 A `get_review_ids` 연결 전 준비 상태입니다. A 함수 반영 후 본인 예약 ID의 조회 결과를 연결하고 작성·삭제 후기의 실제 DB 통합 검증을 마쳐야 하며, 그 전에는 #46을 Draft로 유지합니다.
 
 ## 예약 + 모의 결제 트랜잭션 (B, primary)
 
