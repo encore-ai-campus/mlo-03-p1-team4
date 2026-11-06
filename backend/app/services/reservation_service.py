@@ -280,8 +280,10 @@ def create_reservation(
     )
 
 
-def _as_owned_read(row: dict, *, image: str, now: datetime) -> ReservationRead:
-    """조회 행을 목록·상세 응답으로 바꾸며 예약 당시 금액을 그대로 쓴다."""
+def _as_owned_read(
+    row: dict, *, image: str, now: datetime, review_id: int | None
+) -> ReservationRead:
+    """예약 당시 금액과 전달받은 후기 ID(삭제 포함)를 그대로 응답한다."""
     starts_at = datetime.combine(row["reserve_date"], time(row["start_hour"]))
     return ReservationRead(
         reservation_id=row["reservation_id"],
@@ -309,6 +311,7 @@ def _as_owned_read(row: dict, *, image: str, now: datetime) -> ReservationRead:
             image=image,
         ),
         can_cancel=row["status"] == "confirmed" and starts_at > now,
+        review_id=review_id,
     )
 
 
@@ -335,6 +338,8 @@ def get_my_reservations(
             row,
             image=(images.get(row["venue_id"]) or ["art:group-0"])[0],
             now=now,
+            # TODO(#45): A get_review_ids 제공 후 현재 페이지 매핑의 값으로 연결한다.
+            review_id=None,
         )
         for row in rows
     ]
@@ -360,4 +365,6 @@ def get_my_reservation(
         row,
         image=(images.get(row["venue_id"]) or ["art:group-0"])[0],
         now=get_now(),
+        # TODO(#45): A get_review_ids 제공 후 본인 예약의 조회 결과로 연결한다.
+        review_id=None,
     )

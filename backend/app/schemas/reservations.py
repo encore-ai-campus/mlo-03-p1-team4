@@ -77,5 +77,5 @@ class ReservationRead(BaseModel):
     payment: ReservationPaymentRead
     venue: ReservationVenueRead
     can_cancel: bool
-    # #45에서 A의 목록용 후기 ID 조회 계약을 합의하기 전까지는 설정하지 않는다.
-    review_id: int | None = None
+    # #45 확정: 삭제된 후기 ID도 유지하고, 작성한 적이 없을 때만 null이다.
+    review_id: int | None

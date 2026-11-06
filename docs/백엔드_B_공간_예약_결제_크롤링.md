@@ -239,7 +239,9 @@ F-21 구현 기준(기존 프론트 목업과 동일):
 | `card` | 카드결제 |
 | `phone` | 휴대폰 |
 
-내 예약 목록 항목: 예약 칸 전부 + `venue`(id·이름·유형·지역·이미지) + `payment`(method·status·paid_at·refunded_at) + `can_cancel` + `review_id`(썼으면). `status` 필터는 `confirmed`·`completed`·`cancelled`입니다.
+내 예약 목록·상세 항목: 예약 칸 전부 + `venue`(id·이름·유형·지역·이미지) + `payment`(method·status·paid_at·refunded_at) + `can_cancel` + 필수 nullable `review_id`. `status` 필터는 `confirmed`·`completed`·`cancelled`입니다.
+
+#45 PM 확정: 작성한 적이 없으면 `review_id: null`, 작성 이력이 있으면 삭제 여부와 관계없이 후기 ID를 반환합니다. 새 삭제 상태 필드는 추가하지 않으며 FE는 ID가 있으면 작성 버튼을 숨기고 기존 “후기 작성 완료”를 표시합니다. B는 소유권이 확인된 현재 페이지의 예약 ID만 A의 일괄 조회 함수에 넘기며, 함수 구현·연결·실제 후기 DB 검증이 끝나기 전에는 #46을 Draft로 유지합니다.
 
 ## 6. 예약 트랜잭션 (핵심, primary)
 

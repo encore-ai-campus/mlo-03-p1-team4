@@ -49,7 +49,6 @@ def create_reservation(
 
 @router.get(
     "/me",
-    response_model_exclude_unset=True,
     summary="내 예약 목록",
 )
 def get_my_reservations(
@@ -69,7 +68,6 @@ def get_my_reservations(
 
 @router.get(
     "/{reservation_id}",
-    response_model_exclude_unset=True,
     summary="내 예약 상세",
 )
 def get_my_reservation(

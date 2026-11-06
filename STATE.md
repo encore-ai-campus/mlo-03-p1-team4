@@ -2,7 +2,7 @@
 
 사람과 에이전트(Codex, Claude Code)가 함께 고치는 진행 기록입니다. 작업을 끝낼 때마다 해당 줄을 고치고 '최근 변경' 맨 위에 한 줄 더합니다. 설계 내용 자체는 `docs/`에, 여기는 상태와 결정만 둡니다.
 
-- 마지막 갱신: 2026-11-05
+- 마지막 갱신: 2026-11-06
 - 단계: **11-05 통합일** · 설계 11-03 확정안 + 11-05 회의(탈퇴·A6·A7 확정, A8 보류) · DB 0001·seed·로컬 compose 검증 · 프론트 7화면(목업, 다락큐브·푸터 반영) · GitHub develop 흐름·CI·Project 보드 · **1차 배포 로컬 VM 7대(노트북 4대, 11-05)** · B 조회 #31·예약 #39·내부 공간 등록 #42 develop 병합 완료. **#43 후기 목록용 B 조회 계약 구현·로컬 검증**(예약 의존성 43건·전체 pytest 303건), A 직접 import 연결은 후속
 - 디자인 캔버스(화면 설계 · 시스템 아키텍처 · 글꼴 시안): https://claude.ai/artifact/5dQciCDEaMm8uNjw6sqZpm
 - 실행 환경: Python은 conda `pro_1`(`environment.yml`), 프론트는 `frontend/`의 npm
@@ -13,7 +13,7 @@
 | --- | --- | --- | --- | --- |
 | 프론트 | 노진산(FE·PM) | FE-1~9 확정안 반영, Claude 시안 대조·FE 오류/모바일 결제/가입 UX 재검토 및 목업·화면 검증 | A·B 구현 후 실제 API 연결·오류·예약 동시성 통합 검증 | 실제 API 미구현 |
 | FastAPI A | [이름] | 이슈 #2 회원·탈퇴 구현 및 수동 확인, 로컬 전체 pytest 230건·프론트 단위 54건 통과 | 이슈 #2 PR 검토, 후기 목록 연결·테스트 | 탈퇴와 동시 예약 처리 B 협의, 이벤트 개인정보 정책 합의 대기 |
-| FastAPI B | [이름] | 최신 develop `bdd6dea`에서 `feat/B-F-40-reservations` 생성. F-40 조회 구현. MariaDB 대상 pytest 67건·Uvicorn/Postman 6요청·12검증, Ruff 린트·포맷 통과 | A 후기 ID 묶음 조회·삭제 후기 표시 합의 후 반영. Draft PR은 미합의 범위를 표시해 준비. F-34·35는 #8 후속 | #45 댓글 없음으로 후기 연계 미합의. Starlette TestClient deprecation 경고 1건. Postman CLI workspace 로그인 안내는 나왔으나 로컬 실행은 성공. 탈퇴·동시 예약 잠금은 A·B 협의 필요 |
+| FastAPI B | 이세훈 | 11-06 PR #46 브랜치 feat/B-F-40-reservations에서 B 응답 준비 수정: review_id 필수 nullable·변환 인자·필드 생략 해제·테스트/Postman 보강. 관련 70건, verify.ps1(Python 309건·FE 55건·린트·빌드), 실제 HTTP 6요청/12검증 통과. A 일괄 함수는 아직 없으며 현재 호출부는 null인 준비 상태, #46 Draft 유지. F-34·35 PR #49, #38 동시성 PR #50 열림. #14 계획 검토 | A 함수·공유 계약 반영 후 B 목록/상세 실제 ID 연결·작성/삭제 후기·일괄 SQL 검증. #46 최신 develop 반영·충돌 해결 후 병합 → #49 브랜치 develop 반영·충돌 해결·회귀·병합 → #50도 같은 절차. #49 병합 후 api1 배치 설치. #14·16 및 생성기 과거 시각 지원 | A get_review_ids 구현·테스트·반영 커밋 필요. 작성/삭제 후기 응답은 아직 미완성이라 병합 전 연결 필수. FE 목업 수정은 담당자 후속. #20 실행 위치·스케줄러 합의. Project 보드 조회 실패 |
 | DB | [이름] | `0001_init.sql`·`mongo_init.js` 검증(설치형 11.8·compose 11.4 둘 다 29건 통과), seed(유형 5·시설 20·지역 230 → `seed.sql`), `infra/local` compose, 크롤러 시제품(옛 필터). 1차 수집원 2곳+부족분 생성 방향 확정 | 스페이스클라우드 새 필터·쉐어잇 파서/사이트별 robots 확인 → 속성 기반 시연용 공간 선별·`/internal/venues` 등록(B와) → 부족한 공간·과거 30일 행동 데이터 생성기 | 없음(A2 결정을 팀원에게 공유) |
 
 ## 기능 진행표
@@ -34,7 +34,7 @@
 | F-22 | 날짜별 시간 칸 | B | 검증: 공개 GET /venues/{venue_id}/slots?date=YYYY-MM-DD 구현. 엄격한 날짜·설정 범위 양끝·0일 설정, 공간/날짜별 점유·완료 칸·past·F-20 일치·재조회·400/404·읽기 의존성 등 38건 추가. test_venues 총 66건, 전체 pytest 105건, 실제 HTTP Chrome 1건 통과 |
 | F-30~32 | 예약+모의 결제 한 번, 중복 차단 | B | 공식 앱의 POST /reservations 등록·A 공통 가상 키 검증 사용. API 21건·경쟁 3건 포함 전체 MariaDB pytest 241건 통과. PR #39의 취소·환불 재시도 제외 및 취소 후 재예약·타인 선점 회귀 검증 반영. 동시 다른 회원 50명: 201 1건/409 49건, 같은 회원: 201 1건/200 49건. 실제 인증·Postman 4요청/8검증에서 OpenAPI 200·무인증 401·생성 201·재시도 200 확인, DB 3개 표·합성 표시·카운터 검증·테스트 데이터 정리 완료 |
 | F-34~35 | 취소, 이용 완료 배치 | B | 설계 확정. 11-05 남은 예약 기능 구현 계획 검토: 열린 이슈 #8 기준으로 취소·환불과 완료 배치를 분리 구현 제안, 코드 착수 전 |
-| F-40~41 | 내 예약, 내 후기 | B / A | F-40 진행: `/reservations/me`·`/reservations/{id}` B 구현, 상태·페이지·정렬·이미지 묶음·소유권·환불·취소 경계 포함 pytest·Uvicorn/Postman 검증 통과. 후기 ID 묶음 조회·삭제 후기 표시는 #45 미합의라 보류, 미설정 `review_id`는 응답에서 생략. F-41은 A 범위 |
+| F-40~41 | 내 예약, 내 후기 | B / A | F-40 Draft PR #46의 B 사전 수정 완료: review_id 필수 nullable·ID 인자를 받는 변환 함수·라우터 생략 해제·기존 테스트 교체·변환/필수 필드 3건 추가·Postman null 확인. 관련 70건·전체 309건·FE 55건·HTTP 6요청/12검증 통과. #45 PM 확정 계약은 삭제 후기 포함 ID, 미작성만 null, 새 필드 없이 기존 완료 문구 유지. A get_review_ids는 미제공이라 현재 목록/상세는 null을 전달하는 준비 상태이며 실제 후기 연결 완료가 아님. A 반영 후 작성/삭제 후기·소유권·일괄 SQL 통합 검증, develop 충돌 정리 및 전체 검증 후 #46 → #49 → #50 병합. F-41은 A 범위 |
 | F-50 지원 | A 후기 작성용 예약 소유권 조회 | B | 예약·칸·결제 모델 및 `get_owned()`를 이전 프로젝트에서 가져옴. DDL 일치·매퍼 구성 4건, 실제 MariaDB 소유권·A 후기 작성 연결 10건 통과. 예약 생성 API 구현 완료를 뜻하지 않음 |
 | F-51 지원 (#43) | A 후기 목록용 예약·공간·유형 조회식 | B / A 연계 | B review_context_query(*, active_only=True) 구현·MariaDB 계약 테스트 14건 포함 예약 의존성 43건·전체 pytest 303건 통과. 반환 4열·예약당 한 행·유형 5개·활성 필터·필터/개수/페이지 결합 검증. A 직접 import와 공개 후기 숨김·내 후기 유지 HTTP 검증은 후속 |
 | F-50~51 | 후기 작성·조회(후기 모아보기) | A | B 소유권 조회·공간 정보 연결 전 503 경로 존재, 미검증 |
@@ -49,6 +49,7 @@
 
 | 날짜 | 결정 | 근거 |
 | --- | --- | --- |
+| 11-06 | #45 PM 확정 사항 반영: 내 예약 review_id는 필수 nullable이며 삭제 후기 ID도 유지, 미작성만 null. review_deleted 필드 없이 ID가 있으면 작성 버튼을 숨기고 “후기 작성 완료” 유지. A 일괄 함수 제공·실제 연결 전에는 #46 Draft 유지 | #45 PM 댓글 issuecomment-6672677838, B 명세 5-3절 |
 | 11-05 | #43 후기 목록은 B review_context_query(*, active_only=True)의 4열 Select를 A review_repo가 직접 import해 결합한다. 공개 목록은 비활성 공간 후기 숨김, 내 후기는 False로 유지. 세션 실행·후기 조인·마스킹은 A, review_create는 프론트만 전송. B 구현·검증 완료, A 연결·통합은 후속 | #43 PM 승인 댓글 및 B 동의 · `AGENTS.md` 약속 · `백엔드_A·B` 3절 |
 | 11-05 | F-30~32에서 본인 예약 여러 건과 모두 겹치면 `SLOT_TAKEN.detail.reservation_id`는 겹친 예약 ID 중 최솟값으로 반환한다. 자동 증가 ID는 실제 커밋 순서를 보장하지 않는다고 구분한다 | 사용자 승인 · `docs/백엔드_B` 6절 · `docs/오류코드.md` |
 | 11-05 | F-21은 offset 기본 0·음수 허용, days 기본 14·1~31. 시작 범위 밖은 OUT_OF_RANGE, 마지막 페이지 뒷부분은 최대 날짜에서 자르고 응답 days는 요청값 유지. free는 빈 칸 총수, bookable은 연속 빈 칸 ≥ min_hours이며 지난 칸 포함 | 사용자 승인 계획 · 기존 FE venuesApi 목업 · `백엔드_B` 5-2절 |
@@ -166,6 +167,12 @@ A1~A4는 11-03에 확정했고, **A5~A8은 추후 확정**으로 미뤘다(11-03
 - 개인 기억(Claude 자동 메모리 등)은 팀에 공유되지 않는다. 팀이 알아야 할 것은 이 파일과 `docs/`에 쓴다.
 
 ## 최근 변경 (최신이 위)
+
+- 11-06 · B · 사용자 요청으로 PR #46의 feat/B-F-40-reservations(HEAD f2edf4c, 원격 동일)에서 A 함수 제공 전 B 응답 준비를 구현. review_id 필수 nullable·변환 함수 필수 인자·라우터 exclude_unset 제거, 목록/상세 기존 생략 검증을 null 포함 검증으로 교체하고 변환/필수 필드 단위 3건 추가. Postman 기존 목록·상세 테스트에 미작성 null 확인 추가, B 명세·관련 README 갱신. A 파일·FE 코드·DDL은 변경하지 않음. A 함수는 최신 develop에도 없어 호출부의 null TODO와 작성/삭제 후기 DB 연동 미완료를 문서화하고 Draft 유지. 관련 MariaDB pytest 70 passed, Postman lint 6파일 오류/경고 0, 실제 Uvicorn·인증·MariaDB 11.4.13 HTTP 6요청/12검증 통과 및 임시 데이터 정리. pro_1 경로를 PATH 앞에 두고 verify.ps1 실행: Ruff 85파일·pytest 309 passed·FE 단위 55 passed·린트/색 검사/빌드 모두 통과(exit 0). 기존 Starlette·FE 조건문 경고 각 1건. A 일괄 SQL·작성/삭제 후기 통합·브라우저 E2E·실제 replica는 미검증. 기존 STATE 변경 보존, 브랜치 전환·커밋·푸시·외부 댓글 없음. #46 → #49 → #50 순서와 각 후속 브랜치의 develop 반영·수동 충돌 해결·회귀 검증을 유지.
+
+- 11-06 · B · F-40 후속 작업 계획 수립. 현재 브랜치는 PR #46의 feat/B-F-40-reservations, HEAD f2edf4c이며 미커밋 변경은 기존 STATE.md뿐임을 확인. 원격 PR head도 동일하고 #45 PM 결정은 유지되며 develop의 A 일괄 함수는 아직 없음. 계획: ① 기존 #45에서 A에게 합의된 get_review_ids 구현·삭제 후기/후기 없음/빈 입력/일괄 SQL 및 트랜잭션 비간섭 테스트·반영 PR/커밋 요청 ② A는 develop 기반 별도 A 브랜치에서 구현하고 공유 계약 문서 반영, B는 현 브랜치에서 응답·회귀 테스트 준비 ③ A 변경이 develop에 병합되면 현 브랜치에 최신 develop 반영·충돌 정리 ④ B 서비스는 소유권 확인된 현재 페이지 ID만 일괄 전달하고 목록/상세에 review_id 또는 null을 항상 설정, 스키마는 필수 nullable로 정리 ⑤ MariaDB·실제 HTTP/Postman·verify.ps1 검증 후 PR 본문 갱신·Draft 해제·리뷰 요청. FE 목업 수정은 병행하고 화면 통합 때 확인, DB 스키마 변경은 불필요. 이번 요청 범위는 브랜치 확인·계획이며 코드 구현·브랜치 전환·커밋·외부 댓글 등록은 하지 않음.
+
+- 11-06 · B · 사용자 요청으로 PR #46·#45 최신 댓글·원격 develop을 검토. PM·FE 결정(#45 comment-6672677838)은 이미 확정됐으며, A 제공 함수 get_review_ids(db, reservation_ids) → dict[int, int]와 공유 계약 문서가 후속 산출물임을 확인. 삭제 후기 ID도 유지하고 후기 없는 예약만 null로 응답해야 하나 현재 서비스는 필드를 설정하지 않고 라우터가 생략하며 테스트 2곳은 생략을 기대함. 최신 develop의 A review_repo에 일괄 함수가 없고 FE 목업도 삭제 후기를 제외함. #47은 이미 병합되어 별도 후기 목록 연결을 이번 함수 제공과 혼동하지 않도록 확인. #46은 Draft·정식 리뷰/인라인 스레드 없음·head f2edf4c CI 성공(run 42041269018)·mergeable=false. PM 제안 병합 순서는 #46 → #49 → #50. 구현·테스트 실행·외부 쓰기 없이 검토 및 STATE만 갱신했으며 기존 미커밋 변경은 보존. gh 인증 401·Project 조회 실패, GitHub 연결 도구로 원격 근거 확인. Postman은 계정·워크스페이스 미연결이라 원격 검색을 사용하지 않음.
 
 - 11-05 · B · #45 댓글 0건 확인 후 최신 `origin/develop` `bdd6dea`에서 `feat/B-F-40-reservations` 생성. 목록·상세 라우터·스키마·서비스·리포지토리를 추가하고, `review_id`는 A 묶음 조회 계약이 미합의라 응답에서 생략. `test_reservations.py` 24건과 `test_reservation_dependencies.py` 43건, 총 67건이 로컬 MariaDB `spacecube_test`에서 통과(exit 0); F-40 신규 3건 포함. Ruff lint·format 통과, 기존 Starlette TestClient deprecation 경고 1건. 별도 실제 Uvicorn/Postman 검증은 MariaDB 11.4.13에서 6요청·12검증 통과(exit 0): OpenAPI·무인증 401·예약 생성/재시도·F-40 목록/상세. 일시 Uvicorn과 합성 회원·공간·예약은 종료 시 정리됨. CLI workspace 로그인 안내는 있었으나 no-report-events 로컬 실행은 성공. 커밋·푸시·PR 없음.
 

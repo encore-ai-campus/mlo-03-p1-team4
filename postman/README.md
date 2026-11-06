@@ -17,6 +17,7 @@ $PostmanCli = Get-ChildItem (Join-Path $env:NVM_HOME 'installs') -Directory |
 
 - `Contract checks`는 OpenAPI의 예약 경로와 인증 실패 응답을 확인하며 DB 데이터를 쓰지 않습니다.
 - `F-30 live booking`은 예약 생성·10분 내 재시도 뒤 F-40 내 예약 목록·상세 조회를 확인합니다. 로컬 `spacecube_test` API만 대상으로 하고, 활성 공간·예약 가능 시간·Bearer 액세스 토큰을 환경에 넣은 뒤 실행하세요.
+- F-40 조회 검증은 방금 생성해 후기를 작성하지 않은 예약의 `review_id: null` 필드 포함도 검사합니다. 작성·삭제 후기 ID의 실제 조회와 일괄 SQL 검증은 A `get_review_ids` 연결 후 추가해야 하며, 현재 실행 성공이 후기 연계 완료를 뜻하지 않습니다.
 - `access_token`은 비워 두고 Git에 저장하지 않습니다. 실예약 확인용으로 `Local.private.environment.yaml`을 복사해 사용하며, 이 파일은 `.gitignore`에 포함됩니다.
 - 가상 예약에는 `X-Synthetic: 1`과 `synthetic_api_key`를 함께 보냅니다. 키는 임시 API 서버의 `SYNTHETIC_API_KEY`와 같아야 하며 공유 템플릿에는 비워 둡니다.
 - 컬렉션 기본 실행 시 예약 환경값이 비어 있으면 쓰기 요청은 건너뜁니다.

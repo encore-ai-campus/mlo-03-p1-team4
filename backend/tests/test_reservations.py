@@ -8,7 +8,7 @@ from uuid import uuid4
 import pytest
 from fastapi import Request
 from fastapi.testclient import TestClient
-from pydantic import SecretStr
+from pydantic import SecretStr, ValidationError
 from sqlalchemy import create_engine, event, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session
@@ -20,6 +20,7 @@ from app.core.deps import CurrentUser, get_current_user
 from app.core.errors import AppError
 from app.core.metrics import reservation_counter
 from app.main import create_app
+from app.schemas.reservations import ReservationRead
 from app.services import reservation_service
 
 TODAY = date(2026, 11, 5)
@@ -576,7 +577,7 @@ def test_my_reservation_list_filters_pages_and_batches_images(connection, sample
         "image": "art:group-1",
     }
     assert item["can_cancel"] is True
-    assert "review_id" not in item
+    assert item["review_id"] is None
     assert sum("from reservations" in statement for statement in statements) == 2
     assert sum("from venue_images" in statement for statement in statements) == 1
 
@@ -620,7 +621,7 @@ def test_my_reservation_detail_hides_other_users_and_reports_cancel_boundary(
     assert at_start_read.json()["can_cancel"] is False
     assert before_start_read.json()["can_cancel"] is True
     assert at_start_read.json()["venue"] == before_start_read.json()["venue"]
-    assert "review_id" not in before_start_read.json()
+    assert before_start_read.json()["review_id"] is None
 
     connection.execute(
         text("UPDATE venues SET is_active=FALSE WHERE venue_id=:venue"),
@@ -662,3 +663,56 @@ def test_my_reservation_routes_require_auth_and_validate_query_and_id(connection
         api.app.dependency_overrides[get_current_user] = override
     assert response.status_code == 401
     assert response.json()["code"] == "UNAUTHORIZED"
+
+
+@pytest.fixture
+def owned_read_row():
+    """후기 조회와 분리해 B 응답 변환에 필요한 예약 행만 준비한다."""
+    return {
+        "reservation_id": 100,
+        "venue_id": 7,
+        "reserve_date": TODAY - timedelta(days=1),
+        "start_hour": 13,
+        "end_hour": 15,
+        "headcount": 2,
+        "total_price": 22000,
+        "status": "completed",
+        "created_at": NOW,
+        "payment_method": "card",
+        "payment_status": "paid",
+        "paid_at": NOW,
+        "refunded_at": None,
+        "venue_name": "예약 검증 공간",
+        "category_code": "studyroom",
+        "category_name": "스터디룸",
+        "region_sido": "서울",
+        "region_sigungu": "관악구",
+    }
+
+
+@pytest.mark.parametrize("review_id", [None, 101])
+def test_owned_read_serializes_explicit_null_or_provided_review_id(owned_read_row, review_id):
+    """A 조회 결과를 전달받으면 null과 ID가 모두 생략되지 않고 직렬화된다."""
+    response = reservation_service._as_owned_read(
+        owned_read_row, image="art:group-0", now=NOW, review_id=review_id
+    )
+    body = response.model_dump(mode="json", exclude_unset=True)
+    assert "review_id" in body
+    assert body["review_id"] == review_id
+    assert body["status"] == "completed"
+    assert body["can_cancel"] is False
+
+
+def test_owned_read_requires_review_id_even_when_nullable(owned_read_row):
+    """후기 결과를 빠뜨린 응답은 기본 null로 조용히 바뀌지 않고 검증에 실패한다."""
+    response = reservation_service._as_owned_read(
+        owned_read_row, image="art:group-0", now=NOW, review_id=None
+    )
+    body = response.model_dump()
+    del body["review_id"]
+    with pytest.raises(ValidationError) as caught:
+        ReservationRead.model_validate(body)
+    assert [(error["loc"], error["type"]) for error in caught.value.errors()] == [
+        (("review_id",), "missing")
+    ]
+    assert "review_id" in ReservationRead.model_json_schema()["required"]

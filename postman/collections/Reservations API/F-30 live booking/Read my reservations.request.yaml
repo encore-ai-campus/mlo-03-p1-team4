@@ -37,6 +37,7 @@ scripts:
         pm.expect(item.date).to.equal(pm.environment.get('booking_date'));
         pm.expect(item.created_at).to.match(/\+09:00$/);
         pm.expect(item.can_cancel).to.equal(true);
+        pm.expect(item).to.have.property('review_id', null);
         pm.expect(item.payment).to.include({
           method: pm.environment.get('method'),
           status: 'paid',

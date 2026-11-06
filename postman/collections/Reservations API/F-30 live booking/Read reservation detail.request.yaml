@@ -23,6 +23,7 @@ scripts:
         pm.expect(body.status).to.equal('confirmed');
         pm.expect(body.date).to.equal(pm.environment.get('booking_date'));
         pm.expect(body.can_cancel).to.equal(true);
+        pm.expect(body).to.have.property('review_id', null);
         pm.expect(body.created_at).to.match(/\+09:00$/);
       });
 
