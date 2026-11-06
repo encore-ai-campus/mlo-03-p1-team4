@@ -43,7 +43,7 @@ Codex와 Claude Code가 함께 읽는 작업 지침입니다. 사람이 채팅�
 - 아래 **약속**은 여러 파트가 같이 쓴다. 이름·인자·반환 형태를 바꾸지 말고, 바꿔야 하면 사람에게 먼저 묻는다. 자세한 형태는 `docs/백엔드_A` 3절, `docs/백엔드_B` 3절.
   - `get_db_write()` primary 세션 / `get_db_read()` replica 세션(실패하면 primary로 대체) (A 제공)
   - `get_current_user()` → `CurrentUser(user_id)`, primary에서 확인 (A 제공)
-  - `log_event(session_id, user_id, event_type, venue_id=None, category=None, payload=None, is_synthetic=False)` — MongoDB는 내부 스레드 풀로, 부르는 쪽은 기다리지 않음 (A 제공)
+  - `log_event(session_id, user_id, event_type, venue_id=None, category=None, payload=None, is_synthetic=False, *, products=None)` — 앞의 7개 인자는 유지. 예약 서버 이벤트는 B가 확정한 `products`를 키워드로 전달. MongoDB는 내부 스레드 풀로 처리 (A 제공, #60 PM 승인)
   - `get_today()`·`get_now()` → Asia/Seoul 오늘·지금. `get_now()`는 **시간대 없는 한국 시각**(MariaDB `DATETIME`과 같음), `TODAY_OVERRIDE`는 테스트 전용 (A 제공)
   - `AppError(code, message, status, detail=None)`, `paginate()`, `is_synthetic_request()`, `get_session_id()`(헤더 `X-Session-Id`), `reservation_counter` (A 제공)
   - `reservation_repo.get_owned(db, user_id, reservation_id)` → `(reservation_id, venue_id, reserve_date, start_hour, end_hour, status, created_at)` 또는 `None` (B 제공)
@@ -62,7 +62,7 @@ Codex와 Claude Code가 함께 읽는 작업 지침입니다. 사람이 채팅�
 - 예약 상태는 `confirmed` → `completed`(끝나는 시각이 지나면, 1시간 배치) 또는 `cancelled`(이용 시작 전, 칸 삭제, 결제 `refunded`). `pending`·`expired`·결제 대기 10분·`/confirm`은 없다.
 - 결제는 모의 결제만. 결제수단은 `transfer`·`card`·`phone`(API 값 = DB 값). 실제 결제 연동 코드를 만들지 않는다.
 - 회원이 쓰는 글은 후기만(예약당 1개, `completed`일 때만). 자유게시판·댓글·공지·관리자 역할은 없다.
-- 사용자 이벤트는 `events.log`(→ Alloy → Loki)에 먼저 쓰고 MongoDB `user_events`에는 응답 뒤 백그라운드로 쓴다. MongoDB가 꺼져도 예약·이벤트 API는 성공해야 한다.
+- 사용자 이벤트는 `events.log`(→ Alloy → Loki)에 먼저 쓰고 MongoDB `space_rental_analytics.events`에는 응답 뒤 백그라운드로 쓴다. MongoDB가 꺼져도 예약·이벤트 API는 성공해야 한다. 파일 기록 실패 시 이벤트 API는 503이다(#60).
 - 공간 이미지는 프론트의 유형별 일러스트와 유형별 CCL 분위기 참고 이미지 풀(`frontend/public/photos/`)에서 보여 준다. CCL 사진은 `category.code`와 공간 ID로 프론트에서 안정 선택하고, 실제 등록 공간 사진이 아님을 표시하며 출처·저작자·라이선스·변경 사실을 공개한다. `art:<종류>-<색>` API 계약은 바꾸지 않는다. 크롤링한 사진·업체 실명·원문 소개를 저장하지 않는다.
 - 가상 데이터는 `is_synthetic = true`. API로 넣을 때 헤더 `X-Synthetic: 1` + `X-Synthetic-Key`(= `.env` `SYNTHETIC_API_KEY`). 키가 없거나 틀리면 401 `UNAUTHORIZED` (11-05 A6)
 - 시간대 Asia/Seoul(MongoDB 저장은 UTC), 날짜 `YYYY-MM-DD`, 금액은 원 단위 정수. 오늘·지금은 `get_today()`·`get_now()`로만 읽는다(`date.today()`·`datetime.now()` 직접 호출 금지).
