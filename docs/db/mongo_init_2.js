@@ -1,5 +1,5 @@
 // F-60 MongoDB 초기화. 현재 Compass의 space_rental_analytics.events 구조를 기준으로 한다.
-// 실행: mongosh <연결주소> docs/db/mongo_init.js
+// 실행: mongosh <연결주소> docs/db/mongo_init_2.js
 // 테스트: MONGO_ANALYTICS_DB=space_rental_analytics_test 를 주면 운영 컬렉션과 crawl DB를 건드리지 않는다.
 // 기존 spacecube.user_events와 그 문서는 삭제하거나 변환하지 않는다.
 
