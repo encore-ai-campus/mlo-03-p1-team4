@@ -12,7 +12,7 @@
 | 파트 | 담당자 | 지금 | 다음 할 일 | 막힌 것 |
 | --- | --- | --- | --- | --- |
 | 프론트 | 노진산(FE·PM) | FE-1~9 확정안 반영, Claude 시안 대조·FE 오류/모바일 결제/가입 UX 재검토 및 목업·화면 검증. 11-06 C안 화풍(흰 바탕·검은 글자·주칠)과 유형별 일러스트 5장 유지. CCL 분위기 참고 사진 40장(유형별 8장)을 정적 경로로 연결하고 유형·venue ID 해시로 안정 선택, 사진 표시·크레딧 추가(API `art:` 계약 그대로) | A·B 구현 후 실제 API 연결·오류·예약 동시성 통합 검증 | 실제 API 미구현 |
-| FastAPI A | [이름] | 이슈 #2 회원·탈퇴, 후기 작성·목록 #47 develop 병합(#43 직접 import·공개 비활성 공간 제외·내 후기 유지, 관련 테스트 58건 재확인). #45 `review_repo.get_review_ids(db, reservation_ids)` 계약 #55: 삭제된 후기 포함, 페이지당 SQL 1회, 빈 입력 SQL 없음. 관련 pytest 60건·전체 verify 통과 | B의 PR #46에서 목록·상세 실제 ID 연결 및 통합 검증 확인, Swagger에서 실제 데이터로 후기 목록 수동 확인 | 탈퇴와 동시 예약 처리 B 협의, 이벤트 개인정보 정책 합의 대기 |
+| FastAPI A | [이름] | 회원·후기 A 기능 구현. F-60은 새 15종 문서 조립·FE 상품 ID 서버 조회·파일 우선 기록·재적재 구현. 관련 pytest 21건·전체 verify Python 372건 통과, 별도 원격 테스트 DB에서 15종 저장·동일 ID 중복 제외 확인 | DB 공식 validator·B 서버 이벤트·FE 남은 ID/예약 문맥 통합, #5 로컬 실저장 확인 | 로컬 Mongo 미기동. DB 초기화 코드는 옛 user_events(#63), B는 옛 이벤트 호출. 서버 이벤트 session_id 없는 직접 요청 정책·UTM 허용 값 확인 필요 |
 | FastAPI B | 이세훈 | #49·#50 develop 병합 완료. 최신 develop `b6a97c6` 기반 `feat/B-F-40-review-ids`에서 #45 목록·상세 실제 후기 ID 연결, 소프트 삭제 이력 보존, 페이지당 A 일괄 조회 검증. 전체 verify Python 362건·FE 56건·Ruff 90파일·린트/빌드 및 실제 HTTP 확인 통과 | #45 PR 생성·CI·A/PM 리뷰·병합 → api1 cron #8과 생성기 백필 지원은 별도 | 실제 api1·replica·브라우저 E2E는 미검증 |
 | DB | [이름] | `0001_init.sql`·`mongo_init.js` 검증(설치형 11.8·compose 11.4 둘 다 29건 통과), seed(유형 5·시설 20·지역 230 → `seed.sql`), `infra/local` compose, 크롤러 시제품(옛 필터). 1차 수집원 2곳+부족분 생성 방향 확정. 별도 Compass DB의 events·event_daily 속성 정리 v1을 docs/db에 공유 | 스페이스클라우드 새 필터·쉐어잇 파서/사이트별 robots 확인 → 속성 기반 시연용 공간 선별·`/internal/venues` 등록(B와) → 부족한 공간·과거 30일 행동 데이터 생성기 | 없음(A2 결정을 팀원에게 공유) |
 
@@ -39,7 +39,7 @@
 | F-50 지원 | A 후기 작성용 예약 소유권 조회 | B | 예약·칸·결제 모델 및 `get_owned()`를 이전 프로젝트에서 가져옴. DDL 일치·매퍼 구성 4건, 실제 MariaDB 소유권·A 후기 작성 연결 10건 통과. 예약 생성 API 구현 완료를 뜻하지 않음 |
 | F-51 지원 (#43) | A 후기 목록용 예약·공간·유형 조회식 | B / A 연계 | 검증: B 4열 `review_context_query(*, active_only=True)` PR #44, A 직접 import·공개 비활성 공간 제외·내 후기 유지 PR #47이 develop 병합됨. 로컬 MariaDB 관련 테스트 58건 통과. Swagger 실제 데이터 수동 확인은 별도 |
 | F-50~51 | 후기 작성·조회(후기 모아보기) | A | B get_owned·review_context_query 연결, 작성·목록·수정·삭제 및 탈퇴 후 예약·후기 보존·작성자 익명화 로컬 MariaDB 검증. 공개 비활성 공간 제외·내 후기는 포함. 전체 backend pytest 318건 통과 |
-| F-60, F-62~65 | 이벤트(로그 파일 + MongoDB), 가상 데이터, `get_today`, 서버 로그, 지표 | A | 공통 계약·이벤트 pytest 통과. 자유 문자열 개인정보 처리 팀 합의 대기. DB 참고 문서 `docs/db/events_event_daily_컬렉션_속성정리_v1.md` 공유: 별도 `space_rental_analytics` 설정이며 기존 `spacecube.user_events` 계약·초기화 코드는 변경하지 않음 |
+| F-60, F-62~65 | 이벤트(로그 파일 + MongoDB), 가상 데이터, `get_today`, 서버 로그, 지표 | A | 진행: #60 승인 구조로 FE 12종·서버 3종 문서·파일 우선·새 로그 재적재 구현. PR #59는 develop 병합. 관련 pytest 21건, 전체 verify Python 372건·Ruff 92파일·FE 62건/빌드 통과. 별도 원격 테스트 DB 임시 validator에서 15종 저장·재적재 중복 제외(임시 문서 15건 정리). 로컬 공식 Mongo validator·B 새 호출·FE 남은 ID/예약 문맥 통합은 미검증이므로 완료 아님 |
 | F-61 | 크롤링 신규 등록 | DB / B | 진행: B POST /internal/venues 구현·로컬 검증 완료(35건·같은 출처 동시 8건·HTTP 6요청/12검증). DB 크롤러 새 필터·쉐어잇 파서·crawl_raw 연결과 api1 배포는 후속 |
 | #19 생성기 | 시연용 공간 부족분 생성·과거 30일 백필(회원·예약·결제·후기·이벤트)·`event_daily` 집계 | DB (api1 실행 환경 A, 과거 시각 저장 지원 B) | 설계 확정(11-05 #38), 코드 전. 100명으로 먼저 검증 → 11-07까지 규모 확정 |
 | F-70 | 헬스체크 3단계 | A | 설계 확정 |
@@ -51,6 +51,7 @@
 | 날짜 | 결정 | 근거 |
 | --- | --- | --- |
 | 11-06 | 사진은 유형별 8장씩 40개의 CCL 분위기 참고 이미지로 사용한다. 프론트가 venue ID와 유형으로 안정 선택하고 실제 공간 사진이 아님을 알린다. 원본·저작자·라이선스·편집 사실은 화면과 `SOURCES.md`에 표시하고 `art:` API·DB 계약은 바꾸지 않는다 | 사용자 요청 · `frontend/public/photos/credits.html` · `docs/데이터_수집_명세.md` |
+| 11-06 | #60: 서버 결과 3종에 한해 `user.anonymous_id`·`user.session_sequence`·`site`·`acquisition`·`page`·`navigation` null 허용. `log_event`의 기존 7개 인자를 보존하고 키워드 전용 `products=None` 추가. FE는 공간 ID만 보내고 A가 활성 공간 이름·현재 가격 조회. 옛 로그 보존, 새 로그만 재적재. UTM 코드는 허용값 결정 전 null로 제한 | #60 PM 댓글 · PR #58 |
 | 11-06 | 사용자 이벤트 저장 구조는 DB가 만든 `space_rental_analytics`의 `events`·`event_daily`(`docs/db/events_event_daily_컬렉션_속성정리_v1.md`)를 기준으로 채택. 행동 이름 15종·중첩 필드로 바꾸고, 백엔드 A·B·FE·`mongo_init.js`·`산출물_04` 9절을 이 문서에 맞춘다(대응표: PR #58 코멘트). 서버 이벤트의 화면 정보 전달 방식 등 4가지는 11-07 오전까지 결정 | PM 결정 · PR #58 |
 | 11-06 | #46 병합 이후 후속 처리는 #49 충돌 해결·검증·병합 → #50 최신 develop 통합·검증·병합 → #45 실제 후기 ID 연결 순서. #8은 실제 api1 시간별 cron 등록·실행 확인 전까지 유지 | 사용자 지시 · PR #49 PM 댓글 issuecomment-6674796150 |
 | 11-06 | #45 내 예약의 `review_id`는 삭제된 후기 ID도 유지하고, 미작성만 `null`로 표시한다. A는 `get_review_ids(db, reservation_ids)`로 본인 예약 페이지 ID를 SQL 한 번에 조회해 B에 매핑을 제공하며 트랜잭션은 종료하지 않는다. 새 삭제 상태 필드는 추가하지 않는다 | #45 A·B·PM 합의 · `AGENTS.md` 약속 · `백엔드_A·B` 3절 |
@@ -173,6 +174,11 @@ A1~A4는 11-03에 확정했고, **A5~A8은 추후 확정**으로 미뤘다(11-03
 
 ## 최근 변경 (최신이 위)
 
+- 11-06 · A · F-60 최신 FE PR #59 요청과 A 스키마를 대조해 상품 이름·가격 위조 입력을 거부하고 정상 `product_id`의 서버 스냅샷 보강을 각각 검사하도록 이벤트 테스트 수정. 관련 pytest 21건, 전체 verify Python 372건·Ruff 92파일·FE 62건/빌드 통과. 처음 1045는 실행 중인 `SpacecubeTestMariaDB1` 대신 다른 인스턴스 설정을 읽은 결과였으며 올바른 로컬 `spacecube_test` 설정으로 재검증했다. 별도 원격 테스트 DB 임시 validator에서 15종 15건 저장·동일 ID 재삽입 15건 중복 제외·임시 데이터 정리 확인. 로컬 Mongo 미기동·DB 공식 초기화 #63·B 구형 호출·FE 지역/시설 ID와 예약 문맥 남음. 현재 FE는 상품 이벤트당 한 ID이며, 여러 ID는 B 일괄 조회 계약 전까지 지원하지 않음. 기존 stash와 미추적 항목 보존.
+
+- 11-06 · A · #5·#48·#60 및 PR #58·#59 최신 결정을 반영해 F-60 실행 코드의 대상과 문서 구조를 `space_rental_analytics.events`로 전환. FE 12종·서버 3종, 필수 문맥, 상품 스냅샷, URL query/fragment 제거, 제한된 properties, 파일 우선·새 형식 로그 재적재를 구현. 기존 7개 `log_event` 인자는 보존하고 `products` 키워드 선택 인자만 추가. 공통 계약·이벤트 pytest 21건, Ruff 92파일, FE 단위 56건·린트·빌드 통과. 전체 verify는 로컬 `spacecube_test` 계정 인증 1045로 DB 테스트가 막혀 실패(4 failed, 59 passed, 299 errors); 로컬 Mongo 미기동으로 새 validator 실제 저장 미검증. B 구형 호출/상품값·FE PR #59 남은 작업·DB validator가 연결되기 전까지 F-60 완료 아님. stash·DB/FE/B 구현 파일과 기존 미추적 임시 항목 보존.
+
+- 11-06 · A · PR #58 새 `events` 명세와 #5·#48 합의를 대조. 기존 이벤트 payload는 형식 확인된 코드·날짜·정수만 남기고 자유 문자열을 제외하며, `events.log` 실패 문서를 MongoDB 대기열에도 보내지 않도록 보강. 신규 `test_events.py`에서 개인정보·혼합 이벤트·파일 실패를 검증. `verify.ps1` 통과: Ruff 91파일, pytest 357건, FE 단위 56건·린트·빌드. Starlette·기존 FE lint 경고 각 1건. 필수 화면 문맥을 B 서버 이벤트에서 채우는 정책 미정으로 새 MongoDB 전환·실저장·재적재는 보류. stash·DB/FE/B 코드는 변경하지 않음.
 - 11-06 · FE · 사용자가 승인한 CCL 참고 사진 25장을 더해 5개 유형별 8장, 총 40장을 맞춤. 모두 1200×780 WebP(약 34~167KB, 합계 3.29MB). `RoomArt.vue`가 정적 `/photos/...` 경로에서 유형별 사진을 venue ID 해시로 고르고, 상세 갤러리는 슬롯 번호로 별도 선택. 사진 로드 실패 시 일러스트로 대체한다. 실제 등록 공간 사진이 아님을 이미지와 푸터에 표시하고, 40개 출처·저작자·라이선스·편집 기록을 파일 원장과 사용자용 크레딧 페이지에 연결. 기존 `art:` API·DB 계약 변경 없음. `npm run verify`: 린트 오류 0(기존 경고 1), 단위 62건, 빌드 통과. E2E는 74개 결과가 모두 출력(성공 67, 조건부 건너뜀 7)됐으나 CLI가 결과 요약 없이 70초간 종료되지 않아 중단, 전체 명령 통과로 집계하지 않음. Playwright 브라우저에서 상세 사진·배지·푸터 링크와 크레딧의 40개 이미지(전부 1200×780), 출처 링크 40·라이선스 링크 40 확인.
 
 - 11-06 · FE · 사용자 요청으로 Wikimedia Commons CCL 사진 후보를 유형별 3장씩 15장 수집, 파일별 라이선스·저작자·원본·변경 내역을 `frontend/public/photos/SOURCES.md`에 기록. README의 크기 기준에 맞춰 1200×780 WebP로 통일하고 얼굴·상호·간판·화이트보드 글씨를 검토, 카페 2장·강의실 1장·파티룸 1장의 식별 글자를 생성형 편집으로 제거. [후보 미리보기](docs/사진_후보_미리보기_2026-11-06.jpg) 추가. 기존 `art:` UI·API는 그대로이며 실제 공간 사진으로 연결하지 않음. 이미지 크기 15장 확인, 프론트 테스트는 실행하지 않음

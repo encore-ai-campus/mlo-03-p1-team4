@@ -8,6 +8,9 @@ from datetime import datetime
 @dataclass(frozen=True, slots=True)
 class ClientEventContext:
     occurred_at: datetime | None
+    anonymous_id: str | None = None
+    session_sequence: int | None = None
+    browser_context: dict | None = None
 
 
 client_event_context: ContextVar[ClientEventContext | None] = ContextVar(
