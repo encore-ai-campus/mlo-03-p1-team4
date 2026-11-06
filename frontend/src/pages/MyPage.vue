@@ -87,7 +87,7 @@ async function doCancel() {
   cancelling.value = true
   try {
     await cancelReservation(cancelTarget.value.reservation_id, token.value)
-    log('reserve_cancel', { venue_id: cancelTarget.value.venue_id, reservation_id: cancelTarget.value.reservation_id })
+    log('reservation_cancel_attempt', { venue_id: cancelTarget.value.venue_id, reservation_id: cancelTarget.value.reservation_id })
     toast.success('예약을 취소했어요. 결제 금액은 전액 모의 환불됐어요.')
     cancelOpen.value = false
     await load()

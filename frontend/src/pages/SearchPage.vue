@@ -92,7 +92,7 @@ watch(
     router.replace({
       query: { category: p.category, sido: p.sido, sigungu: p.sigungu, people: p.people, date: p.date, q: p.q || undefined, facilities: p.facilities || undefined, now: p.now ? '1' : undefined },
     })
-    log('search', { ...p })
+    log('search_submit', { ...p })
     load()
   },
   { deep: true },
@@ -217,7 +217,7 @@ function resetFilters() {
               :model-value="selectionFor(r.venue_id)"
               :label="`${r.name} 시간 칸`"
               @update:model-value="(h) => setSelection(r.venue_id, h)"
-              @select="(h) => log('select_slot', { venue_id: r.venue_id, hour: h })"
+              @select="(h) => log('rental_slot_select', { venue_id: r.venue_id, hour: h })"
             />
           </div>
         </article>

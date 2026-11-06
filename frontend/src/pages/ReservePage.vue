@@ -64,7 +64,7 @@ async function pay() {
   if (paying.value || !validSelection.value) return
   if (!form.agree) { errors.agree = '이용 규칙과 환불 규정에 동의해야 결제할 수 있어요.'; return }
   paying.value = true
-  log('reserve_try', { venue_id: venue.value.venue_id, date: date.value, start_hour: selected.value[0], hours: selected.value.length })
+  log('reservation_start', { venue_id: venue.value.venue_id, date: date.value, start_hour: selected.value[0], hours: selected.value.length })
   try {
     result.value = await createReservation({ venue_id: venue.value.venue_id, date: date.value, start_hour: selected.value[0], hours: selected.value.length, headcount: Number(people.value), method: form.method }, token.value)
     toast.success('모의 결제를 마쳤어요.')
