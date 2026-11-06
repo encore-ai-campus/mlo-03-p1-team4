@@ -68,7 +68,7 @@ const regionOptions = computed(() => ['전국', ...regions.value])
 const peopleOptions = ['1', '2', '4', '6', '8', '10', '15'].map((n) => ({ value: n, label: `${n}명` }))
 function submitSearch() {
   const query = { category: form.value.category, sido: form.value.region === '전국' ? undefined : form.value.region, date: form.value.date, people: form.value.people }
-  log('search', query)
+  log('search_submit', query)
   router.push({ path: '/search', query })
 }
 const sortOptions = [{ value: 'default', label: '추천순' }, { value: 'popular', label: '인기순' }, { value: 'price', label: '낮은 가격순' }, { value: 'rating', label: '평점순' }]

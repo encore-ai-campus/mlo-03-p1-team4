@@ -31,7 +31,7 @@ function toggle(h) {
   } else {
     selected.value = [h]
   }
-  log('select_slot', { venue_id: props.slots.venue_id, hour: h })
+  log('rental_slot_select', { venue_id: props.slots.venue_id, hour: h })
 }
 
 const summary = computed(() => {

@@ -27,7 +27,7 @@ const won = (n) => n.toLocaleString('ko-KR')
     <div class="card__body">
       <div class="card__title-row">
         <h3 class="card__title">
-          <RouterLink :to="`/venues/${room.venue_id}`" class="card__link" @click="log('view_venue', { venue_id: room.venue_id })">{{ room.name }}</RouterLink>
+          <RouterLink :to="`/venues/${room.venue_id}`" class="card__link" @click="log('product_view', { venue_id: room.venue_id })">{{ room.name }}</RouterLink>
         </h3>
         <span class="rating num"><Star :size="15" class="star" fill="currentColor" aria-hidden="true" />{{ Number(room.rating_avg ?? 0).toFixed(1) }} <span class="rating__count">({{ room.review_count }})</span></span>
       </div>

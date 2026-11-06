@@ -10,12 +10,12 @@ it('허용된 프론트 이벤트만 보내고 공간·세션을 맞추며 개�
   setActivePinia(createPinia())
   const { useEventLogger, FRONTEND_EVENTS } = await import('@/composables/useEventLogger')
   const logger = useEventLogger()
-  expect(FRONTEND_EVENTS).toEqual(['search', 'view_venue', 'view_dates', 'select_slot', 'reserve_try', 'reserve_cancel', 'review_create', 'login', 'signup'])
+  expect(FRONTEND_EVENTS).toEqual(['page_view', 'product_impression', 'product_view', 'product_section_click', 'search_submit', 'availability_view', 'rental_slot_select', 'reservation_start', 'reservation_cancel_attempt', 'review_create', 'login', 'signup'])
   logger.log('unknown_event', { email: 'private@example.com' })
-  logger.log('select_slot', { venue_id: 2, hour: 13, email: 'private@example.com', name: '개인정보', q: '자유 입력' })
+  logger.log('rental_slot_select', { venue_id: 2, hour: 13, email: 'private@example.com', name: '개인정보', q: '자유 입력' })
   await logger.flush()
   expect(send).toHaveBeenCalledExactlyOnceWith('/events', expect.objectContaining({
     reportErrors: false,
-    body: { session_id: 'test-session', events: [{ event_type: 'select_slot', venue_id: 2, payload: { hour: 13 }, occurred_at: expect.any(String) }] },
+    body: { session_id: 'test-session', events: [expect.objectContaining({ schema_version: 1, event_name: 'rental_slot_select', occurred_at: expect.any(String), user: expect.objectContaining({ session_id: 'test-session', session_sequence: 1 }), products: [{ product_id: '2' }], properties: { hour: 13 } })] },
   }))
 })
