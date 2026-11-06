@@ -23,7 +23,7 @@ from app.core.event_document import (
     SERVER_EVENTS,
     build_document,
 )
-from app.core.logging import write_event
+from app.core.logging import request_id_context, write_event
 from app.core.metrics import mongo_event_write_failures_counter
 from app.core.mongo import get_event_collection
 
@@ -239,6 +239,10 @@ def _log_event(
     if event_type not in FRONTEND_EVENTS | SERVER_EVENTS:
         logging.getLogger("spacecube.app").warning("명세에 없는 서버 이벤트 제외")
         return
+    if event_type in SERVER_EVENTS and session_id is None:
+        request_id = request_id_context.get()
+        if request_id is not None:
+            session_id = f"server-{request_id}"
     context = client_event_context.get()
     try:
         if venue_id is not None and (

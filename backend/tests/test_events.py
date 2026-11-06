@@ -61,6 +61,68 @@ def test_mixed_batch_counts_only_allowed_events(monkeypatch):
     assert len(recorded) == 2
 
 
+@pytest.mark.parametrize("inactive_first", [False, True])
+def test_inactive_review_event_rejects_whole_batch_by_current_contract(
+    event_app, monkeypatch, inactive_first
+):
+    http, log_dir = event_app
+
+    def fake_db():
+        yield object()
+
+    monkeypatch.setattr(event_service, "get_db_write", fake_db)
+    monkeypatch.setattr(event_service.venue_repo, "get_detail", lambda _db, _id: None)
+    valid = frontend_event("search_submit")
+    inactive = frontend_event("review_create", product_id=777)
+    items = [inactive, valid] if inactive_first else [valid, inactive]
+
+    response = http.post("/events", json={"session_id": SESSION, "events": items})
+
+    assert response.status_code == 400
+    assert response.json()["code"] == "VALIDATION"
+    assert response.json()["detail"]["fields"][0]["field"] == "products.product_id"
+    assert not (log_dir / "events.log").exists()
+
+
+def test_server_result_uses_request_id_when_session_header_is_missing(monkeypatch):
+    from fastapi.testclient import TestClient
+
+    from app.core import middleware
+    from app.main import create_app
+
+    saved = []
+    queued = []
+    monkeypatch.setattr(events, "write_event", saved.append)
+    monkeypatch.setattr(middleware, "submit_events", lambda documents: queued.extend(documents))
+    product = {
+        "product_id": "7",
+        "product_name": "테스트 공간",
+        "price": {"currency": "KRW", "displayed_amount_minor": 10000, "billing_unit": "hour"},
+        "rental_conditions": {
+            "start_at": None,
+            "end_at": None,
+            "guest_count": None,
+            "option_ids": [],
+        },
+    }
+    app = create_app()
+
+    @app.post("/_test/server-event")
+    def emit_server_event():
+        events.log_event(None, 4, "reservation_complete", products=[product])
+        return {"ok": True}
+
+    with TestClient(app) as http:
+        response = http.post("/_test/server-event")
+
+    assert response.status_code == 200
+    assert len(saved) == 1
+    assert saved[0]["user"]["session_id"] == f"server-{response.headers['x-request-id']}"
+    assert saved[0]["user"]["anonymous_id"] is None
+    assert saved[0]["site"] is None
+    assert queued == saved
+
+
 def test_file_failure_rejects_api_and_never_queues_document(event_app, monkeypatch):
     http, _log_dir = event_app
     submitted = []

@@ -208,12 +208,12 @@ infra/monitoring/  alloy.config                # [A] 로그 파일 → Loki, 로
 
 - 프론트 이벤트 12종: `page_view`, `product_impression`, `product_view`, `product_section_click`, `search_submit`, `availability_view`, `rental_slot_select`, `reservation_start`, `reservation_cancel_attempt`, `review_create`, `login`, `signup`.
 - 서버 결과 이벤트 3종: `reservation_complete`, `reservation_conflict`, `reservation_cancel_complete`. B가 확정한 `products`를 전달한다. 현재 B의 구형 이름 호출은 새 컬렉션에 기록되지 않으므로 B 변경이 필요하다.
-- **미허용 이름만 그 건을 제외**하고 `202 {"accepted": n, "ignored": [{"event_type": "…", "count": k}]}`. 허용된 이름의 필수 문맥이 틀리거나 51건 이상이면 400이다.
+- **미허용 이름만 그 건을 제외**하고 `202 {"accepted": n, "ignored": [{"event_type": "…", "count": k}]}`. 허용된 이름의 필수 문맥·상품 조건이 틀리거나 51건 이상이면 400이다. 비활성 공간 `review_create`가 정상 이벤트와 섞여도 현재는 묶음 전체 400이며 로그에 쓰지 않는다(PR #72 PM 검토 사항).
 - FE PR #59는 현재 상품 이벤트마다 `product_id` 하나만 보낸다. A는 추가 `product_name`·`price` 입력을 400으로 거절하고 B의 `venue_repo.get_detail()`을 primary에서 호출해 활성 공간의 이름·수집 시점 가격을 채운다(복제 지연 방지). 인증된 `user_id`는 JWT 확인 결과만 사용한다. 같은 묶음의 서로 다른 공간 ID마다 상세 조회 SQL 한 번이 실행되므로 최대 50건 묶음에서 조회도 최대 50회다. DB 명세는 상품을 1개 이상 허용하지만 현재 FE는 한 개씩 보내므로, 다중 상품 이벤트 도입 전 B의 일괄 공간 스냅샷 조회 계약을 협의해야 한다.
 - URL query·fragment를 제거하고 `page.title`은 고정 화면명으로 바꾼다. UTM은 팀 허용 목록 결정 전까지 null, 임의 자유 문자열은 제외한다. `region_id`·`facility_ids`처럼 형식을 확인한 값과 `reservation_conflict.reason=SLOT_TAKEN`은 보존한다.
-- 서버 결과 3종은 문맥이 없을 때 `user.anonymous_id`·`user.session_sequence`·`site`·`acquisition`·`page`·`navigation`을 null로 기록한다(#60 승인). `user.session_id`는 새 DB에서 필수이므로 B의 `X-Session-Id`가 없는 직접 API 요청은 예약 성공을 유지하되 이벤트는 기록하지 않는다. 이 경우 저장 정책은 DB·PM과 확인이 필요하다.
+- 서버 결과 3종은 문맥이 없을 때 `user.anonymous_id`·`user.session_sequence`·`site`·`acquisition`·`page`·`navigation`을 null로 기록한다(#60 승인). `X-Session-Id`가 없으면 A가 요청 ID로 `user.session_id=server-<request_id>`를 채운다(#60 PM 결정). 예약 응답과 이벤트 수집은 독립적으로 유지한다.
 
-**#60 전환 상태(11-06):** A는 새 문서 조립·저장 대상·재적재 형식을 구현했다. FE PR #59는 develop에 병합됐지만 지역·시설 ID와 예약 문맥의 실제 전송은 남았다. B 서버 이벤트 이름·상품 전달과 DB 공식 `mongo_init.js` 갱신도 남았다. A 이벤트·공통 계약 pytest 21건이 통과했고, 별도 원격 테스트 DB의 임시 validator에서는 15종 저장·같은 ID 재적재 중복 제외를 확인한 뒤 임시 문서를 지웠다. 로컬 MongoDB 공식 validator 통합 검증은 아직 못 했다. 옛 로그는 별도로 보존하고 재적재에서 제외한다. 같은 새 로그 재적재는 `event_id`를 유지하며 HTTP 재전송은 서버가 새 ID를 발급한다.
+**#60 전환 상태(11-06):** A는 새 문서 조립·저장 대상·재적재 형식을 구현했다. 공식 `mongo_init.js`를 전용 `space_rental_analytics_test`에 적용한 뒤 실제 HTTP 검색 이벤트와 `log_event` 서버 이벤트 각 1건을 `events.log`와 MongoDB에서 확인했고, 같은 로그를 두 번 재적재해도 ID별 1건만 남음을 확인했다. 생성한 두 문서는 삭제했다. 이벤트 pytest 24건·전체 375건, Ruff·프론트 verify가 통과했다. FE PR #59는 develop에 병합됐지만 지역·시설 ID와 예약 문맥 전송은 남았고, B 서버 이벤트 이름·상품 전달도 미완료다. 비활성 공간 `review_create`가 유효한 항목과 섞이면 전체 400인 현행 정책은 PM 후속 논의 대상이다. 옛 로그는 별도로 보존하고 재적재에서 제외한다. HTTP 재전송은 서버가 새 ID를 발급한다.
 
 MongoDB 인덱스·TTL(1년)은 DB 담당의 `mongo_init.js`가 만듭니다. A는 앱 시작 때 만들지 않습니다(두 서버가 동시에 만들지 않게).
 
@@ -265,7 +265,7 @@ user_id·venue_id·session_id는 라벨이 아니라 본문에 둡니다. MongoD
 | test_auth.py | 가입 성공, 필수 입력·동의·휴대폰·birth 형식 오류 400, 만 14세 제한, 이메일 중복 409, **가입 직후 로그인 성공**, 인증된 로그아웃 204, 탈퇴 회원 로그인·만료 토큰 401 |
 | test_users.py | 내 정보 응답에 password_hash 없음, 조회 인증·시간대, 프로필 수정·잘못된 입력, 현재 비밀번호 확인, 새 비밀번호 길이·bcrypt 저장·로그인 변경, **취소 가능 예약 탈퇴 차단·개인정보 익명화·기존 토큰 무효화·이메일 재가입, 예약·후기 보존 및 탈퇴 회원 후기 표시** |
 | test_reviews.py | 자격 4단계 각각(404·403·403·409), 남의 후기 수정 403, 공간별·전체 정렬, 이름 가림, **작성 직후 내 후기에 보임** |
-| test_events.py | 50건 허용·51건 400, FE 12종·서버 3종의 상품·문맥 조건, 미허용 `event_name`만 빠지고 202 + `ignored`, MongoDB 장애 202/파일 실패 503, X-Synthetic, 개인정보 제거, 새 `events.log` 재적재 중복 제외. 실제 새 validator 저장은 통합 환경에서 추가 검증 |
+| test_events.py | 50건 허용·51건 400, FE 12종·서버 3종의 상품·문맥 조건, 미허용 `event_name`만 빠지고 202 + `ignored`, MongoDB 장애 202/파일 실패 503, X-Synthetic, 개인정보 제거, 새 `events.log` 재적재 중복 제외. 별도 실험에서 공식 validator를 적용한 테스트 MongoDB에 검색·서버 이벤트 각 1건 저장 확인; B 예약 호출 3종 통합은 별도 |
 | test_metrics.py | `/metrics`에 요청·예약 카운터가 나옴 |
 | test_health.py | primary 끊김 503, replica 끊김 200 degraded, MongoDB 끊김 200 degraded |
 | test_db_routing.py | `DB_READ_URL`이 틀려도 공개 조회가 primary로 대체되어 성공 |
