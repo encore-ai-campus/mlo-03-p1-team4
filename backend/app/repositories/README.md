@@ -21,5 +21,6 @@
 | `reservation_repo.get_owned(db, user_id, reservation_id)` | B | A (후기 작성 자격, primary 세션) | `(reservation_id, venue_id, reserve_date, start_hour, end_hour, status, created_at)` 튜플 또는 `None` |
 | `reservation_repo.count_cancellable(db, user_id)` | B | A (탈퇴 전 확인, 같은 primary 세션) | 시작 전 `confirmed` 예약 수(`int`), 시작 정각·이용 중·완료·취소 제외. 커밋은 호출자가 관리 |
 | `reservation_repo.review_context_query(*, active_only: bool = True)` | B | A `review_repo`에서 직접 import (#43) | 예약당 한 행인 `Select`: `reservation_id`, `venue_id`, `venue_name`, `category`(`categories.code`). 기본값은 활성 공간만, 내 후기는 `False`. 실행·commit·rollback 없음 |
+| `review_repo.get_review_ids(db, reservation_ids)` | A | B 내 예약 목록·상세 (#45, 같은 primary 세션) | 삭제된 후기까지 `{reservation_id: review_id}`. 후기가 없으면 매핑 제외, 빈 입력은 SQL 없음. commit·rollback 없음 |
 
 표·컬럼 이름은 `docs/산출물_04_DB명세서.md`(검증 후 `db/migrations`)가 기준입니다. 바꾸고 싶으면 DB 담당에게 요청합니다.

@@ -68,6 +68,7 @@ infra/nginx/       spacecube.conf         # [B] upstream 2대, /health
 | 이름 | 제공 | 쓰임 |
 | --- | --- | --- |
 | `get_db_write`, `get_db_read`, `get_current_user`, `AppError`, `paginate`, `log_event`, `get_today`, `is_synthetic_request` | A | 전부 |
+| `review_repo.get_review_ids(db, reservation_ids) -> dict[int, int]` | A | 본인 소유로 조회한 현재 페이지 예약 ID만 같은 primary 세션으로 전달해 후기 ID를 SQL 한 번에 조회. 삭제된 후기 ID도 포함하고 미작성은 매핑에 없음. 빈 입력은 SQL 없이 `{}`, commit·rollback 없음. 목록·상세 응답에는 매핑의 ID 또는 `null`을 항상 명시 (#45) |
 | 뷰 `v_venue_rating(venue_id, rating_avg, review_count)` | DB | 평점, 평점순 |
 | 기초 데이터, 생성된 공간·과거 예약 | DB | 조회·테스트 |
 
