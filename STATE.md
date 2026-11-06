@@ -167,6 +167,7 @@ A1~A4는 11-03에 확정했고, **A5~A8은 추후 확정**으로 미뤘다(11-03
 
 ## 최근 변경 (최신이 위)
 
+- 11-06 · FE · #45 결정 반영: 목업 내 예약의 `review_id`가 지운 후기도 포함(예약당 한 번), 지운 뒤에도 '후기 쓰기'가 다시 나오지 않음. 단위 56·E2E 67 통과(재시도 없음)
 - 11-05 · B · #43 PM 제안 및 B 동의에 따라 최신 develop(87de174, #41·#42 병합)에서 feat/B-F-51-review-context 생성·기준 커밋 확인 후 구현. review_context_query(*, active_only=True)가 예약·공간·유형을 조인한 4열 Select를 반환하며 예약 상태·후기 작성 자격은 거르지 않음. 기본값은 비활성 공간 제외, False는 포함. A 코드·main.py·DDL·API·이벤트 변경 없이 루트 약속·A/B 명세 3절·리포지토리/테스트 안내·구조에 계약 반영. pro_1·격리된 loopback MariaDB 11.4.13의 spacecube_test(0001·seed)에서 계약 14건 추가 포함 예약 의존성 43건·전체 pytest 303건 통과. verify.ps1 구성요소를 설치된 Miniforge pro_1·Node 경로로 실행해 Ruff 린트/포맷 및 프론트 린트·색 검사·단위 55건·빌드 통과. Starlette 사용 중단 예정·pytest 캐시 경로 권한·기존 FE 조건문 경고 각 1건. 테스트 데이터 6개 표 모두 0건 확인, 임시 DB 종료·정리. 후기 목록 HTTP·실제 replica·E2E·DDL 전용 검증은 이번에 실행하지 않았으며 A 직접 import 연결 후 통합 검증 예정. 커밋·푸시·PR은 아직 하지 않음.
 
 - 11-05 · B · 사용자 승인에 따라 feat/FastAPI-B-internal-venues로 이름을 맞추고 원격 푸시, develop 대상 PR #42 생성. 본문에 Refs #38·#10·#19와 구현 범위·검증 결과·api1 후속 배포를 명시하고 A 담당 naturedevworks에게 리뷰 요청. 관련 이슈의 나머지 작업은 열어 두며 예약 후속 기능은 보류. 코드 변경 없이 진행 기록만 갱신, PR CI 결과 확인 대기.

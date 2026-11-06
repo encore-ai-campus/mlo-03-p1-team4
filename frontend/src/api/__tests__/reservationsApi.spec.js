@@ -130,6 +130,25 @@ describe('F-30~41 결제와 후기', () => {
       code: 'REVIEW_PERIOD_OVER'
     });
   });
+  it('지운 후기도 내 예약의 review_id로 남고 다시 쓸 수 없다(#45)', async () => {
+    const a = await api.createReservation({
+      ...body, date: '2026-11-02'
+    }, token);
+    const r = await reviews.createReview(a.reservation_id, {
+      rating: 4, content: '지울 후기'
+    }, token);
+    await reviews.deleteReview(r.review_id, token);
+    const item = (await api.getMyReservations(token, {
+      status: 'completed', size: 50
+    })).items.find(x => x.reservation_id === a.reservation_id);
+    expect(item.review_id).toBe(r.review_id);
+    await expect(reviews.createReview(a.reservation_id, {
+      rating: 5, content: '다시 쓰기'
+    }, token)).rejects.toMatchObject({
+      code: 'REVIEW_EXISTS', status: 409
+    });
+    expect((await reviews.getMyReviews(token)).items.find(x => x.review_id === r.review_id)).toBeUndefined();
+  });
   it('후기 수정·삭제 작성자만, 탈퇴 후 익명 표기', async () => {
     const a = await api.createReservation({
       ...body, date: '2026-11-02'
