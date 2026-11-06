@@ -264,7 +264,8 @@ def main() -> None:
                     metrics = client.get("/metrics").text
                     assert 'reservation_total{result="ok"} 1.0' in metrics
                     print(
-                        "HTTP/DB verified: one synthetic reservation, two slots, one payment, one success counter"
+                        "HTTP/DB verified: one synthetic reservation, two slots, one payment, "
+                        "F-40 list/detail reads, one success counter"
                     )
             finally:
                 process.terminate()
