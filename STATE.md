@@ -13,7 +13,7 @@
 | --- | --- | --- | --- | --- |
 | 프론트 | 노진산(FE·PM) | FE-1~9 확정안 반영, Claude 시안 대조·FE 오류/모바일 결제/가입 UX 재검토 및 목업·화면 검증. 11-06 C안 화풍(흰 바탕·검은 글자·주칠)과 유형별 일러스트 5장 유지. CCL 분위기 참고 사진 40장(유형별 8장)을 정적 경로로 연결하고 유형·venue ID 해시로 안정 선택, 사진 표시·크레딧 추가(API `art:` 계약 그대로) | A·B 구현 후 실제 API 연결·오류·예약 동시성 통합 검증 | 실제 API 미구현 |
 | FastAPI A | [이름] | 회원·후기 A 기능 구현. F-60 공식 `mongo_init.js`를 전용 테스트 DB에 적용하고 실제 HTTP 202→파일→MongoDB 저장·재적재 중복 제외를 확인. 헤더 없는 서버 이벤트에 `server-<request_id>` 적용. 이벤트 관련 pytest 24건·전체 375건, Ruff, FE verify 통과 | B 서버 이벤트 3종 새 이름·상품 전달 및 FE 남은 지역·시설 ID/예약 문맥 통합 | 비활성 공간 `review_create`가 정상 건과 섞이면 전체 400(기존 계약, PM 후속 논의). UTM 허용 값 미확정 |
-| FastAPI B | 이세훈 | `feat/B-F60-events`에서 #60·#72 예약 결과 3종 이름·상품값·선택적 문맥 연결. A `d75deea`와 임시 통합에서 관련 pytest 77건·전체 375건·실제 HTTP/Postman 7요청/15검증·지정 MongoDB 결과 3종 저장/중복 제외/정리 확인. FE verify 67건·빌드 통과 | B 변경 리뷰 후 A #72와 함께 통합·배포. #8 api1 cron·생성기 백필 지원은 별도 | A의 세션 헤더 없는 요청 ID 보완 미반영, 원격 MongoDB 서버 문맥 null validator 동기화 필요. 실제 api1·replica·브라우저 E2E 미검증 |
+| FastAPI B | 이세훈 | #74 develop 병합 후 #5 PM 후속: 최신 develop `f387df2`에서 분리한 `fix/B-issue5-reservation-events`에 커밋 후 이벤트 문맥 조립·기록 전체 예외 경계와 회귀 테스트 구현. 로컬 MariaDB 예약·동시성 65건, 예외 주입·문맥 복원 3건, 실제 HTTP/Postman 7요청/15검증 통과. 기존 생성기 작업 트리는 수정하지 않음 | #5 B 수정 리뷰·병합. FE 문맥 전송·DB validator 동기화·브라우저 통합은 각 담당 후속. #8 api1 cron·생성기 백필 지원은 별도 | 원격 MongoDB 서버 문맥 null validator 동기화 필요. 실제 api1·replica·브라우저 E2E 미검증 |
 | DB | [이름] | `0001_init.sql`·`mongo_init.js` 검증(설치형 11.8·compose 11.4 둘 다 29건 통과), seed(유형 5·시설 20·지역 230 → `seed.sql`), `infra/local` compose, 크롤러 시제품(옛 필터). 1차 수집원 2곳+부족분 생성 방향 확정. 별도 Compass DB의 events·event_daily 속성 정리 v1을 docs/db에 공유 | 스페이스클라우드 새 필터·쉐어잇 파서/사이트별 robots 확인 → 속성 기반 시연용 공간 선별·`/internal/venues` 등록(B와) → 부족한 공간·과거 30일 행동 데이터 생성기 | 없음(A2 결정을 팀원에게 공유) |
 
 ## 기능 진행표
@@ -32,7 +32,7 @@
 | F-20 | 공간 상세 | B / A·FE 연계 | B 상세 API 구현·검증: test_venues 28건, 공간 모델 DDL 3건, 실제 API Chrome 1건 통과. 공개 읽기 경로 3건·기존 목업 E2E 59건 통과. A 후기 목록·FE 실제 서버 연결은 별도 통합 항목 |
 | F-21 | 예약 가능 날짜 | B | 검증: 공개 available-dates API 구현. 빈 칸 총수·min_hours 이상 연속 빈 칸 판정, 음수 offset·days 1~31·기간 양끝·0일 설정·마지막 페이지 잘림·큰 offset·점유 분리·재조회·SQL 2회·400/404·읽기 의존성 등 48건 추가. test_venues 114건, 전체 pytest 153건, 실제 HTTP Chrome 1건 통과. FE 전체 연결은 별도 |
 | F-22 | 날짜별 시간 칸 | B | 검증: 공개 GET /venues/{venue_id}/slots?date=YYYY-MM-DD 구현. 엄격한 날짜·설정 범위 양끝·0일 설정, 공간/날짜별 점유·완료 칸·past·F-20 일치·재조회·400/404·읽기 의존성 등 38건 추가. test_venues 총 66건, 전체 pytest 105건, 실제 HTTP Chrome 1건 통과 |
-| F-30~32 | 예약+모의 결제 한 번, 중복 차단 | B | 공식 앱의 POST /reservations 등록·A 공통 가상 키 검증 사용. API 21건·경쟁 3건 포함 전체 MariaDB pytest 241건 통과. PR #39의 취소·환불 재시도 제외 및 취소 후 재예약·타인 선점 회귀 검증 반영. 동시 다른 회원 50명: 201 1건/409 49건, 같은 회원: 201 1건/200 49건. 실제 인증·Postman 4요청/8검증에서 OpenAPI 200·무인증 401·생성 201·재시도 200 확인, DB 3개 표·합성 표시·카운터 검증·테스트 데이터 정리 완료 |
+| F-30~32 | 예약+모의 결제 한 번, 중복 차단 | B | #5 후속: model_dump·log_event 예외에도 201·예약/칸/결제 저장·성공 카운터 유지, 기록 뒤 기존 문맥 복원 회귀 통과. 예약·동시성 65건 및 추가 문맥 복원 포함 회귀 3건, 실제 인증·Postman 7요청/15검증 통과. 기존 트랜잭션·슬롯 중복·이벤트 이름/products/event_context 계약 유지. 동시 다른 회원 50명: 201 1건/409 49건, 같은 회원: 201 1건/200 49건 |
 | F-34 | 예약 취소·환불 | B | #49에서 develop 3a729f2와 코드 충돌 해결. 실제 취소 API 뒤 F-40 목록/상세가 같은 cancelled·refunded 상태인지 검증. 활성/비활성 공간 5개 유형 category 기록과 원자 환불·슬롯 반납·동시 취소·재예약 유지. 관련 94건·전체 347건·HTTP 7요청/15검증·CI 통과 후 #49가 55ebd23으로 develop 병합됨 |
 | F-35 | 이용 완료 배치 | B | #49의 primary 조건부 일괄 UPDATE·get_now 1회·commit/rollback·CLI·완료 뒤 칸/결제 보존을 develop 통합 후 재검증. test_jobs 6건 포함 관련 94건·전체 347건 통과. 실제 api1 시간별 cron 등록·실행은 미완료이므로 #8 유지 |
 | F-40~41 | 내 예약, 내 후기 | B / A | #46 조회·필수 nullable review_id·필드 생략 해제는 develop 병합됨. #49·#50 후속 병합도 완료. #45 브랜치에서 A `get_review_ids`를 목록·상세에 연결하고 미작성 null·작성/삭제 이력 ID·페이지당 SQL 1회·소유권 차단을 MariaDB/HTTP로 검증. PR 리뷰·병합 대기. F-41은 A 범위 |
@@ -174,6 +174,14 @@ A1~A4는 11-03에 확정했고, **A5~A8은 추후 확정**으로 미뤘다(11-03
 - 개인 기억(Claude 자동 메모리 등)은 팀에 공유되지 않는다. 팀이 알아야 할 것은 이 파일과 `docs/`에 쓴다.
 
 ## 최근 변경 (최신이 위)
+
+- 11-06 · B · 사용자 요청으로 #5 B 수정 브랜치 `fix/B-issue5-reservation-events`의 원격 푸시·develop 대상 PR 등록 진행. 준비한 제목·본문과 기존 검증 결과를 사용하고 `Refs #5`로 연결해 전체 이슈는 자동 종료하지 않음. 생성기 작업 트리는 그대로 유지.
+
+- 11-06 · B · 사용자 요청으로 #5 B 수정 4파일을 `fix/B-issue5-reservation-events`에서 커밋하고 develop 대상 PR 제목·본문 초안 준비. 검증 결과는 위 수정의 최종 실행 기록을 사용하며 이번 커밋 준비에서는 코드 변경·테스트 재실행 없음. #5는 FE·DB 후속이 남아 PR에서 `Refs #5`로 연결하고 자동 종료하지 않음. 생성기 미커밋 작업은 포함하지 않으며 푸시·PR 생성은 하지 않음.
+
+- 11-06 · B · #5 최종 검증: `verify.ps1`을 pro_1 실행기로 실행해 Ruff 93파일·로컬 MariaDB `spacecube_test` pytest 381건·FE 단위 67건·린트·빌드 모두 통과. 최종 예외 주입·문맥 복원 3건도 별도 통과. 실제 Uvicorn/JWT/Postman 7요청/15검증 및 임시 데이터 정리 통과. 기존 Starlette·FE 린트 경고 각 1건. MongoDB 실저장·배포·브라우저 E2E는 미실행. 커밋·푸시·PR은 하지 않음.
+
+- 11-06 · B · #5 최신 PM 결정(issuecomment-6683005424)에 따라 `_log_reservation_event()` 전체에 예외 경계를 적용하고 기존 문맥 복원 유지. 수정 전 model_dump·log_event 예외 주입에서 500 재현, 수정 후 로컬 MariaDB `spacecube_test`에서 201·예약/칸/결제 저장·성공 카운터 회귀 2건 및 문맥 복원 1건 통과. 예약·동시성 65건, Ruff, 실제 Uvicorn/JWT/Postman 7요청/15검증·임시 데이터 정리 통과. 최신 develop `f387df2`의 별도 작업 트리 `.worktrees/fix-B-issue5-reservation-events`에서만 수정하며 `feat/B-F-62-generator` 미커밋 작업은 포함하지 않음. #5 전체 종료는 FE·DB 후속 통합 후 담당자가 판단.
 
 - 11-06 · B · 사용자 요청으로 `feat/B-F60-events`를 푸시하고 GitHub CLI에서 Draft PR #74를 develop 대상으로 생성. B 변경만 포함하며 A #72 의존성과 서버 세션 ID·원격 MongoDB validator 후속 항목을 PR 본문에 명시. 이전 통합 검증 결과를 그대로 첨부했고 이번 PR 작성 작업에서는 테스트를 재실행하지 않음.
 

@@ -1,5 +1,15 @@
 # tests — pytest (담당: A·B 각자)
 
+## #5 F-30~32 커밋 후 이벤트 실패 회귀
+
+`test_reservations.py`는 `ReservationEventContext.model_dump()`와 B의 `log_event()`에 각각 예외를 주입해도 `POST /reservations`가 201을 반환하고 MariaDB에 예약 1건·시간 칸 2건·결제 1건이 유지되는지 확인합니다. 성공 카운터와 기록 실패 후 기존 문맥 복원도 검사합니다. 기존 테스트와 같이 로컬 MariaDB `spacecube_test`만 허용하고 임시 데이터는 외부 트랜잭션 롤백으로 정리합니다.
+
+```powershell
+python -m pytest backend/tests/test_reservations.py backend/tests/test_concurrency.py -q
+```
+
+11-06 검증: 수정 전 예외 주입 2건에서 HTTP 500 재현, 수정 후 예약·동시성 65건과 예외 주입·문맥 복원 3건 통과. `verify.ps1`은 pro_1 실행기를 지정해 Ruff 93파일·pytest 381건·FE 67건·린트·빌드까지 통과했습니다. 실제 Uvicorn/JWT/Postman 7요청/15검증과 임시 데이터 정리도 통과했습니다. 기존 Starlette 사용 중단 예정 경고·FE E2E 린트 경고 각 1건이며 실패는 없습니다. MongoDB 실저장·배포·브라우저 E2E는 이번 검증에서 실행하지 않았습니다.
+
 ## F-60 예약 서버 이벤트 전환 (#60·#72)
 
 `test_reservations.py`는 A #72와 합친 환경에서 새 결과 3종의 실제 문서 조립·primary 상품값·UTC 변환·문맥 전달/격리·재시도 중복 방지를 검사합니다. 비활성/가격 변경 공간 취소는 원래 결제 금액의 시간당 가격을 보존합니다. `test_concurrency.py`는 다른 회원 50건 중 성공 1/충돌 49와 같은 회원 재시도 성공 이벤트 1건을 확인합니다. 순수 B 브랜치는 A #72의 `products`·`ClientEventContext` 확장에 의존하므로 임시 통합 브랜치에서 실행합니다.
