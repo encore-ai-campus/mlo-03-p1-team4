@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#ffffff" />
+    <link rel="icon" href="data:," />
+    <title>사진 출처와 라이선스 · 다락큐브</title>
+    <style>
+      :root { color-scheme: light; font-family: Inter, "Noto Sans KR", "Apple SD Gothic Neo", sans-serif; color: #171717; background: #fff; }
+      * { box-sizing: border-box; }
+      body { margin: 0; line-height: 1.55; }
+      main { width: min(1120px, 100% - 40px); margin: 0 auto; padding: 44px 0 72px; }
+      a { color: #8d3519; text-underline-offset: 3px; }
+      h1 { margin: 0 0 12px; font-size: clamp(1.8rem, 4vw, 2.5rem); letter-spacing: -.04em; }
+      h2 { margin: 44px 0 16px; font-size: 1.3rem; }
+      .intro { max-width: 720px; color: #444; }
+      .intro strong { color: #171717; }
+      .group { display: grid; grid-template-columns: repeat(auto-fill, minmax(245px, 1fr)); gap: 16px; }
+      article { overflow: hidden; border: 1px solid #dedede; border-radius: 12px; background: #fff; }
+      article img { display: block; width: 100%; aspect-ratio: 400 / 260; object-fit: cover; background: #f3f3f3; }
+      article .body { padding: 13px 14px 16px; }
+      article h3 { margin: 0 0 8px; font-size: .98rem; }
+      article p { margin: 5px 0; color: #444; font-size: .87rem; }
+      article .license { color: #171717; font-weight: 650; }
+      .source { margin-top: 10px; }
+      .status { padding: 18px; border-radius: 10px; background: #f5f5f5; }
+      .footer { margin-top: 48px; padding-top: 20px; border-top: 1px solid #dedede; color: #555; font-size: .88rem; }
+      @media (max-width: 520px) { main { width: min(100% - 28px, 1120px); padding-top: 30px; } }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>사진 출처와 라이선스</h1>
+      <div class="intro">
+        <p><strong>이 사진은 공간 유형의 분위기를 보여 주는 참고 이미지입니다.</strong> 다락큐브에 등록된 실제 공간을 촬영한 사진이 아닙니다. 사진은 Wikimedia Commons 원본 페이지의 라이선스에 따라 제공하며, 편집한 사진은 변경 사실을 표시했습니다.</p>
+        <p>작은 화면과 넓은 화면에 맞춰 1200×780px WebP로 잘라 크기를 통일했습니다. CC BY-SA 사진의 편집본은 같은 라이선스로 표시합니다. 각 카드에서 원본 설명과 라이선스를 확인할 수 있습니다.</p>
+      </div>
+      <p id="status" class="status">출처 목록을 불러오는 중입니다.</p>
+      <div id="content"></div>
+      <p class="footer"><a href="/">다락큐브 홈으로</a> · <a href="./SOURCES.md">출처 표 전체 보기</a></p>
+    </main>
+    <script type="module">
+      const groups = { studyroom: '스터디룸', studio: '스튜디오', cafe: '카페', lectureroom: '강의실', partyroom: '파티룸' }
+      const escapeHtml = (value) => String(value).replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char])
+      const source = (cell) => {
+        const match = cell.match(/^\[(.+?)\]\((.+?)\) · (.+)$/)
+        return match ? { title: match[1], url: match[2], author: match[3] } : null
+      }
+      const license = (cell) => {
+        const match = cell.match(/^\[(.+?)\]\((.+?)\)$/)
+        return match ? { name: match[1], url: match[2] } : null
+      }
+      try {
+        const response = await fetch('./SOURCES.md')
+        if (!response.ok) throw new Error('출처 파일을 읽지 못했습니다.')
+        const markdown = await response.text()
+        const rows = markdown.split('\n').filter((line) => /^\| `[^`]+` \|/.test(line)).map((line) => line.split('|').slice(1, -1).map((cell) => cell.trim()))
+        const content = document.querySelector('#content')
+        for (const [type, label] of Object.entries(groups)) {
+          const entries = rows.filter((row) => row[0].startsWith(`\`${type}/`))
+          if (!entries.length) continue
+          const section = document.createElement('section')
+          const heading = document.createElement('h2')
+          heading.textContent = `${label} · ${entries.length}장`
+          section.append(heading)
+          const grid = document.createElement('div')
+          grid.className = 'group'
+          for (const row of entries) {
+            const filename = row[0].replaceAll('`', '')
+            const photo = source(row[1])
+            const rights = license(row[2])
+            const card = document.createElement('article')
+            card.innerHTML = `<img src="/photos/${escapeHtml(filename)}" alt="${label} 분위기 참고 이미지, 실제 등록 공간 사진이 아님" loading="lazy" decoding="async"><div class="body"><h3>${escapeHtml(photo?.title ?? filename)}</h3><p>저작자: ${escapeHtml(photo?.author ?? '정보 없음')}</p><p class="license">라이선스: ${rights ? `<a href="${escapeHtml(rights.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(rights.name)}</a>` : '정보 없음'}</p><p>${escapeHtml(row[3])}</p><p class="source"><a href="${escapeHtml(photo?.url ?? '#')}" target="_blank" rel="noopener noreferrer">Wikimedia Commons 원본 보기</a></p></div>`
+            grid.append(card)
+          }
+          section.append(grid)
+          content.append(section)
+        }
+        document.querySelector('#status').remove()
+      } catch (error) {
+        document.querySelector('#status').textContent = `${error.message} [SOURCES.md](./SOURCES.md)에서 전체 출처를 확인해 주세요.`
+      }
+    </script>
+  </body>
+</html>

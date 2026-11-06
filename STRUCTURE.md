@@ -41,7 +41,7 @@ Pro_1/
 │  ├─ 프론트_변경목록_11-03.md           [FE] 확정안에 맞춰 고칠 것
 │  ├─ 공간대여_04_UI패턴_글꼴.md · 공간대여_05_프론트_현황.md · 공간대여_06_크롤링_사이트조사.md
 │  ├─ 로컬_VM_구성.md                    [공동] 1차 배포: 노트북 4대 · VM 7대 배치·주소·방화벽 (11-05)
-│  ├─ 데이터_수집_명세.md                [공동] 1차 수집원 2곳·부족분 생성·약관 검토 (11-05, 사진안 미확정)
+│  ├─ 데이터_수집_명세.md                [공동] 1차 수집원 2곳·부족분 생성·약관 검토, CCL 참고 사진 40장과 FE 연결
 │  ├─ AWS_프리티어_구성.md               [공동] AWS C안(프리 티어, 11-04) — 참고안
 │  ├─ AWS_네트워크_설계.md · MVP_시뮬레이션_크롤링_수치.md   (10-30 기준, 맨 위 안내 참고)
 │  ├─ db/                     [DB] mongo_init.js (검증 끝). spacecube_mariadb.sql은 0001로 옮겼다는 안내만
@@ -62,6 +62,8 @@ Pro_1/
 │  │  └─ **/__tests__/        Vitest 단위 테스트
 │  ├─ e2e/                    Playwright + axe
 │  ├─ public/fonts/           웹용 글꼴 (Noto Sans KR 서브셋)
+│  ├─ public/photos/          [FE] CCL 분위기 참고 사진 40장(유형별 8장), README·SOURCES·크레딧 페이지
+│  │  └─ studyroom/ · studio/ · cafe/ · lectureroom/ · partyroom/ 1200×780 WebP
 │  └─ scripts/check-colors.mjs  tokens.css 밖 색 코드 검사
 │
 ├─ backend/                   [A·B] FastAPI 한 앱 (공식 A 통합, B F-10~14·20~22·30~32·61·get_owned·count_cancellable 구현)

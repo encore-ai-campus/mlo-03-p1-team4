@@ -109,7 +109,7 @@ async function loadSlots() {
 watch(() => route.params.venueId, loadRoom, { immediate: true })
 watch(date, () => { if (!initializing) loadSlots() })
 
-// 이미지: 같은 그림의 색 두 가지 (실사 사진이 없으므로)
+// 사진은 공간 유형과 공간 ID를 기준으로 고정 선택하고, image API 계약은 그대로 둔다.
 const gallery = computed(() => (room.value ? room.value.images : []))
 const peopleOptions = computed(() => {
   if (!room.value) return []
@@ -190,7 +190,7 @@ function scrollToBooking() {
     <SplitLayout ratio="3fr 2fr" sticky-end>
       <template #start>
         <UiCarousel label="공간 이미지">
-          <div v-for="(g, i) in gallery" :key="i" class="shot"><RoomArt :image="g" :category="room.category" /></div>
+          <div v-for="(g, i) in gallery" :key="i" class="shot"><RoomArt :image="g" :category="room.category" :seed="`${room.venue_id}-${i}`" /></div>
         </UiCarousel>
 
         <ul class="glance" aria-label="한눈에 보기">

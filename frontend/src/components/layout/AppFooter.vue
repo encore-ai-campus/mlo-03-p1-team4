@@ -34,6 +34,7 @@ const REPO = 'https://github.com/encore-ai-campus/mlo-03-p1-team4'
           <span>역할 프론트·PM 1 · FastAPI 2 · DB 1</span>
           <span>Vue 3 · FastAPI · MariaDB · MongoDB · HAProxy · Nginx</span>
           <span>배포 노트북 4대 · VM 7대 (로컬)</span>
+          <a href="/photos/credits.html">사진 출처 · 라이선스</a>
           <a :href="REPO" target="_blank" rel="noopener noreferrer">GitHub 저장소</a>
           <a :href="`${REPO}/wiki`" target="_blank" rel="noopener noreferrer">프로젝트 위키</a>
         </section>
@@ -41,7 +42,7 @@ const REPO = 'https://github.com/encore-ai-campus/mlo-03-p1-team4'
         <section class="footer__col" aria-label="안내">
           <h2>안내</h2>
           <span>결제는 모의 결제라 실제 돈이 나가지 않아요.</span>
-          <span>공간 정보는 공개 자료를 가공한 예시예요. 업체 실명과 사진은 쓰지 않고, 공간 그림은 유형별 일러스트예요.</span>
+          <span>공간 정보는 공개 자료를 가공한 예시예요. 업체 실명·실제 공간 사진은 표시하지 않으며, 유형별 분위기 참고 사진과 일러스트를 사용해요.</span>
           <span>탈퇴하면 이름 · 연락처 · 생년월일은 바로 지워져요.</span>
         </section>
       </div>
