@@ -12,7 +12,7 @@
 | 파트 | 담당자 | 지금 | 다음 할 일 | 막힌 것 |
 | --- | --- | --- | --- | --- |
 | 프론트 | 노진산(FE·PM) | FE-1~9 확정안 반영, Claude 시안 대조·FE 오류/모바일 결제/가입 UX 재검토 및 목업·화면 검증. 11-06 C안 화풍(흰 바탕·검은 글자·주칠)과 유형별 일러스트 5장 유지. CCL 분위기 참고 사진 40장(유형별 8장)을 정적 경로로 연결하고 유형·venue ID 해시로 안정 선택, 사진 표시·크레딧 추가(API `art:` 계약 그대로) | A·B 구현 후 실제 API 연결·오류·예약 동시성 통합 검증 | 실제 API 미구현 |
-| FastAPI A | [이름] | 회원·후기 A 기능 구현. F-60 공식 `mongo_init.js`를 전용 테스트 DB에 적용하고 실제 HTTP 202→파일→MongoDB 저장·재적재 중복 제외를 확인. 헤더 없는 서버 이벤트에 `server-<request_id>` 적용. 이벤트 관련 pytest 24건·전체 375건, Ruff, FE verify 통과 | B 서버 이벤트 3종 새 이름·상품 전달 및 FE 남은 지역·시설 ID/예약 문맥 통합 | 비활성 공간 `review_create`가 정상 건과 섞이면 전체 400(기존 계약, PM 후속 논의). UTM 허용 값 미확정 |
+| FastAPI A | [이름] | #5 통합 재검증: 로컬 MariaDB `spacecube_test`와 공식 validator가 적용된 전용 MongoDB 테스트 DB에서 공식 앱 HTTP 검색 202·예약 201/충돌 409/취소 200, 서버 이벤트 3종의 파일·Mongo 저장과 상품값·세션 ID 일치 확인. 관련 pytest 69건·전체 378건, Ruff·FE verify 67건 통과 | FE의 화면 이벤트 3종 호출·예약/취소 `event_context`·`region_id`/`facility_ids` 전송, B의 커밋 후 이벤트 문맥 예외 처리 확인 | PM #74 경계: 이벤트 문맥 직렬화 실패를 주입하면 예약 행 생성 후 응답 500. 실제 잘못된 JSON은 사전 400. 혼합 묶음 전체 400은 현행 정책, UTM 허용 값 미확정 |
 | FastAPI B | 이세훈 | `feat/B-F60-events`에서 #60·#72 예약 결과 3종 이름·상품값·선택적 문맥 연결. A `d75deea`와 임시 통합에서 관련 pytest 77건·전체 375건·실제 HTTP/Postman 7요청/15검증·지정 MongoDB 결과 3종 저장/중복 제외/정리 확인. FE verify 67건·빌드 통과 | B 변경 리뷰 후 A #72와 함께 통합·배포. #8 api1 cron·생성기 백필 지원은 별도 | A의 세션 헤더 없는 요청 ID 보완 미반영, 원격 MongoDB 서버 문맥 null validator 동기화 필요. 실제 api1·replica·브라우저 E2E 미검증 |
 | DB | [이름] | `0001_init.sql`·`mongo_init.js` 검증(설치형 11.8·compose 11.4 둘 다 29건 통과), seed(유형 5·시설 20·지역 230 → `seed.sql`), `infra/local` compose, 크롤러 시제품(옛 필터). 1차 수집원 2곳+부족분 생성 방향 확정. 별도 Compass DB의 events·event_daily 속성 정리 v1을 docs/db에 공유 | 스페이스클라우드 새 필터·쉐어잇 파서/사이트별 robots 확인 → 속성 기반 시연용 공간 선별·`/internal/venues` 등록(B와) → 부족한 공간·과거 30일 행동 데이터 생성기 | 없음(A2 결정을 팀원에게 공유) |
 
@@ -39,7 +39,7 @@
 | F-50 지원 | A 후기 작성용 예약 소유권 조회 | B | 예약·칸·결제 모델 및 `get_owned()`를 이전 프로젝트에서 가져옴. DDL 일치·매퍼 구성 4건, 실제 MariaDB 소유권·A 후기 작성 연결 10건 통과. 예약 생성 API 구현 완료를 뜻하지 않음 |
 | F-51 지원 (#43) | A 후기 목록용 예약·공간·유형 조회식 | B / A 연계 | 검증: B 4열 `review_context_query(*, active_only=True)` PR #44, A 직접 import·공개 비활성 공간 제외·내 후기 유지 PR #47이 develop 병합됨. 로컬 MariaDB 관련 테스트 58건 통과. Swagger 실제 데이터 수동 확인은 별도 |
 | F-50~51 | 후기 작성·조회(후기 모아보기) | A | B get_owned·review_context_query 연결, 작성·목록·수정·삭제 및 탈퇴 후 예약·후기 보존·작성자 익명화 로컬 MariaDB 검증. 공개 비활성 공간 제외·내 후기는 포함. 전체 backend pytest 318건 통과 |
-| F-60, F-62~65 | 이벤트(로그 파일 + MongoDB), 가상 데이터, `get_today`, 서버 로그, 지표 | A | 진행: #60 승인 구조로 FE 12종·서버 3종 문서·파일 우선·새 로그 재적재 구현. 공식 `mongo_init.js`를 `space_rental_analytics_test`에 적용하고 검색 HTTP 202·서버 공용 함수 이벤트 각 1건의 파일·MongoDB 저장, 개인정보 제거, 두 차례 재적재 중복 제외, 생성 문서 정리를 확인. MongoDB 장애 202·파일 실패 503 테스트 통과. 비활성 공간 `review_create` 혼합 전체 400 재현; 정책 변경 없이 PM 후속 논의. 이벤트 pytest 24건·전체 375건, Ruff·FE verify(67건/빌드) 통과. B 새 호출·FE ID/예약 문맥 통합은 미검증이므로 #5 완료 아님 |
+| F-60, F-62~65 | 이벤트(로그 파일 + MongoDB), 가상 데이터, `get_today`, 서버 로그, 지표 | A | 진행: 공식 validator·고유 인덱스 적용된 `space_rental_analytics_test`와 로컬 `spacecube_test` 확인. 공식 앱 HTTP 검색 이벤트 202→파일·Mongo 동일 ID, URL·개인정보 제거, 같은 로그 재적재 추가 0건. 실제 예약 성공·충돌·취소 서버 이벤트 3종이 파일·Mongo에 저장되고 상품 ID·이름·가격·이용일·인원 일치. 헤더 없는 예약 결과는 `server-<request_id>`. 생성 Mongo 문서 4건 삭제, Maria 테스트 행은 외부 트랜잭션 롤백. Mongo 장애 202·파일 실패 503·혼합 묶음 전체 400 확인. 관련 pytest 69건·전체 378건, Ruff·FE verify 67건/빌드 통과. FE 화면 호출 9/12종, 예약 문맥·지역·시설 ID 미전송과 B 커밋 후 이벤트 문맥 예외 경계가 남아 #5 완료 아님 |
 | F-60 B 지원 (#60·#72) | 예약 결과 3종·상품 스냅샷·선택적 브라우저 문맥 | B / A·DB 연계 | B 구현·A d75deea 임시 통합 검증: 관련 pytest 77건·전체 375건, Postman 7요청/15검증, 지정 MongoDB에서 결과 3종 실저장·동일 ID 중복 제외·가상 데이터 정리. A의 server-요청 ID 보완 및 원격 validator null 허용 반영 전 최종 완료 아님 |
 | F-61 | 크롤링 신규 등록 | DB / B | 진행: B POST /internal/venues 구현·로컬 검증 완료(35건·같은 출처 동시 8건·HTTP 6요청/12검증). DB 크롤러 새 필터·쉐어잇 파서·crawl_raw 연결과 api1 배포는 후속 |
 | #19 생성기 | 시연용 공간 부족분 생성·과거 30일 백필(회원·예약·결제·후기·이벤트)·`event_daily` 집계 | DB (api1 실행 환경 A, 과거 시각 저장 지원 B) | 설계 확정(11-05 #38), 코드 전. 100명으로 먼저 검증 → 11-07까지 규모 확정 |
@@ -174,6 +174,8 @@ A1~A4는 11-03에 확정했고, **A5~A8은 추후 확정**으로 미뤘다(11-03
 - 개인 기억(Claude 자동 메모리 등)은 팀에 공유되지 않는다. 팀이 알아야 할 것은 이 파일과 `docs/`에 쓴다.
 
 ## 최근 변경 (최신이 위)
+
+- 11-06 · A · #5·#60, 병합 PR #72·#74 기준 통합 재검증. 기존 서비스를 새로 켜지 않고 공식 앱의 TestClient HTTP 경로와 로컬 `spacecube_test`·공식 validator 적용 `space_rental_analytics_test`를 연결했다. 검색 202→파일·Mongo 동일 ID 및 URL query/fragment·이메일·전화번호·토큰 제거, 예약 201·충돌 409·취소 200의 서버 이벤트 3종·상품 스냅샷·헤더 없는 `server-<request_id>`를 확인. Mongo 장애 202, 파일 실패 503, 재적재 추가 0건, 혼합 묶음 전체 400 확인. Mongo 테스트 문서 4건 삭제, Maria 임시 행은 외부 트랜잭션 롤백. 관련 pytest 69건·전체 378건, Ruff 87파일·FE verify 67건/빌드 통과. 잘못된 `event_context.user` JSON은 사전 400으로 500 미재현; `model_dump()` 실패를 주입하면 커밋 뒤 500·예약 행 잔존을 재현해 B 후속 수정 필요. FE 화면 호출은 9/12종이며 예약 문맥·지역·시설 ID 미전송. #5는 미완료.
 
 - 11-06 · B · 사용자 요청으로 `feat/B-F60-events`를 푸시하고 GitHub CLI에서 Draft PR #74를 develop 대상으로 생성. B 변경만 포함하며 A #72 의존성과 서버 세션 ID·원격 MongoDB validator 후속 항목을 PR 본문에 명시. 이전 통합 검증 결과를 그대로 첨부했고 이번 PR 작성 작업에서는 테스트를 재실행하지 않음.
 
