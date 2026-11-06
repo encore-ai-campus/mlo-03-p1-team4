@@ -42,7 +42,9 @@ Locust는 HTTP만 보내 수백~수천 명을 만들고, Playwright는 진짜 �
 
 ## #20 페르소나별 매일 실행
 
-`daily_locustfile.py`는 위의 50·200명 성능 판정과 별개입니다. 네 페르소나 클래스 중 **한 번에 하나**를 선택해 정문 `/api`로 실제 요청을 보냅니다. 검색 → 상세 → 날짜별 칸 조회 후, 탐색만 제외한 클래스는 빈 칸이 있으면 예약합니다. `SLOT_TAKEN` 409를 받으면 다른 공간을 최대 두 번 시도합니다. 가상 회원은 실행 전에 준비하고, 각 동시 사용자에게 서로 다른 계정을 배정합니다. 요청 사이 대기는 1~5초입니다.
+**기본은 GET 조회 전용이며 로그인·이벤트·예약 POST를 보내지 않습니다.** 아래 예약·이벤트 행동은 쓰기 모드를 명시적으로 켠 경우만 실행합니다.
+
+`daily_locustfile.py`는 위의 50·200명 성능 판정과 별개입니다. 네 페르소나 클래스 중 **한 번에 하나**를 선택해 정문 `/api`로 실제 요청을 보냅니다. 검색 → 상세 → 날짜별 칸 조회 후, 탐색만 제외한 클래스는 빈 칸이 있으면 예약합니다. `SLOT_TAKEN` 409를 받으면 다른 공간을 최대 두 번 시도합니다. 가상 회원은 실행 전에 준비하고, 각 동시 사용자에게 서로 다른 계정을 배정합니다. 방문 반복 사이 대기는 1~5초이며 방문 안의 각 HTTP 요청마다 대기하지는 않습니다.
 
 | 클래스 | 문서의 실행 요일·시간대 (Asia/Seoul) | 동시 사용자 | 행동 |
 | --- | --- | ---: | --- |
@@ -55,21 +57,23 @@ Locust는 HTTP만 보내 수백~수천 명을 만들고, Playwright는 진짜 �
 
 ### 실행 준비와 명령
 
-`pro_1` 환경에 고정 버전 `locust==2.43.1`이 필요합니다. 계정 파일은 커밋하지 않는 경로에 `[{"email":"…","password":"…"}]` 형태로 준비합니다. 가상 회원은 최소 해당 동시 사용자 수만큼 서로 달라야 합니다. 키·계정·토큰은 명령 인자나 실행 기록에 쓰지 않습니다. 다음 환경변수는 노트북 4에서 작업 실행 계정에만 설정합니다.
+`pro_1` 환경에 고정 버전 `locust==2.47.0`이 필요합니다. 계정 파일은 커밋하지 않는 경로에 `[{"email":"…","password":"…"}]` 형태로 준비합니다. 가상 회원은 최소 해당 동시 사용자 수만큼 서로 달라야 합니다. 키·계정·토큰은 명령 인자나 실행 기록에 쓰지 않습니다. 다음 환경변수는 노트북 4에서 작업 실행 계정에만 설정합니다.
 
 | 환경변수 | 값 |
 | --- | --- |
 | `SYNTHETIC_API_KEY` | 서버의 가상 데이터 키. 모든 요청에 `X-Synthetic: 1`, `X-Synthetic-Key`로 전달 |
-| `LOCUST_ACCOUNTS_FILE` | 가상 회원 JSON 파일의 절대 경로. `Explorer`에는 필요 없음 |
+| `LOCUST_ALLOW_WRITES` | 기본 0(GET만), 1(쓰기). Windows 실행기는 -Mode Write로 지정 |
+| `PYTHONPATH` | 직접 Locust 실행 시 backend 경로. Windows 실행기는 자동 설정 |
+| `LOCUST_ACCOUNTS_FILE` | 가상 회원 JSON 파일의 절대 경로. 조회 모드·`Explorer`에는 필요 없음 |
 | `LOCUST_DATES` | 서버 예약 범위 안의 실제 날짜 `YYYY-MM-DD`, 여러 날짜는 쉼표로 구분 |
 | `LOCUST_RUN_LOG` | 실행 요약 JSONL 경로. 생략하면 `simulator/locust/logs/daily-runs.jsonl` |
 | `LOCUST_LOKI_PUSH_URL` | `mon`의 Loki push API 주소 (`http://<mon 주소>:3100/loki/api/v1/push`) |
 
-저장소 루트를 **시작 위치**로 지정한 작업 스케줄러의 실행 명령 예시는 아래와 같습니다. `Student`와 `-u 20`을 해당 행의 클래스·인원으로 바꾸어 네 작업을 만듭니다. `-t 10m`는 한 번 실행할 길이의 예시이며 PM이 작업 스케줄러에 등록할 때 정합니다. 시간대와 실행 길이가 정해지지 않은 상태에서 코드는 특정 시각을 가정하지 않습니다. 아래 Python 경로는 노트북 4의 실제 `pro_1` 경로로 바꿉니다.
+저장소 루트를 **시작 위치**로 지정한 작업 스케줄러의 실행 명령 예시는 아래와 같습니다. 위 표의 클래스·인원으로 작업을 구성합니다. Windows 실행기가 pro_1과 PYTHONPATH를 설정합니다. `-t 10m`는 한 번 실행할 길이의 예시이며 PM이 작업 스케줄러에 등록할 때 정합니다. 시간대와 실행 길이가 정해지지 않은 상태에서 코드는 특정 시각을 가정하지 않습니다. 아래 Python 경로는 노트북 4의 실제 `pro_1` 경로로 바꿉니다.
 
 ```text
-프로그램: C:\Users\<계정>\miniforge3\envs\pro_1\python.exe
-인수: -m locust -f simulator/locust/daily_locustfile.py --headless --host http://<gw 주소> -u 20 -r 4 -t 10m Student
+프로그램: powershell.exe
+인수: -NoProfile -ExecutionPolicy Bypass -File simulator/locust/run_daily.ps1 -Profile Student -Mode ReadOnly -Dates <실제날짜> -Duration 10m
 시작 위치: C:\<저장소 경로>
 ```
 
@@ -82,3 +86,23 @@ Nginx가 `/api`를 FastAPI로 전달하는 정문 주소를 `--host`에 넣습�
 PM이 실제 등록을 마치면 작업 스케줄러의 마지막 실행 결과와 Grafana의 같은 `run_id`를 대조합니다. `mon`의 Loki 접속·보존·대시보드 설정은 모니터링 담당 A와 함께 확인합니다. 별도 50명 `SameSlotRush`는 매일 작업에 넣지 않습니다.
 
 로컬 검증: `python -m pytest -q simulator/locust/tests/test_daily_locustfile.py`와 `python -m locust -f simulator/locust/daily_locustfile.py --list`. 이 점검은 실제 예약을 만들지 않으며, 노트북 4 작업 스케줄러·정문·Grafana 전송 확인을 대신하지 않습니다.
+
+
+## 실험 기록을 반영한 실행·판정 구분
+
+- 일일 상한: Student 20, Worker 15, Gathering 10, Explorer 5. 한 클래스·단일 프로세스만 지원한다. 계정 파일은 저장소 밖 보호 경로에 두고 스케줄러 중복 실행과 다른 시험의 계정 공유를 막는다.
+- 기본 run_daily.ps1은 ReadOnly다. -Mode Write를 명시하면 사용자 시작 시 한 번 로그인하고 토큰을 재사용한다. 이벤트와 예약을 쓰되 사용자당 예약 성공은 최대 1건이며 이후에는 조회를 계속한다. Explorer는 쓰기 모드에서도 예약은 하지 않고 이벤트만 보낸다.
+- 예약은 유효 reservation_id를 받은 201(신규)/200(기존 재전송)을 구분한다. code=SLOT_TAKEN인 409만 예상 충돌이며 다른 공간을 최대 두 번 더 시도한다. 400·401을 정상으로 숨기지 않는다.
+- run_daily.ps1의 Dates는 실제 예약 날짜다. 실행 요일·시각은 작업 스케줄러에서 관리하고 이 코드는 시계 시간으로 실행을 차단하지 않는다. 스케줄 등록·계정 생성·데이터 삭제·DB 설정 변경은 수행하지 않는다.
+- 실행기는 logs/persona-시각-클래스-모드/에 JSONL·CSV·HTML을 저장한다. 직접 python -m locust를 호출한다면 PYTHONPATH=backend와 LOCUST_ALLOW_WRITES를 직접 설정해야 한다.
+- JSONL에는 모드·목표/실제 최고 인원·실행 시간·전체 평균/p95/p99·상태별 건수·서버 오류율·예약 신규/재전송/충돌을 기록한다. 4xx가 서버 오류율에서 제외돼도 기능 오류·인원 미도달은 전체 실패다. Loki 전달 결과는 로컬 JSONL에서 확인하고 run_id는 본문에만 둔다. 앱 로그와 run_id 자동 연결은 아직 없으므로 시간·서버로 대조한다.
+
+### 현재 적재·성능 판정의 한계
+
+현재 백엔드는 event_type API 형식이며 새 이벤트 구조(#60)와 통합 전이다. 이 시나리오는 현재 API 계약을 따른다. 이벤트 202는 수락이고 MongoDB 저장 완료를 보장하지 않는다. MongoDB 제외 환경에서 실제 적재 완료로 보고하지 않는다.
+
+PR #73은 109 단일 호스트의 읽기 한계 시험 기록이다. 동시성 100/200 모두 400명에서 제한과 헬스 제외를 관측했으며 DB 병목은 미확인이다. 일일 실행 인원을 그 수준으로 올리지 않는다. DB exporter와 앱 계측 후 재시험한다. #73이 머지 전이면 별도 브랜치의 실행기다.
+
+정식 A7의 Browser 60·Booker 30·Reviewer 10 혼합, SameSlotRush, 유선 10분·워밍업 뒤 통계 reset 판정은 별도 후속이다. 일일 전체 p95에는 로그인·이벤트도 포함하므로 A7 경로별 p95가 아니다. CSV의 첫 1분 행 삭제로 워밍업 제외 p95를 만들지 않는다. 계정 일괄 생성·DB 연결 상향·합성 데이터 대량 삭제는 수행하지 않는다.
+
+[이번 보완 검증과 미검증 범위](VALIDATION.md). pytest.ini의 기본 testpaths는 backend/tests·db/tests이므로 일일 시나리오 회귀는 위의 별도 명령으로 실행한다.

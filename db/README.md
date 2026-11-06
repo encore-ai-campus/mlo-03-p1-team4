@@ -7,7 +7,7 @@
 | 저장소 | 무엇 | 위치 |
 | --- | --- | --- |
 | MariaDB 11.4 (RDS primary + read replica) | 표 12개(regions, categories, facilities, users, venues, venue_facilities, venue_images, reservations, reservation_slots, payments, reviews, crawl_jobs) + 뷰 `v_venue_rating` | `migrations/0001_init.sql` |
-| MongoDB 7 (EC2) | `user_events`(TTL 1년), `event_daily`, `crawl_raw` | `docs/db/mongo_init.js` |
+| MongoDB 7 | `space_rental_analytics.events`(TTL 365일), `event_daily`, `crawl.crawl_raw` (11-06 F-60 새 구조) | `docs/db/mongo_init.js` |
 
 | 폴더 | 내용 |
 | --- | --- |

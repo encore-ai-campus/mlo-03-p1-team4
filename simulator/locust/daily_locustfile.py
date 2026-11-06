@@ -13,6 +13,9 @@ from zoneinfo import ZoneInfo
 
 from locust import HttpUser, between, events, task
 from locust.exception import StopUser
+from locust.runners import MasterRunner, WorkerRunner
+
+from app.core.clock import get_event_time
 
 SEOUL = ZoneInfo("Asia/Seoul")
 PROFILES = {
@@ -25,6 +28,7 @@ PROFILES = {
     },
     "Explorer": {"categories": (), "hours": (), "people": 0},
 }
+DAILY_USER_LIMITS = {"Student": 20, "Worker": 15, "Gathering": 10, "Explorer": 5}
 RUN = None
 
 
@@ -87,7 +91,19 @@ def preferred_hours(profile: str, booking_date: str, starts: list[int], hours: i
 
 
 def now_kst() -> str:
-    return datetime.now(SEOUL).isoformat(timespec="seconds")
+    return get_event_time().astimezone(SEOUL).isoformat(timespec="seconds")
+
+
+def booking_outcome(status: int, body: object) -> str:
+    """예상 칸 충돌만 허용하고 인증·검증 실패는 정상 예약으로 숨기지 않는다."""
+    if not isinstance(body, dict):
+        return "error"
+    if status == 409 and body.get("code") == "SLOT_TAKEN":
+        return "conflict"
+    identifier = body.get("reservation_id")
+    if status in (200, 201) and type(identifier) is int and identifier > 0:
+        return "created" if status == 201 else "replayed"
+    return "error"
 
 
 class DailyRun:
@@ -105,6 +121,26 @@ class DailyRun:
         self.key = os.environ.get("SYNTHETIC_API_KEY", "")
         if not self.key:
             raise ValueError("SYNTHETIC_API_KEY가 필요합니다.")
+        flag = os.environ.get("LOCUST_ALLOW_WRITES", "0")
+        if flag not in {"0", "1"}:
+            raise ValueError("LOCUST_ALLOW_WRITES는 0 또는 1만 허용합니다.")
+        self.allow_writes = flag == "1"
+        self.target_users = environment.parsed_options.num_users
+        if (
+            type(self.target_users) is not int
+            or not 1 <= self.target_users <= DAILY_USER_LIMITS[self.profile]
+        ):
+            raise ValueError(
+                "일일 페르소나 인원 상한을 넘었습니다. 한계 시험은 별도 실행기를 사용하세요."
+            )
+        if isinstance(environment.runner, (MasterRunner, WorkerRunner)):
+            raise ValueError(
+                "매일 실행은 단일 프로세스만 지원합니다. 계정 배분을 보장할 수 없습니다."
+            )
+        self.max_bookings_per_user = 1
+        self.peak_users = 0
+        self.server_errors = 0
+        self.outcomes = Counter()
         self.dates = load_dates(os.environ.get("LOCUST_DATES", ""))
         if self.profile != "Explorer":
             self.dates = [
@@ -116,11 +152,15 @@ class DailyRun:
                 raise ValueError("페르소나의 선호 요일에 맞는 LOCUST_DATES가 없습니다.")
         self.accounts = (
             deque()
-            if self.profile == "Explorer"
+            if self.profile == "Explorer" or not self.allow_writes
             else load_accounts(os.environ.get("LOCUST_ACCOUNTS_FILE", ""))
         )
         self.target_users = environment.parsed_options.num_users
-        if self.profile != "Explorer" and len(self.accounts) < self.target_users:
+        if (
+            self.allow_writes
+            and self.profile != "Explorer"
+            and len(self.accounts) < self.target_users
+        ):
             raise ValueError("가상 회원 수가 동시 사용자 수보다 적습니다.")
         self.statuses = Counter()
         self.issues = Counter()
@@ -134,12 +174,33 @@ class DailyRun:
             "started_at": self.started_at,
             "finished_at": now_kst(),
             "target_users": self.target_users,
+            "actual_peak_users": self.peak_users,
+            "mode": "persona-write" if self.allow_writes else "read-only",
+            "max_bookings_per_user": self.max_bookings_per_user,
+            "duration_seconds": max(
+                0,
+                (
+                    datetime.fromisoformat(now_kst()) - datetime.fromisoformat(self.started_at)
+                ).total_seconds(),
+            ),
+            "average_ms": stats.avg_response_time,
+            "p95_ms": stats.get_response_time_percentile(0.95),
+            "p99_ms": stats.get_response_time_percentile(0.99),
+            "server_errors": self.server_errors,
+            "server_error_rate": self.server_errors / stats.num_requests
+            if stats.num_requests
+            else None,
+            "outcomes": dict(self.outcomes),
+            "performance_verdict": "not_evaluated_daily_run",
             "requests": stats.num_requests,
             "failures": stats.num_failures,
             "statuses": dict(self.statuses),
             "issues": dict(self.issues),
             "result": "success"
-            if stats.num_requests and not stats.num_failures and not self.issues
+            if stats.num_requests
+            and not stats.num_failures
+            and not self.issues
+            and self.peak_users >= self.target_users
             else "failure",
         }
         if result["result"] == "failure":
@@ -158,7 +219,7 @@ class DailyRun:
                         {
                             "stream": {"job": "locust_daily", "profile": self.profile},
                             "values": [
-                                [str(int(datetime.now(SEOUL).timestamp() * 1_000_000_000)), line]
+                                [str(int(get_event_time().timestamp() * 1_000_000_000)), line]
                             ],
                         }
                     ]
@@ -188,6 +249,7 @@ class DailyRun:
 @events.test_start.add_listener
 def on_test_start(environment, **_kwargs):
     global RUN
+    RUN = None
     try:
         RUN = DailyRun(environment)
     except ValueError as error:
@@ -197,7 +259,23 @@ def on_test_start(environment, **_kwargs):
 @events.request.add_listener
 def on_request(response=None, exception=None, **_kwargs):
     if RUN is not None:
-        RUN.statuses[str(response.status_code if response is not None else 0)] += 1
+        status = response.status_code if response is not None else 0
+        RUN.statuses[str(status)] += 1
+        RUN.server_errors += int(status == 0 or status >= 500)
+        RUN.peak_users = max(RUN.peak_users, RUN.environment.runner.user_count)
+
+
+@events.spawning_complete.add_listener
+def on_spawning_complete(user_count, **_kwargs):
+    if RUN is not None:
+        RUN.peak_users = max(RUN.peak_users, user_count)
+
+
+@events.user_error.add_listener
+def on_user_error(user_instance, exception, tb, **_kwargs):
+    # 예외 본문에는 입력값이 섞일 수 있으므로 종류별 상세 대신 건수만 기록한다.
+    if RUN is not None:
+        RUN.issues["task_exception"] += 1
 
 
 @events.test_stop.add_listener
@@ -219,7 +297,8 @@ class Persona(HttpUser):
             "X-Session-Id": self.session_id,
         }
         self.token = ""
-        if self.profile != "Explorer":
+        self.bookings = 0
+        if RUN.allow_writes and self.profile != "Explorer":
             if not RUN.accounts:
                 RUN.issues["missing_account"] += 1
                 raise StopUser()
@@ -246,7 +325,12 @@ class Persona(HttpUser):
                 self.token = body["access_token"]
                 self.headers["Authorization"] = f"Bearer {self.token}"
 
+    def booking_budget_available(self) -> bool:
+        return self.bookings < RUN.max_bookings_per_user
+
     def event(self, event_type: str, venue_id: int | None = None):
+        if not RUN.allow_writes:
+            return True
         item = {"event_type": event_type, "occurred_at": now_kst()}
         if venue_id is not None:
             item["venue_id"] = venue_id
@@ -310,6 +394,9 @@ class Persona(HttpUser):
         random.shuffle(venues)
         attempts = 1 if self.profile == "Explorer" else 3
         for venue in venues[:attempts]:
+            if not isinstance(venue, dict):
+                RUN.issues["invalid_venue"] += 1
+                return
             venue_id = venue.get("venue_id")
             if not isinstance(venue_id, int):
                 RUN.issues["invalid_venue"] += 1
@@ -325,8 +412,6 @@ class Persona(HttpUser):
                 params={"date": date},
                 name="GET /venues/{id}/slots",
             )
-            if self.profile == "Explorer":
-                return
             if not isinstance(slots, list) or any(
                 not isinstance(slot, dict)
                 or type(slot.get("hour")) is not int
@@ -335,6 +420,12 @@ class Persona(HttpUser):
             ):
                 RUN.issues["invalid_slots"] += 1
                 continue
+            if (
+                self.profile == "Explorer"
+                or not RUN.allow_writes
+                or not self.booking_budget_available()
+            ):
+                return
             min_hours = detail.get("min_hours")
             capacity = detail.get("capacity_max")
             if type(min_hours) is not int or type(capacity) is not int:
@@ -364,17 +455,17 @@ class Persona(HttpUser):
                 name="POST /reservations",
                 catch_response=True,
             ) as response:
-                if response.status_code == 201:
-                    return
                 try:
                     result = response.json()
                 except ValueError:
                     result = {}
-                if (
-                    response.status_code == 409
-                    and isinstance(result, dict)
-                    and result.get("code") == "SLOT_TAKEN"
-                ):
+                outcome = booking_outcome(response.status_code, result)
+                RUN.outcomes[outcome] += 1
+                if outcome in {"created", "replayed"}:
+                    self.bookings += 1
+                    response.success()
+                    return
+                if outcome == "conflict":
                     response.success()
                     continue
                 RUN.issues["reservation_failed"] += 1
