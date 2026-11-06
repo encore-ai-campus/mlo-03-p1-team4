@@ -59,7 +59,7 @@ infra/nginx/       spacecube.conf         # [B] upstream 2대, /health
 | `reservation_repo.count_cancellable(db, user_id)` → `int` | 그 회원의 `status='confirmed'`이면서 시작 시각(`reserve_date` + `start_hour`)이 `get_now()`보다 뒤인 예약 수. **호출하는 쪽이 primary 세션을 넘기며, 예약 ID를 `FOR UPDATE`로 읽어 최신 행 기준으로 집계함** (11-06) | A 탈퇴 전 확인 |
 | `reservation_repo.review_context_query(*, active_only: bool = True)` → `Select` | 예약·공간·유형을 조인해 예약당 한 행, `reservation_id`·`venue_id`·`venue_name`·`category`(`categories.code`) 열을 `.label()`로 고정해 반환. 기본값은 비활성 공간 제외, `False`는 포함. DB 실행·commit·rollback 없음 (#43 PM 승인) | A `review_repo`가 직접 import: 공개 후기는 기본값·replica, 내 후기는 `False`·primary |
 | `GET /reservations/me` | 5-3 응답 | 프론트 마이페이지 |
-| 서버 쪽 이벤트 | `reserve_ok`, `reserve_conflict`, `reserve_cancel_ok` (A의 `log_event()`) | 분석 |
+| 서버 쪽 이벤트 | `reservation_complete`, `reservation_conflict`, `reservation_cancel_complete` (A의 `log_event()`) | 분석. #60 기준: 기존 7개 인자를 유지하고 `products=None` 키워드 전용 선택 인자를 추가. B가 확정 예약·공간명·시간당 가격·이용 시작/종료·인원으로 상품 스냅샷을 채워 전달. 문맥 없는 직접 API 예약도 성공해야 함 |
 
 후기 목록의 필터·정렬·페이지 계산, 후기·회원 조인과 작성자 마스킹은 A가 담당합니다. `review_context_query()`는 후기·회원·결제·시설·그림을 조회하지 않으며 예약 상태나 후기 작성 자격으로 결과를 거르지 않습니다. A가 후기와 결합할 때 해당 조건을 판단합니다. 비활성 공간은 공개 후기 두 목록에서 숨기되 내 후기에서는 공간명을 포함해 유지합니다. 기존 `get_owned()`는 후기 작성 자격 확인용으로 그대로 사용합니다. 연결은 `main.py` 등록 대신 A 리포지토리의 직접 import로 하고, 후기 생성 이벤트 `review_create`는 프론트만 전송합니다.
 

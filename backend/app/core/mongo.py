@@ -38,7 +38,7 @@ def get_event_collection():
     client = get_mongo_client()
     if client is None:
         raise RuntimeError("MONGO_URL이 설정되지 않았습니다.")
-    return client[get_settings().mongo_db]["user_events"]
+    return client[get_settings().mongo_db]["events"]
 
 
 def check_mongo() -> bool:

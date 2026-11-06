@@ -3,13 +3,12 @@
 사용: 이벤트 서비스와 B 예약 서비스가 이벤트를 기록하고 MongoDB에 전달한다.
 """
 
-import json
 import logging
-import math
 import re
 from concurrent.futures import ThreadPoolExecutor
 from contextvars import ContextVar
 from dataclasses import dataclass, field
+from datetime import date
 from queue import Empty, Full, Queue
 from threading import Event, Lock
 from uuid import uuid4
@@ -17,33 +16,21 @@ from uuid import uuid4
 import pymongo
 from pymongo.errors import BulkWriteError
 
-from app.core.clock import get_event_time
-from app.core.config import get_settings
 from app.core.errors import fail
 from app.core.event_context import client_event_context
-from app.core.logging import write_event
+from app.core.event_document import (
+    FE_EVENTS,
+    SERVER_EVENTS,
+    build_document,
+)
+from app.core.logging import request_id_context, write_event
 from app.core.metrics import mongo_event_write_failures_counter
 from app.core.mongo import get_event_collection
 
-FRONTEND_EVENTS = frozenset(
-    {
-        "search",
-        "view_venue",
-        "view_dates",
-        "select_slot",
-        "reserve_try",
-        "reserve_cancel",
-        "review_create",
-        "login",
-        "signup",
-    }
-)
-SERVER_EVENTS = frozenset({"reserve_ok", "reserve_conflict", "reserve_cancel_ok"})
+FRONTEND_EVENTS = FE_EVENTS
 PAYLOAD_KEYS = frozenset(
     {
         "category",
-        "sido",
-        "sigungu",
         "date",
         "people",
         "headcount",
@@ -51,32 +38,14 @@ PAYLOAD_KEYS = frozenset(
         "end_hour",
         "hours",
         "hour",
-        "facilities",
         "facility_ids",
+        "region_id",
         "sort",
         "page",
         "size",
         "reservation_id",
         "rating",
         "slots",
-        "reason",
-        "result",
-        "code",
-    }
-)
-EVENT_DOCUMENT_FIELDS = frozenset(
-    {
-        "event_id",
-        "ts",
-        "client_ts",
-        "session_id",
-        "user_id",
-        "event_type",
-        "venue_id",
-        "category",
-        "payload",
-        "is_synthetic",
-        "server",
     }
 )
 
@@ -90,30 +59,51 @@ class EventBuffer:
 event_buffer: ContextVar[EventBuffer | None] = ContextVar("event_buffer", default=None)
 
 
-def sanitize_payload(payload: dict | None) -> dict:
-    def clean(value, depth: int = 0):
-        if depth > 3:
-            return None
-        if value is None or isinstance(value, (bool, int)):
-            return value
-        if isinstance(value, float):
-            return value if math.isfinite(value) else None
-        if isinstance(value, str):
-            value = re.sub(r"[^\s@]+@[^\s@]+", "[가림]", value[:200])
-            return re.sub(
-                r"(?<!\d)(?:01[016789][- ]?\d{3,4}[- ]?\d{4}|\d{6})(?!\d)",
-                "[가림]",
-                value,
-            )
-        if isinstance(value, list):
-            return [clean(item, depth + 1) for item in value[:50]]
-        return None
+def sanitize_payload(payload: dict | None, event_type: str | None = None) -> dict:
+    """자유 문자열을 저장하지 않고 형식이 확인된 분석 값만 남긴다."""
+    categories = {"studyroom", "studio", "cafe", "lectureroom", "partyroom"}
+    sorts = {"default", "popular", "price", "rating", "recent", "high", "low"}
 
-    sanitized = {key: clean(value) for key, value in (payload or {}).items() if key in PAYLOAD_KEYS}
-    if len(json.dumps(sanitized, ensure_ascii=True).encode("utf-8")) > 8192:
-        # 대기열 1,000건이 큰 payload 때문에 메모리를 소진하지 않게 한다.
-        return {}
-    return sanitized
+    def valid(key, value):
+        if key == "category":
+            return type(value) is str and value in categories
+        if key == "sort":
+            return type(value) is str and value in sorts
+        if key == "date":
+            if type(value) is not str or not re.fullmatch(r"\d{4}-\d{2}-\d{2}", value):
+                return False
+            try:
+                date.fromisoformat(value)
+            except ValueError:
+                return False
+            return True
+        if type(value) is int:
+            limits = {
+                "people": (1, 1000),
+                "headcount": (1, 1000),
+                "page": (1, 1000),
+                "size": (1, 1000),
+                "hour": (9, 22),
+                "start_hour": (9, 22),
+                "end_hour": (10, 23),
+                "hours": (1, 4),
+                "rating": (1, 5),
+                "reservation_id": (1, 9223372036854775807),
+                "region_id": (1, 9223372036854775807),
+            }
+            return key in limits and limits[key][0] <= value <= limits[key][1]
+        if key in {"slots", "facility_ids"} and type(value) is list:
+            return len(value) <= 50 and all(type(item) is int and item > 0 for item in value)
+        return False
+
+    result = {
+        key: value
+        for key, value in (payload or {}).items()
+        if key in PAYLOAD_KEYS and valid(key, value)
+    }
+    if event_type == "reservation_conflict" and (payload or {}).get("reason") == "SLOT_TAKEN":
+        result["reason"] = "SLOT_TAKEN"
+    return result
 
 
 def insert_event_documents(documents: list[dict]) -> tuple[int, int]:
@@ -243,31 +233,43 @@ def _log_event(
     category=None,
     payload=None,
     is_synthetic=False,
+    *,
+    products=None,
 ) -> None:
     if event_type not in FRONTEND_EVENTS | SERVER_EVENTS:
         logging.getLogger("spacecube.app").warning("명세에 없는 서버 이벤트 제외")
         return
+    if event_type in SERVER_EVENTS and session_id is None:
+        request_id = request_id_context.get()
+        if request_id is not None:
+            session_id = f"server-{request_id}"
     context = client_event_context.get()
-    received_at = get_event_time()
-    client_ts = (
-        context.occurred_at.astimezone(received_at.tzinfo)
-        if context is not None and context.occurred_at is not None
-        else None
-    )
-    props = sanitize_payload(payload)
-    document = {
-        "event_id": str(uuid4()),
-        "ts": received_at,
-        "client_ts": client_ts,
-        "session_id": session_id or "server",
-        "user_id": user_id,
-        "event_type": event_type,
-        "venue_id": venue_id,
-        "category": category,
-        "payload": props,
-        "is_synthetic": is_synthetic,
-        "server": get_settings().server_name,
-    }
+    try:
+        if venue_id is not None and (
+            type(venue_id) is not int
+            or not products
+            or any(item.get("product_id") != str(venue_id) for item in products)
+        ):
+            raise ValueError("공간 ID 불일치")
+        properties = sanitize_payload(payload, event_type)
+        if category in {"studyroom", "studio", "cafe", "lectureroom", "partyroom"}:
+            properties["category"] = category
+        document = build_document(
+            event_id=str(uuid4()),
+            session_id=session_id,
+            user_id=user_id,
+            event_name=event_type,
+            occurred_at=context.occurred_at if context else None,
+            anonymous_id=context.anonymous_id if context else None,
+            session_sequence=context.session_sequence if context else None,
+            context=context.browser_context if context else None,
+            products=products,
+            properties=properties,
+            is_synthetic=is_synthetic,
+        )
+    except (ValueError, TypeError):
+        logging.getLogger("spacecube.app").warning("이벤트 필수값 오류로 제외")
+        return
     buffer = event_buffer.get()
     try:
         write_event(document)
@@ -277,6 +279,7 @@ def _log_event(
         logging.getLogger("spacecube.app").error(
             "이벤트 파일 기록 실패. 디스크 공간·권한을 확인하세요.",
         )
+        return
     # 관측 실패가 이미 커밋한 예약을 사용자에게 실패로 보이게 해서는 안 된다.
     if buffer is None:
         submit_events([document])
@@ -292,10 +295,21 @@ def log_event(
     category=None,
     payload=None,
     is_synthetic=False,
+    *,
+    products=None,
 ) -> None:
     """A·B 공용 약속. 관측 계층의 오류가 업무 응답으로 전파되지 않게 한다."""
     try:
-        _log_event(session_id, user_id, event_type, venue_id, category, payload, is_synthetic)
+        _log_event(
+            session_id,
+            user_id,
+            event_type,
+            venue_id,
+            category,
+            payload,
+            is_synthetic,
+            products=products,
+        )
     except Exception:
         buffer = event_buffer.get()
         if buffer is not None:
