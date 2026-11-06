@@ -63,7 +63,7 @@ Codex와 Claude Code가 함께 읽는 작업 지침입니다. 사람이 채팅�
 - 결제는 모의 결제만. 결제수단은 `transfer`·`card`·`phone`(API 값 = DB 값). 실제 결제 연동 코드를 만들지 않는다.
 - 회원이 쓰는 글은 후기만(예약당 1개, `completed`일 때만). 자유게시판·댓글·공지·관리자 역할은 없다.
 - 사용자 이벤트는 `events.log`(→ Alloy → Loki)에 먼저 쓰고 MongoDB `user_events`에는 응답 뒤 백그라운드로 쓴다. MongoDB가 꺼져도 예약·이벤트 API는 성공해야 한다.
-- 공간 이미지는 일러스트 풀(`art:<종류>-<색>`, `frontend/src/components/domain/RoomArt.vue`)을 돌려 쓴다. 크롤링한 사진·업체 실명·원문 소개를 저장하지 않는다.
+- 공간 이미지는 프론트의 유형별 일러스트와 유형별 CCL 분위기 참고 이미지 풀(`frontend/public/photos/`)에서 보여 준다. CCL 사진은 `category.code`와 공간 ID로 프론트에서 안정 선택하고, 실제 등록 공간 사진이 아님을 표시하며 출처·저작자·라이선스·변경 사실을 공개한다. `art:<종류>-<색>` API 계약은 바꾸지 않는다. 크롤링한 사진·업체 실명·원문 소개를 저장하지 않는다.
 - 가상 데이터는 `is_synthetic = true`. API로 넣을 때 헤더 `X-Synthetic: 1` + `X-Synthetic-Key`(= `.env` `SYNTHETIC_API_KEY`). 키가 없거나 틀리면 401 `UNAUTHORIZED` (11-05 A6)
 - 시간대 Asia/Seoul(MongoDB 저장은 UTC), 날짜 `YYYY-MM-DD`, 금액은 원 단위 정수. 오늘·지금은 `get_today()`·`get_now()`로만 읽는다(`date.today()`·`datetime.now()` 직접 호출 금지).
 - 오류 응답 `{"code","message","detail"}`, 목록 응답 `{"items","page","size","total"}`.

@@ -1,21 +1,25 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import cafe from '@/assets/art/venue-cafe.jpg'
 import lectureroom from '@/assets/art/venue-lectureroom.jpg'
 import partyroom from '@/assets/art/venue-partyroom.jpg'
 import studio from '@/assets/art/venue-studio.jpg'
 import studyroom from '@/assets/art/venue-studyroom.jpg'
+import { getVenuePhoto } from '@/utils/venuePhoto'
 
-// 공간 이미지: 유형별 일러스트 5장(11-06, `assets/art/README.md`)을 돌려 쓴다. 크롤링한 사진은 쓰지 않는다.
-// API 계약은 그대로 `art:<종류>-<색>`(예: art:group-1). 공간 유형(category)을 받으면 그 유형 그림을 먼저 쓴다.
+// 공간 유형별 CCL 분위기 참고 사진을 venue ID로 안정적으로 선택한다. 이미지 API 계약은 그대로 `art:<종류>-<색>`이다.
+// 로딩 실패·유형 정보 없음·로그인 화면은 일러스트를 사용한다.
 // 크롤러는 스터디룸에도 인원에 따라 seminar·lounge 같은 종류를 주므로, 종류만으로는 유형을 알 수 없다.
-// 유형이 없을 때만 종류 → 그림 대응표를 쓴다. 색 1은 그림을 좌우로 뒤집어 카드가 덜 겹쳐 보이게 한다.
+// 유형이 없을 때는 종류 → 일러스트 대응표를 쓴다. 색 1은 그림을 좌우로 뒤집는다.
 const props = defineProps({
   image: { type: String, default: '' },
   kind: { type: String, default: 'group' }, // booth duo group seminar meeting lounge studio cafe partyroom
   tone: { type: Number, default: 0 },
   category: { type: [Object, String], default: null }, // { code } 또는 'studyroom' 같은 유형 코드
+  seed: { type: [Number, String], default: '' }, // 공간 ID, 상세 갤러리는 공간 ID + 칸 번호
 })
+const photoFailed = ref(false)
+watch(() => [typeof props.category === 'string' ? props.category : props.category?.code, props.seed], () => { photoFailed.value = false })
 
 const PICTURES = {
   studyroom: { src: studyroom, label: '6인 테이블과 화이트보드가 있는 스터디룸 일러스트' },
@@ -41,14 +45,25 @@ const art = computed(() => {
   const kind = match?.[1] ?? props.kind
   const tone = match ? Number(match[2]) : props.tone
   const code = typeof props.category === 'string' ? props.category : props.category?.code
+  const photo = photoFailed.value ? null : getVenuePhoto(code, props.seed)
   const picture = PICTURES[code] ?? PICTURES[KIND_TO_PICTURE[kind]] ?? PICTURES.studyroom
-  return { ...picture, flip: tone === 1 }
+  return {
+    src: photo ?? picture.src,
+    label: photo ? `${code} 유형 분위기 참고 사진입니다. 실제 등록 공간의 사진이 아닙니다.` : picture.label,
+    isPhoto: Boolean(photo),
+    flip: !photo && tone === 1,
+  }
 })
+
+function onImageError() {
+  if (art.value.isPhoto) photoFailed.value = true
+}
 </script>
 
 <template>
   <div class="art" role="img" :aria-label="art.label">
-    <img :src="art.src" alt="" loading="lazy" decoding="async" :class="{ 'is-flip': art.flip }" />
+    <img :key="art.src" :src="art.src" alt="" loading="lazy" decoding="async" :class="{ 'is-flip': art.flip }" @error="onImageError" />
+    <span v-if="art.isPhoto" class="art__note">분위기 참고</span>
   </div>
 </template>
 
@@ -68,5 +83,15 @@ const art = computed(() => {
 }
 .art img.is-flip {
   transform: scaleX(-1);
+}
+.art__note {
+  position: absolute;
+  inset: auto var(--sp-8) var(--sp-8) auto;
+  padding: var(--sp-4) var(--sp-8);
+  border-radius: var(--r-sm);
+  background: var(--c-ink);
+  color: var(--c-on-dark);
+  font-size: var(--fs-12);
+  line-height: 1.4;
 }
 </style>

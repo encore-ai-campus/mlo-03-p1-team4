@@ -123,7 +123,7 @@ const won = (n) => n.toLocaleString('ko-KR')
     <UiCarousel label="새로 문을 연 공간">
       <template v-if="newRooms.length">
         <RouterLink v-for="n in newRooms" :key="n.venue_id" :to="`/venues/${n.venue_id}`" class="new-card">
-          <span class="new-card__art"><RoomArt :image="n.image" :category="n.category" /></span>
+          <span class="new-card__art"><RoomArt :image="n.image" :category="n.category" :seed="n.venue_id" /></span>
           <span class="new-card__body">
             <span class="new-card__open num">{{ n.registered_on }} 오픈 · {{ n.new_days_left }}일 남음</span>
             <span class="new-card__name">{{ n.name }}</span>

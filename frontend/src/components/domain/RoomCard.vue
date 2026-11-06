@@ -21,7 +21,7 @@ const won = (n) => n.toLocaleString('ko-KR')
 <template>
   <article class="card" :style="{ '--i': Math.min(index, 7) }">
     <div class="card__media">
-      <RoomArt :image="room.image" :category="room.category" />
+      <RoomArt :image="room.image" :category="room.category" :seed="room.venue_id" />
     </div>
 
     <div class="card__body">

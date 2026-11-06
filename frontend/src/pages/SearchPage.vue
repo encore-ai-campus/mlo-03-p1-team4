@@ -204,7 +204,7 @@ function resetFilters() {
       <div v-else-if="items.length" class="results">
         <article v-for="r in items" :key="r.venue_id" class="result" :class="{ 'is-selected': sel.venueId === r.venue_id }">
           <div class="result__info">
-            <span class="result__thumb"><RoomArt :image="r.image" :category="r.category" /></span>
+            <span class="result__thumb"><RoomArt :image="r.image" :category="r.category" :seed="r.venue_id" /></span>
             <div class="result__text">
               <h3 class="result__name"><RouterLink :to="`/venues/${r.venue_id}`">{{ r.name }}</RouterLink></h3>
               <span class="result__type">{{ r.category.name }} · {{ r.region.sido }} {{ r.region.sigungu }}</span>

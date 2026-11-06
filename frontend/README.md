@@ -37,7 +37,7 @@ npm run dev
 | `src/pages/` | 라우트별 화면 7개 + `PlaceholderPage.vue`(없는 주소), `UiShowcasePage.vue`(/ui) |
 | `src/components/layout/` | AppHeader(스티키), AppFooter, SplitLayout, SidebarLayout |
 | `src/components/ui/` | BaseButton, UiChip, UiTabs, UiAccordion, UiDialog, UiDrawer, UiSelect, UiMenu, UiTooltip, UiSkeleton, UiCarousel, UiInput, UiPagination, AppToaster |
-| `src/components/domain/` | RoomArt(공간 일러스트 9종), RoomCard(+Skeleton), CategoryBento, SlotStrip, SlotGrid, DateStrip, ReviewCard, SearchFilters, HourlyChart |
+| `src/components/domain/` | RoomArt(CCL 분위기 참고 사진·유형별 일러스트), RoomCard(+Skeleton), CategoryBento, SlotStrip, SlotGrid, DateStrip, ReviewCard, SearchFilters |
 | `src/composables/` | useAuth, useBooking(예약 신청 흐름), useReveal(스크롤 리빌), useEventLogger(활동 로그) |
 | `src/api/` | client(오류 형식·목업 지연), catalog·venues·reservations(B), auth·users·reviews(A), mock/ |
 | `src/utils/` | date.js: 날짜(YYYY-MM-DD)·시간 범위·금액 표시 |
