@@ -109,6 +109,8 @@ Pro_1/
 │  ├─ nginx/                  [B] 서버마다: 정적 파일 + /api → 127.0.0.1:8000 (11-06 B안, README에 초안)
 │  ├─ monitoring/             [A] docker-compose, alloy.config, grafana/dashboards (예정)
 │  ├─ vm/                     [공동] 로컬 VM 7대 설치 체크리스트 (11-05, 1차 배포)
+│  │  ├─ lab/                 [공동] 109 시험 VM 공통 서비스·Grafana 공개 설정
+│  │  └─ remote109/           [공동] Terraform·Ansible·조회 부하 실행과 실험 기록(records/)
 │  └─ aws/                    [공동] 팀원별 AWS 체크리스트 (참고안)
 │
 └─ design/

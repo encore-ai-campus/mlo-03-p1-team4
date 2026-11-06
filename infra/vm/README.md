@@ -52,3 +52,7 @@
 ## 끄는 순서
 
 Locust 정지 → `api1`·`api2` → `gw` → `db2` → `db1`·`mongo` → `mon`. 켤 때는 반대(DB부터).
+
+## 109 예비 실험 환경 (#70)
+
+팀 분산 배치와 별도로 [109 자동화·조회 부하 기록](remote109/README.md)을 추가했다. 새 VM 4대는 한 호스트에 있으며 DB는 기존 서버를 사용하고 MongoDB는 제외했다. [선별 증거](remote109/records/README.md)와 [dd.md 검토·미완료 후속](remote109/DD-REVIEW.md)을 참고한다. 이 기록은 #13·#15·#16 전체 완료나 A7 판정이 아니다.
