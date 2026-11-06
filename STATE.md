@@ -13,7 +13,7 @@
 | --- | --- | --- | --- | --- |
 | 프론트 | 노진산(FE·PM) | FE-1~9 확정안 반영, Claude 시안 대조·FE 오류/모바일 결제/가입 UX 재검토 및 목업·화면 검증. 11-06 C안 화풍(흰 바탕·검은 글자·주칠)과 유형별 일러스트 5장 유지. CCL 분위기 참고 사진 40장(유형별 8장)을 정적 경로로 연결하고 유형·venue ID 해시로 안정 선택, 사진 표시·크레딧 추가(API `art:` 계약 그대로) | A·B 구현 후 실제 API 연결·오류·예약 동시성 통합 검증 | 실제 API 미구현 |
 | FastAPI A | [이름] | 이슈 #2 회원·탈퇴, 후기 작성·목록 #47 develop 병합(#43 직접 import·공개 비활성 공간 제외·내 후기 유지, 관련 테스트 58건 재확인). #45 `review_repo.get_review_ids(db, reservation_ids)` 계약 #55: 삭제된 후기 포함, 페이지당 SQL 1회, 빈 입력 SQL 없음. 관련 pytest 60건·전체 verify 통과 | B의 PR #46에서 목록·상세 실제 ID 연결 및 통합 검증 확인, Swagger에서 실제 데이터로 후기 목록 수동 확인 | 탈퇴와 동시 예약 처리 B 협의, 이벤트 개인정보 정책 합의 대기 |
-| FastAPI B | 이세훈 | #49·#50 develop 병합 완료. 최신 develop `b6a97c6` 기반 `feat/B-F-40-review-ids`에서 #45 목록·상세 실제 후기 ID 연결, 소프트 삭제 이력 보존, 페이지당 A 일괄 조회 검증. 전체 verify Python 362건·FE 56건·Ruff 90파일·린트/빌드 및 실제 HTTP 확인 통과 | #45 PR 생성·CI·A/PM 리뷰·병합 → api1 cron #8과 생성기 백필 지원은 별도 | 실제 api1·replica·브라우저 E2E는 미검증 |
+| FastAPI B | 이세훈 | nginx: feat/B-nginx에 최신 develop 9b9b223 반영. #54 공통 후보 설정과 설치·정적 파일·기본 사이트·검사 README 작성: /api 접두사 제거, 내부·metrics 경로 차단, loopback stub_status, 개인정보를 남기지 않는 접근 로그. `git diff --check`와 정적 검토 통과; 사용자 제공 Ubuntu VM의 Nginx 1.24.0에서 원본 후보 `nginx -t` 통과(exit 0), HTTP·HAProxy 연동·실제 적용 미검증. #49·#50 develop 병합 완료. 최신 develop `b6a97c6` 기반 `feat/B-F-40-review-ids`에서 #45 목록·상세 실제 후기 ID 연결, 소프트 삭제 이력 보존, 페이지당 A 일괄 조회 검증. 전체 verify Python 362건·FE 56건·Ruff 90파일·린트/빌드 및 실제 HTTP 확인 통과 | #45 PR 생성·CI·A 리뷰·병합 → #54 실제 VM 적용 전 Nginx 문법·HTTP·metrics scrape 경로 확인 → api1 cron #8과 생성기 백필 지원은 별도 | 실제 api1·replica·브라우저 E2E 미검증. `127.0.0.1:8000` 바인딩과 `mon`의 8000 직접 scrape 표기 충돌 확인 필요 |
 | DB | [이름] | `0001_init.sql`·`mongo_init.js` 검증(설치형 11.8·compose 11.4 둘 다 29건 통과), seed(유형 5·시설 20·지역 230 → `seed.sql`), `infra/local` compose, 크롤러 시제품(옛 필터). 1차 수집원 2곳+부족분 생성 방향 확정. 별도 Compass DB의 events·event_daily 속성 정리 v1을 docs/db에 공유 | 스페이스클라우드 새 필터·쉐어잇 파서/사이트별 robots 확인 → 속성 기반 시연용 공간 선별·`/internal/venues` 등록(B와) → 부족한 공간·과거 30일 행동 데이터 생성기 | 없음(A2 결정을 팀원에게 공유) |
 
 ## 기능 진행표
@@ -42,6 +42,7 @@
 | F-60, F-62~65 | 이벤트(로그 파일 + MongoDB), 가상 데이터, `get_today`, 서버 로그, 지표 | A | 공통 계약·이벤트 pytest 통과. 자유 문자열 개인정보 처리 팀 합의 대기. DB 참고 문서 `docs/db/events_event_daily_컬렉션_속성정리_v1.md` 공유: 별도 `space_rental_analytics` 설정이며 기존 `spacecube.user_events` 계약·초기화 코드는 변경하지 않음 |
 | F-61 | 크롤링 신규 등록 | DB / B | 진행: B POST /internal/venues 구현·로컬 검증 완료(35건·같은 출처 동시 8건·HTTP 6요청/12검증). DB 크롤러 새 필터·쉐어잇 파서·crawl_raw 연결과 api1 배포는 후속 |
 | #19 생성기 | 시연용 공간 부족분 생성·과거 30일 백필(회원·예약·결제·후기·이벤트)·`event_daily` 집계 | DB (api1 실행 환경 A, 과거 시각 저장 지원 B) | 설계 확정(11-05 #38), 코드 전. 100명으로 먼저 검증 → 11-07까지 규모 확정 |
+| #54 | HAProxy 정문·서버별 Nginx | B / A / DB | #14 종료 후 #54 기준. `spacecube.conf`와 README를 api1·api2 공통 후보로 수정: HAProxy가 서버 선택, 각 Nginx가 정적 파일·`/api` 접두사 제거·localhost FastAPI 전달을 담당. 내부·metrics 공개 경로 차단, loopback 전용 `stub_status`, 개인정보 필드 없는 접근 로그 포함. `git diff --check`와 정적 검토 통과; Ubuntu VM Nginx 1.24.0의 별도 최상위 설정에서 원본 후보 `nginx -t` 통과(exit 0), HTTP·실제 배포 미검증. FastAPI loopback bind와 `mon`의 8000 직접 scrape 표기가 맞지 않아 모니터링 경로 확인 필요 |
 | F-70 | 헬스체크 3단계 | A | 설계 확정 |
 | — | 같은 칸 동시 50건 중 1건만 성공 | B / DB | 설계 확정 (MVP 통과 조건) |
 | — | F-33 결제 대기 만료, F-52 자유게시판·댓글, F-53 공지 | — | 11-03 삭제 |
@@ -172,6 +173,13 @@ A1~A4는 11-03에 확정했고, **A5~A8은 추후 확정**으로 미뤘다(11-03
 - 개인 기억(Claude 자동 메모리 등)은 팀에 공유되지 않는다. 팀이 알아야 할 것은 이 파일과 `docs/`에 쓴다.
 
 ## 최근 변경 (최신이 위)
+
+- 11-07 · B · 사용자 승인으로 #54 nginx 후보안 커밋·푸시·Draft PR 준비. 제목 [B] #54 nginx 설정 초안, develop 대상·Refs #54로 연결. 커밋 전 verify.ps1에서 Ruff 린트·90파일 포맷·pytest 362건 통과(경고 1); 프론트 verify는 이 워크트리 의존성 미설치로 run-s를 찾지 못해 실패(exit 1). Nginx 원본 VM 문법 검사 및 git diff --check 통과. HTTP·HAProxy·실제 적용은 미검증이며 비교·검토용 초안 유지.
+
+- 11-07 · B · 사용자 제공 VM에 SSH 접속해 #54 원본 Nginx 후보 검사. Ubuntu 24.04.4·Nginx 1.24.0, 원본 SHA256 일치 확인. /tmp의 별도 최상위 설정에서 원본 후보를 include한 sudo nginx -t 통과(exit 0); 포트·경로·upstream 치환 없음. 기존 Nginx active 및 80번 listener 유지 확인, 임시 디렉터리 삭제·SSH 종료. 설정 설치·서비스 reload·패키지 설치 없음. HTTP·실제 API·HAProxy·장애 복구 시험 및 기존 운영 설정 전체와의 충돌 검사는 미실행. 접속 비밀번호는 파일에 저장하지 않음.
+
+- 11-06 · B · #54 Nginx 공통 후보안: `infra/nginx/spacecube.conf`를 api1·api2용으로 수정하고 `infra/nginx/README.md`를 로컬 VM 기준으로 정리. HAProxy는 서버 선택, Nginx는 Vue 정적 파일과 `127.0.0.1:8000` 전달을 맡음. `/api/internal`·`/api/metrics` 차단, 로컬 `stub_status`, 개인정보를 남기지 않는 JSON 접근 로그 반영. `git diff --check`와 정적 검토 통과; Windows에 Nginx가 없어 `nginx -t` 미실행, HTTP·실제 VM 배포 미검증. `127.0.0.1:8000`과 `mon`의 8000 직접 scrape 표기 불일치 확인 필요.
+- 11-06 · B · nginx 작업 트리 feat/B-nginx에 최신 origin/develop(9b9b223, 22개 커밋)을 fast-forward 반영. 기존 미커밋 설정은 복원하고 문서 충돌은 최신 진행 상태를 유지해 정리. #14 종료·#54 이관 및 HAProxy 정문 → 서버별 Nginx 구조 확인. spacecube.conf는 이전 정문 후보안이라 서버용 수정 필요. 기존 변경 원본은 nginx-develop-sync-2026-11-06 stash에 보존. 이번 작업은 Git 동기화·파일 확인이며 실행 테스트·배포 없음.
 
 - 11-06 · FE · 사용자가 승인한 CCL 참고 사진 25장을 더해 5개 유형별 8장, 총 40장을 맞춤. 모두 1200×780 WebP(약 34~167KB, 합계 3.29MB). `RoomArt.vue`가 정적 `/photos/...` 경로에서 유형별 사진을 venue ID 해시로 고르고, 상세 갤러리는 슬롯 번호로 별도 선택. 사진 로드 실패 시 일러스트로 대체한다. 실제 등록 공간 사진이 아님을 이미지와 푸터에 표시하고, 40개 출처·저작자·라이선스·편집 기록을 파일 원장과 사용자용 크레딧 페이지에 연결. 기존 `art:` API·DB 계약 변경 없음. `npm run verify`: 린트 오류 0(기존 경고 1), 단위 62건, 빌드 통과. E2E는 74개 결과가 모두 출력(성공 67, 조건부 건너뜀 7)됐으나 CLI가 결과 요약 없이 70초간 종료되지 않아 중단, 전체 명령 통과로 집계하지 않음. Playwright 브라우저에서 상세 사진·배지·푸터 링크와 크레딧의 40개 이미지(전부 1200×780), 출처 링크 40·라이선스 링크 40 확인.
 
