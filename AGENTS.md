@@ -35,7 +35,7 @@ Codex와 Claude Code가 함께 읽는 작업 지침입니다. 사람이 채팅�
 | --- | --- |
 | `frontend/` | 프론트 |
 | `backend/app/core/`, `backend/app/main.py`, A 파일(`auth`·`users`·`reviews`·`events`·`health`), `backend/scripts/`, `infra/monitoring/` | FastAPI A |
-| B 파일(`catalog`·`venues`·`reservations`·`internal`, `slot_repo`·`payment_repo`), `backend/app/jobs/`, `simulator/locust/`, `infra/nginx/` | FastAPI B |
+| B 파일(`catalog`·`venues`·`reservations`·`internal`, `slot_repo`·`payment_repo`), `backend/app/jobs/`, `simulator/locust/`, `infra/nginx/`, `infra/haproxy/` | FastAPI B |
 | `db/`, `docs/db/`, `crawler/`, `simulator/generator/`, `infra/local/` | DB |
 | `docs/`(위 제외), `infra/aws/`, `STATE.md`, `STRUCTURE.md` | 공동 |
 

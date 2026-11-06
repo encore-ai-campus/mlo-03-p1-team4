@@ -3,7 +3,6 @@
 사용: 후기 라우터가 예약 자격·작성자 권한·후기 목록 처리를 위임한다.
 """
 
-import importlib
 from datetime import timedelta
 
 from sqlalchemy.exc import IntegrityError
@@ -12,19 +11,13 @@ from sqlalchemy.orm import Session
 from app.core.clock import get_now, get_today
 from app.core.errors import fail
 from app.core.pagination import paginate
-from app.repositories import review_repo, user_repo
+from app.repositories import reservation_repo, review_repo, user_repo
 
 
 def _owned_reservation(db: Session, user_id: int, reservation_id: int):
     """후기 작성이 B의 약속된 함수로 본인 예약을 확인하도록 연결한다."""
-    try:
-        repository = importlib.import_module("app.repositories.reservation_repo")
-    except ModuleNotFoundError as error:
-        if error.name != "app.repositories.reservation_repo":
-            raise
-        raise fail("SERVICE_UNAVAILABLE", 503) from error
     # B가 제공하기로 확정한 함수만 호출한다. A에서 예약 SQL을 대신 쓰지 않는다.
-    return repository.get_owned(db, user_id, reservation_id)
+    return reservation_repo.get_owned(db, user_id, reservation_id)
 
 
 def create_review(db: Session, user_id: int, reservation_id: int, body) -> dict:
@@ -33,14 +26,7 @@ def create_review(db: Session, user_id: int, reservation_id: int, body) -> dict:
         reservation = _owned_reservation(db, user_id, reservation_id)
         if reservation is None:
             raise fail("RESERVATION_NOT_FOUND", 404)
-        if isinstance(reservation, tuple):
-            _, _, reserve_date, _, _, status, created_at = reservation
-        else:
-            reserve_date, status, created_at = (
-                reservation.reserve_date,
-                reservation.status,
-                reservation.created_at,
-            )
+        _, _, reserve_date, _, _, status, created_at = reservation
         if status != "completed":
             raise fail("NOT_COMPLETED", 403)
         deadline = max(reserve_date, created_at.date()) + timedelta(days=7)
