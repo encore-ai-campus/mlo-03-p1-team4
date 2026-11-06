@@ -12,7 +12,14 @@ from app.core.errors import AppError, fail
 from app.core.events import log_event
 from app.core.metrics import reservation_counter
 from app.core.pagination import Pagination, paginate
-from app.repositories import payment_repo, reservation_repo, slot_repo, user_repo, venue_repo
+from app.repositories import (
+    payment_repo,
+    reservation_repo,
+    review_repo,
+    slot_repo,
+    user_repo,
+    venue_repo,
+)
 from app.schemas.reservations import (
     PaymentRead,
     ReservationCancelPaymentRead,
@@ -344,14 +351,14 @@ def get_my_reservations(
         limit=pagination.size,
     )
     images = venue_repo.list_images_by_venues(db, [row["venue_id"] for row in rows])
+    review_ids = review_repo.get_review_ids(db, [row["reservation_id"] for row in rows])
     now = get_now()
     items = [
         _as_owned_read(
             row,
             image=(images.get(row["venue_id"]) or ["art:group-0"])[0],
             now=now,
-            # TODO(#45): A get_review_ids 제공 후 현재 페이지 매핑의 값으로 연결한다.
-            review_id=None,
+            review_id=review_ids.get(row["reservation_id"]),
         )
         for row in rows
     ]
@@ -373,12 +380,12 @@ def get_my_reservation(
     if row is None:
         raise fail("RESERVATION_NOT_FOUND", 404)
     images = venue_repo.list_images_by_venues(db, [row["venue_id"]])
+    review_ids = review_repo.get_review_ids(db, [row["reservation_id"]])
     return _as_owned_read(
         row,
         image=(images.get(row["venue_id"]) or ["art:group-0"])[0],
         now=get_now(),
-        # TODO(#45): A get_review_ids 제공 후 본인 예약의 조회 결과로 연결한다.
-        review_id=None,
+        review_id=review_ids.get(row["reservation_id"]),
     )
 
 

@@ -21,7 +21,7 @@ from app.core.errors import AppError
 from app.core.metrics import reservation_counter
 from app.main import create_app
 from app.schemas.reservations import ReservationRead
-from app.services import reservation_service
+from app.services import reservation_service, review_service
 
 TODAY = date(2026, 11, 5)
 NOW = datetime.fromisoformat("2026-11-05T12:00:00")
@@ -888,3 +888,139 @@ def test_cancel_route_requires_authentication_and_positive_id(connection, sample
         401,
         "UNAUTHORIZED",
     )
+
+
+@pytest.fixture
+def review_history(connection, sample, api, monkeypatch):
+    """A의 실제 작성·삭제 API로 본인 3상태와 타인 후기를 준비한다."""
+    monkeypatch.setattr(review_service, "get_today", lambda: TODAY)
+    monkeypatch.setattr(review_service, "get_now", lambda: NOW)
+    reservation_ids = []
+    review_ids = {}
+    for index, state in enumerate(("none", "active", "deleted", "active")):
+        response = api.post(
+            "/reservations",
+            json=booking(
+                sample["venue_id"], day=TODAY - timedelta(days=1), start=9 + index * 2, hours=1
+            ),
+        )
+        assert response.status_code == 201 and response.json()["status"] == "completed"
+        reservation_id = response.json()["reservation_id"]
+        reservation_ids.append(reservation_id)
+        if state != "none":
+            review = api.post(
+                f"/reservations/{reservation_id}/review",
+                json={"rating": 5, "content": "후기 ID 연결 검증입니다."},
+            )
+            assert review.status_code == 201
+            review_ids[reservation_id] = review.json()["review_id"]
+            if state == "deleted":
+                assert api.delete(f"/reviews/{review_ids[reservation_id]}").status_code == 204
+        connection.execute(
+            text("UPDATE reservations SET created_at=:created WHERE reservation_id=:id"),
+            {"created": NOW - timedelta(minutes=index), "id": reservation_id},
+        )
+
+    other_headers = {"X-Test-User-Id": str(sample["create_user"]())}
+    other = api.post(
+        "/reservations",
+        json=booking(sample["venue_id"], day=TODAY - timedelta(days=1), start=20, hours=1),
+        headers=other_headers,
+    )
+    assert other.status_code == 201
+    other_id = other.json()["reservation_id"]
+    other_review = api.post(
+        f"/reservations/{other_id}/review",
+        json={"rating": 4, "content": "타인 예약 조회 분리 검증입니다."},
+        headers=other_headers,
+    )
+    assert other_review.status_code == 201
+    return {"ids": reservation_ids, "reviews": review_ids, "other": other_id}
+
+
+@pytest.mark.parametrize("index", [0, 1, 2], ids=["no_review", "active", "deleted"])
+def test_my_reservation_review_ids_include_deleted_history(
+    connection, sample, api, review_history, index
+):
+    """미작성은 null, 작성·삭제 후기는 실제 ID이며 비활성 공간 이력도 유지한다."""
+    reservation_id = review_history["ids"][index]
+    expected_id = review_history["reviews"].get(reservation_id)
+    detail = api.get(f"/reservations/{reservation_id}")
+    listing = api.get("/reservations/me?status=completed&size=50")
+    assert detail.status_code == listing.status_code == 200
+    assert detail.json()["review_id"] == expected_id
+    assert detail.json()["status"] == "completed"
+    assert listing.json()["total"] == 4
+    item = next(row for row in listing.json()["items"] if row["reservation_id"] == reservation_id)
+    assert item == detail.json()
+
+    connection.execute(
+        text("UPDATE venues SET is_active=FALSE WHERE venue_id=:id"), {"id": sample["venue_id"]}
+    )
+    assert api.get(f"/reservations/{reservation_id}").json()["review_id"] == expected_id
+    if expected_id is not None:
+        duplicate = api.post(
+            f"/reservations/{reservation_id}/review",
+            json={"rating": 5, "content": "작성 이력이 있는 예약의 중복 검증입니다."},
+        )
+        assert duplicate.status_code == 409 and duplicate.json()["code"] == "REVIEW_EXISTS"
+        assert duplicate.json()["detail"]["review_id"] == expected_id
+
+
+@pytest.mark.parametrize("page,size", [(1, 1), (1, 3), (2, 2), (3, 2)])
+def test_my_reservation_reviews_use_one_sql_for_owned_page(
+    connection, api, review_history, monkeypatch, page, size
+):
+    """실제 A 조회에 현재 페이지의 본인 ID만 넘기며 빈 페이지는 후기 SQL이 없다."""
+    lookup = review_service.review_repo.get_review_ids
+    calls = []
+    review_selects = []
+
+    def track_lookup(db, ids):
+        assert db.get_bind() is connection
+        calls.append(list(ids))
+        return lookup(db, ids)
+
+    def track_sql(_connection, _cursor, statement, _parameters, _context, _executemany):
+        if statement.lstrip().lower().startswith("select") and "from reviews" in statement.lower():
+            review_selects.append(statement)
+
+    monkeypatch.setattr(review_service.review_repo, "get_review_ids", track_lookup)
+    event.listen(connection, "before_cursor_execute", track_sql)
+    try:
+        response = api.get(f"/reservations/me?status=completed&page={page}&size={size}")
+    finally:
+        event.remove(connection, "before_cursor_execute", track_sql)
+
+    assert response.status_code == 200
+    expected_ids = review_history["ids"][(page - 1) * size : page * size]
+    assert calls == [expected_ids]
+    assert len(review_selects) == (1 if expected_ids else 0)
+    assert response.json()["total"] == 4
+    assert [item["reservation_id"] for item in response.json()["items"]] == expected_ids
+    assert [item["review_id"] for item in response.json()["items"]] == [
+        review_history["reviews"].get(reservation_id) for reservation_id in expected_ids
+    ]
+
+
+def test_my_reservation_review_lookup_follows_detail_ownership(
+    connection, api, review_history, monkeypatch
+):
+    """본인 예약 확인 뒤에만 A를 호출하고 타인·없는 예약은 같은 404로 감춘다."""
+    lookup = review_service.review_repo.get_review_ids
+    calls = []
+
+    def track_lookup(db, ids):
+        assert db.get_bind() is connection
+        calls.append(list(ids))
+        return lookup(db, ids)
+
+    monkeypatch.setattr(review_service.review_repo, "get_review_ids", track_lookup)
+    owned = review_history["ids"][2]
+    response = api.get(f"/reservations/{owned}")
+    assert response.status_code == 200
+    assert response.json()["review_id"] == review_history["reviews"][owned]
+    for reservation_id in (review_history["other"], 9223372036854775000):
+        missing = api.get(f"/reservations/{reservation_id}")
+        assert missing.status_code == 404 and missing.json()["code"] == "RESERVATION_NOT_FOUND"
+    assert calls == [[owned]]

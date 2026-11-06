@@ -58,6 +58,7 @@ def clean_rows(engine, email: str, venue_id: int | None, source_id: str) -> None
             ).all()
             for reservation_id in ids:
                 for statement in (
+                    "DELETE FROM reviews WHERE reservation_id=:id",
                     "DELETE FROM reservation_slots WHERE reservation_id=:id",
                     "DELETE FROM payments WHERE reservation_id=:id",
                     "DELETE FROM reservations WHERE reservation_id=:id",
@@ -296,6 +297,90 @@ def main() -> None:
                     print(
                         "HTTP/DB verified: one synthetic cancelled reservation, refunded payment, "
                         "released slots, booking and cancellation counters, cancellation event category"
+                    )
+
+                    review_headers = {
+                        "Authorization": f"Bearer {token}",
+                        "X-Synthetic": "1",
+                        "X-Synthetic-Key": synthetic_key,
+                    }
+                    completed = client.post(
+                        "/reservations",
+                        headers=review_headers,
+                        json={
+                            "venue_id": venue_id,
+                            "date": (today - timedelta(days=1)).isoformat(),
+                            "start_hour": 13,
+                            "hours": 1,
+                            "headcount": 2,
+                            "method": "card",
+                        },
+                    )
+                    assert completed.status_code == 201, completed.text
+                    completed_id = completed.json()["reservation_id"]
+                    assert completed.json()["status"] == "completed"
+                    detail = client.get(f"/reservations/{completed_id}", headers=review_headers)
+                    listing = client.get(
+                        "/reservations/me?status=completed", headers=review_headers
+                    )
+                    assert detail.status_code == listing.status_code == 200
+                    assert detail.json()["review_id"] is None
+                    completed_item = next(
+                        item
+                        for item in listing.json()["items"]
+                        if item["reservation_id"] == completed_id
+                    )
+                    assert completed_item["review_id"] is None
+
+                    created_review = client.post(
+                        f"/reservations/{completed_id}/review",
+                        headers=review_headers,
+                        json={"rating": 5, "content": "후기 ID 연동 HTTP 검증입니다."},
+                    )
+                    assert created_review.status_code == 201, created_review.text
+                    review_id = created_review.json()["review_id"]
+                    for response in (
+                        client.get(f"/reservations/{completed_id}", headers=review_headers),
+                        client.get("/reservations/me?status=completed", headers=review_headers),
+                    ):
+                        assert response.status_code == 200
+                        if "items" in response.json():
+                            item = next(
+                                item
+                                for item in response.json()["items"]
+                                if item["reservation_id"] == completed_id
+                            )
+                        else:
+                            item = response.json()
+                        assert item["review_id"] == review_id
+
+                    deleted = client.delete(f"/reviews/{review_id}", headers=review_headers)
+                    assert deleted.status_code == 204
+                    deleted_history = client.get(
+                        f"/reservations/{completed_id}", headers=review_headers
+                    )
+                    deleted_listing = client.get(
+                        "/reservations/me?status=completed", headers=review_headers
+                    )
+                    assert deleted_history.status_code == 200
+                    assert deleted_listing.status_code == 200
+                    assert deleted_history.json()["review_id"] == review_id
+                    deleted_item = next(
+                        item
+                        for item in deleted_listing.json()["items"]
+                        if item["reservation_id"] == completed_id
+                    )
+                    assert deleted_item["review_id"] == review_id
+                    duplicate = client.post(
+                        f"/reservations/{completed_id}/review",
+                        headers=review_headers,
+                        json={"rating": 5, "content": "삭제 후에도 중복 작성은 막혀야 합니다."},
+                    )
+                    assert duplicate.status_code == 409
+                    assert duplicate.json()["code"] == "REVIEW_EXISTS"
+                    print(
+                        "HTTP verified: completed reservation review ID appears in list/detail, "
+                        "remains after soft deletion, and blocks duplicate creation"
                     )
             finally:
                 process.terminate()
