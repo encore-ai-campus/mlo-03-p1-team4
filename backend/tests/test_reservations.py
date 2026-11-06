@@ -18,9 +18,10 @@ from app.core import synthetic
 from app.core.db import get_db_write
 from app.core.deps import CurrentUser, get_current_user
 from app.core.errors import AppError
+from app.core.event_context import ClientEventContext, client_event_context
 from app.core.metrics import reservation_counter
 from app.main import create_app
-from app.schemas.reservations import ReservationRead
+from app.schemas.reservations import ReservationEventContext, ReservationRead
 from app.services import reservation_service, review_service
 
 TODAY = date(2026, 11, 5)
@@ -329,6 +330,70 @@ def test_bad_event_context_does_not_change_booking_result(sample, api, collected
     )
     assert response.status_code == 201
     assert collected_documents == []
+
+
+@pytest.mark.parametrize("failure_point", ["model_dump", "log_event"])
+def test_event_failure_after_commit_preserves_created_booking(
+    connection, sample, api, monkeypatch, failure_point
+):
+    """#5 F-30~32: 문맥 조립·기록 예외 뒤에도 201과 예약·칸·결제를 유지한다."""
+    calls = []
+
+    def fail_event(*args, **kwargs):
+        calls.append(failure_point)
+        raise RuntimeError("이벤트 실패 주입")
+
+    if failure_point == "model_dump":
+        monkeypatch.setattr(ReservationEventContext, "model_dump", fail_event)
+    else:
+        monkeypatch.setattr(reservation_service, "log_event", fail_event)
+
+    before_ok = reservation_counter.labels(result="ok")._value.get()
+    response = api.post(
+        "/reservations",
+        json={**booking(sample["venue_id"]), "event_context": browser_context()},
+    )
+
+    assert calls == [failure_point]
+    assert response.status_code == 201
+    body = response.json()
+    reservation_id = body["reservation_id"]
+    assert body["status"] == "confirmed"
+    assert body["total_price"] == 22000
+    assert body["payment"]["status"] == "paid"
+    assert connection.execute(
+        text("SELECT status,total_price FROM reservations WHERE reservation_id=:id"),
+        {"id": reservation_id},
+    ).one() == ("confirmed", 22000)
+    assert count_venue_reservations(connection, sample["venue_id"]) == 1
+    assert count_reservation_slots(connection, reservation_id) == 2
+    assert count_reservation_payments(connection, reservation_id) == 1
+    assert reservation_counter.labels(result="ok")._value.get() == before_ok + 1
+
+
+def test_event_logging_failure_restores_previous_context(monkeypatch):
+    """기록이 실패해도 호출 전 문맥을 복원해 다음 작업과 섞이지 않게 한다."""
+    previous = ClientEventContext(occurred_at=None, anonymous_id="previous")
+    recorded_contexts = []
+
+    def fail_event(*args, **kwargs):
+        recorded_contexts.append(client_event_context.get())
+        raise RuntimeError("이벤트 실패 주입")
+
+    monkeypatch.setattr(reservation_service, "log_event", fail_event)
+    token = client_event_context.set(previous)
+    try:
+        reservation_service._log_reservation_event(
+            None,
+            1,
+            "reservation_complete",
+            event_context=ReservationEventContext.model_validate(browser_context()),
+        )
+        assert len(recorded_contexts) == 1
+        assert recorded_contexts[0].anonymous_id == "anon-test"
+        assert client_event_context.get() is previous
+    finally:
+        client_event_context.reset(token)
 
 
 def test_synthetic_booking_requires_its_own_key_and_sets_the_database_flag(
