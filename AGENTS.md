@@ -49,6 +49,7 @@ Codex와 Claude Code가 함께 읽는 작업 지침입니다. 사람이 채팅�
   - `reservation_repo.get_owned(db, user_id, reservation_id)` → `(reservation_id, venue_id, reserve_date, start_hour, end_hour, status, created_at)` 또는 `None` (B 제공)
   - `reservation_repo.count_cancellable(db, user_id)` → `int`: 시작 전 `confirmed` 예약 수, 탈퇴 전 확인용 (B 제공, 11-05)
   - `reservation_repo.review_context_query(*, active_only: bool = True)` → `Select`: `reservation_id`, `venue_id`, `venue_name`, `category`(`categories.code`) 열을 반환하는 예약·공간·유형 조회식. 공개 후기는 기본값으로 비활성 공간 제외, 내 후기는 `False`로 포함. A가 직접 import하며 DB 실행·commit·rollback은 하지 않음 (B 제공, #43 PM 승인)
+  - `review_repo.get_review_ids(db, reservation_ids) -> dict[int, int]`: B가 본인 소유로 확인한 현재 페이지 예약 ID와 primary 세션을 전달. A가 삭제된 후기까지 SQL 한 번으로 조회해 `{reservation_id: review_id}` 반환, 후기 없으면 매핑에서 제외. 빈 입력은 SQL 없이 `{}`. commit·rollback 없음 (A 제공, #45 PM 승인)
   - 뷰 `v_venue_rating(venue_id, rating_avg, review_count)` (DB 제공)
   - 표·컬럼 이름, API 경로와 응답 형식
 
