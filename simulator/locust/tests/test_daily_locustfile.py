@@ -6,6 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from app.schemas.events import EventBatchCreate
 from simulator.locust import daily_locustfile
 from simulator.locust.daily_locustfile import DailyRun, candidate_hours, load_dates, preferred_hours
 
@@ -34,6 +35,27 @@ def test_dates_require_actual_iso_dates():
         load_dates("2026-02-30")
     with pytest.raises(ValueError):
         load_dates("2026-11-06T14:00:00")
+    with pytest.raises(ValueError, match="중복"):
+        load_dates("2026-11-06,2026-11-06")
+
+
+def test_users_are_round_robin_assigned_across_configured_dates(monkeypatch):
+    run = configure_run(monkeypatch, dates="2026-11-06,2026-11-09,2026-11-10")
+
+    assignments = Counter(run.dates[run.assign_date_offset()] for _ in range(6))
+
+    assert assignments == dict.fromkeys(run.dates, 2)
+
+
+def test_local_slot_claims_prevent_overlapping_persona_bookings(monkeypatch):
+    run = configure_run(monkeypatch)
+
+    assert run.claim_slots(7, "2026-11-06", 14, 2) is True
+    assert run.claim_slots(7, "2026-11-06", 15, 1) is False
+    assert run.claim_slots(7, "2026-11-07", 15, 1) is True
+
+    run.release_slots(7, "2026-11-06", 14, 2)
+    assert run.claim_slots(7, "2026-11-06", 15, 1) is True
 
 
 def test_run_summary_sent_to_loki_without_account_data(monkeypatch, tmp_path):
@@ -93,9 +115,11 @@ def scenario_environment(profile, users=1):
     )
 
 
-def configure_run(monkeypatch, profile="Student", users=1, writes=False):
+def configure_run(
+    monkeypatch, profile="Student", users=1, writes=False, dates="2026-11-06,2026-11-09"
+):
     monkeypatch.setenv("SYNTHETIC_API_KEY", "synthetic-test-key")
-    monkeypatch.setenv("LOCUST_DATES", "2026-11-06,2026-11-07")
+    monkeypatch.setenv("LOCUST_DATES", dates)
     monkeypatch.delenv("LOCUST_ACCOUNTS_FILE", raising=False)
     monkeypatch.setenv("LOCUST_ALLOW_WRITES", "1" if writes else "0")
     return DailyRun(scenario_environment(profile, users))
@@ -112,9 +136,17 @@ def test_default_read_only_needs_no_accounts_and_sends_no_login_or_events(monkey
             pytest.fail("조회 모드는 POST를 보내면 안 됩니다.")
 
     user.client = NoPost()
+    user.host = "http://localhost:8000"
     user.on_start()
-    assert user.event("search") is True
+    assert user.headers["X-Session-Id"] == user.session_id
+    assert user.event("search_submit", page_type="search_results", path="/search") is True
     assert user.token == ""
+    second_user = object.__new__(daily_locustfile.Student)
+    second_user.client = NoPost()
+    second_user.host = "http://localhost:8000"
+    second_user.on_start()
+    assert second_user.headers["X-Session-Id"] == second_user.session_id
+    assert second_user.session_id != user.session_id
 
 
 @pytest.mark.parametrize(
@@ -128,6 +160,11 @@ def test_daily_user_cap_rejects_capacity_test_sizes(monkeypatch, profile, users)
 def test_booking_mode_requires_accounts_but_read_only_does_not(monkeypatch):
     with pytest.raises(ValueError, match="LOCUST_ACCOUNTS_FILE"):
         configure_run(monkeypatch, writes=True)
+
+
+def test_booking_mode_requires_multiple_profile_compatible_dates(monkeypatch):
+    with pytest.raises(ValueError, match="LOCUST_DATES"):
+        configure_run(monkeypatch, writes=True, dates="2026-11-09")
 
 
 @pytest.mark.parametrize(
@@ -187,6 +224,63 @@ class FakeResponse:
         self.succeeded = True
 
 
+def test_write_event_uses_new_context_contract_and_session_header(monkeypatch):
+    run = configure_run(monkeypatch, profile="Explorer", writes=True)
+    monkeypatch.setattr(daily_locustfile, "RUN", run)
+    user = object.__new__(daily_locustfile.Explorer)
+    user.session_id = "00000000-0000-4000-8000-000000000001"
+    user.anonymous_id = "locust_test-user"
+    user.event_sequence = 0
+    user.current_page = None
+    user.site_origin = "http://localhost:8000"
+    user.site_hostname = "localhost"
+    user.landing_url = "http://localhost:8000/"
+    user.headers = {"X-Session-Id": user.session_id, "X-Synthetic": "1"}
+    requests = []
+
+    def post(path, **kwargs):
+        requests.append((path, kwargs))
+        return FakeResponse(202, {"accepted": 1, "ignored": []})
+
+    user.client = SimpleNamespace(post=post)
+
+    assert user.event("search_submit", page_type="search_results", path="/search") is True
+    assert (
+        user.event(
+            "product_view",
+            page_type="product_detail",
+            path="/venues/7",
+            product_id=7,
+        )
+        is True
+    )
+
+    path, first = requests[0]
+    assert path == "/api/events"
+    assert first["headers"]["X-Session-Id"] == user.session_id
+    first_body = first["json"]
+    first_event = first_body["events"][0]
+    EventBatchCreate.model_validate(first_body)
+    assert first_body["session_id"] == user.session_id
+    assert first_event["event_name"] == "search_submit"
+    assert first_event["user"] == {
+        "anonymous_id": user.anonymous_id,
+        "session_id": user.session_id,
+        "session_sequence": 1,
+    }
+    assert first_event["site"]["platform"] == "desktop_web"
+    assert first_event["acquisition"]["landing_url"] == user.landing_url
+    assert first_event["page"]["page_type"] == "search_results"
+    assert first_event["navigation"]["to"]["path"] == "/search"
+    assert first_event["products"] == []
+
+    second_event = requests[1][1]["json"]["events"][0]
+    assert second_event["event_name"] == "product_view"
+    assert second_event["user"]["session_sequence"] == 2
+    assert second_event["navigation"]["from"]["path"] == "/search"
+    assert second_event["products"] == [{"product_id": "7"}]
+
+
 def prepared_student(monkeypatch):
     run = configure_run(monkeypatch)
     run.allow_writes = True
@@ -195,14 +289,19 @@ def prepared_student(monkeypatch):
     user.headers = {"X-Synthetic": "1"}
     user.bookings = 0
     user.session_id = "00000000-0000-4000-8000-000000000001"
-    user.event = lambda *_args: True
+    user.event = lambda *_args, **_kwargs: True
+    user.date_offset = 0
+    user.visit_count = 0
     monkeypatch.setattr(daily_locustfile.random, "choice", lambda values: values[0])
     monkeypatch.setattr(daily_locustfile.random, "shuffle", lambda _values: None)
     run.dates = ["2026-11-06"]
 
     def get_json(path, **_kwargs):
         if path == "/venues":
-            return {"items": [{"venue_id": 1}, {"venue_id": 2}, {"venue_id": 3}]}
+            return {
+                "items": [{"venue_id": 1}, {"venue_id": 2}, {"venue_id": 3}],
+                "total": 30,
+            }
         if path.endswith("/slots"):
             return [{"hour": hour, "taken": False} for hour in range(14, 18)]
         return {"min_hours": 1, "capacity_max": 8}
@@ -211,20 +310,66 @@ def prepared_student(monkeypatch):
     return run, user
 
 
+def test_venue_results_are_selected_across_pages(monkeypatch):
+    _run, user = prepared_student(monkeypatch)
+    monkeypatch.setattr(daily_locustfile.random, "randint", lambda _low, high: high)
+    pages = []
+    get_json = user.get_json
+
+    def record_page(path, *, params=None, name):
+        if path == "/venues":
+            pages.append(params["page"])
+        return get_json(path, params=params, name=name)
+
+    user.get_json = record_page
+    user.client = SimpleNamespace(
+        post=lambda *_args, **_kwargs: FakeResponse(201, {"reservation_id": 7})
+    )
+
+    user.visit()
+
+    assert pages == [1, 3]
+
+
 def test_booking_budget_stops_additional_posts_after_one_success(monkeypatch):
     run, user = prepared_student(monkeypatch)
-    calls = []
+    reservation_calls = []
+    event_names = []
+    user.headers["X-Session-Id"] = user.session_id
+    user.anonymous_id = "locust_test-user"
+    user.event_sequence = 0
+    user.current_page = None
+    user.site_origin = "http://localhost:8000"
+    user.site_hostname = "localhost"
+    user.landing_url = "http://localhost:8000/"
+    user.event = lambda event_name, **kwargs: daily_locustfile.Persona.event(
+        user, event_name, **kwargs
+    )
 
     def post(path, **kwargs):
-        calls.append((path, kwargs))
+        if path == "/api/events":
+            event_names.append(kwargs["json"]["events"][0]["event_name"])
+            EventBatchCreate.model_validate(kwargs["json"])
+            return FakeResponse(202, {"accepted": 1, "ignored": []})
+        reservation_calls.append((path, kwargs))
         return FakeResponse(201, {"reservation_id": 7})
 
     user.client = SimpleNamespace(post=post)
     user.visit()
     user.visit()
-    assert len(calls) == 1
+    assert len(reservation_calls) == 1
     assert user.bookings == 1
     assert run.outcomes["created"] == 1
+    assert event_names == [
+        "search_submit",
+        "product_view",
+        "availability_view",
+        "rental_slot_select",
+        "reservation_start",
+        "search_submit",
+        "product_view",
+        "availability_view",
+    ]
 
 
 def test_slot_conflict_retries_at_most_two_alternatives(monkeypatch):
@@ -278,7 +423,7 @@ def test_read_only_still_rejects_malformed_slot_response(monkeypatch, bad_slots)
 
 def test_non_object_venue_is_reported_not_unhandled(monkeypatch):
     run, user = prepared_student(monkeypatch)
-    user.get_json = lambda *_args, **_kwargs: {"items": [None]}
+    user.get_json = lambda *_args, **_kwargs: {"items": [None], "total": 1}
     user.visit()
     assert run.issues["invalid_venue"] == 1
 

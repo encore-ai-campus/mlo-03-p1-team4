@@ -59,7 +59,9 @@ def test_public_contract_shapes():
         "category",
         "payload",
         "is_synthetic",
+        "products",
     ]
+    assert signature(events.log_event).parameters["products"].kind.name == "KEYWORD_ONLY"
     assert CurrentUser(user_id=7).user_id == 7
     assert paginate(["a"], 1, 20, 1) == {"items": ["a"], "page": 1, "size": 20, "total": 1}
     session = "4b1c0000-0000-4000-8000-000000000001"

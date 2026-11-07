@@ -37,6 +37,9 @@ jobs:
               - 'frontend/**'
               - '.github/workflows/ci.yml'
             data:
+              - 'conftest.py'
+              - 'tests/**'
+              - 'verify.ps1'
               - 'backend/**'
               - 'db/**'
               - 'docs/db/**'
@@ -164,7 +167,7 @@ jobs:
         env:
           MYSQL_PWD: ${{ env.MARIADB_ROOT_PASSWORD }}
         run: |
-          if [ -z "$(find backend/tests db/tests -name 'test_*.py' -o -name '*_test.py' | head -1)" ]; then
+          if [ -z "$(find tests backend/tests db/tests -name 'test_*.py' -o -name '*_test.py' | head -1)" ]; then
             echo "테스트 파일 없음, pytest 건너뜀"; echo "run=false" >> "$GITHUB_OUTPUT"; exit 0
           fi
           grep -E '^ {6}- [A-Za-z]' environment.yml | sed -E 's/^ {6}- ([^ #]+).*/\1/' > "$RUNNER_TEMP/requirements.txt"
@@ -174,7 +177,7 @@ jobs:
           "$MARIADB_BIN" -uroot spacecube_test < db/seed/seed.sql
           echo "run=true" >> "$GITHUB_OUTPUT"
 
-      - name: pytest (backend/tests · db/tests)
+      - name: pytest (공통 · backend/tests · db/tests)
         if: steps.prep.outputs.run == 'true'
         env:
           # 키 이름은 backend/.env.example. A가 설정 키를 바꾸면 여기도 같이 고친다

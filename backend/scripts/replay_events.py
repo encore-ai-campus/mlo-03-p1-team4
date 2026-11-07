@@ -10,7 +10,8 @@ from pathlib import Path
 
 from app.core.clock import as_korean_time
 from app.core.config import get_settings
-from app.core.events import EVENT_DOCUMENT_FIELDS, insert_event_documents
+from app.core.event_document import EVENT_DOCUMENT_FIELDS
+from app.core.events import insert_event_documents
 from app.core.mongo import close_mongo
 
 
@@ -26,19 +27,22 @@ def replay(path: Path, since: datetime | None) -> dict:
         for line in stream:
             try:
                 document = json.loads(line)
-                # 옛 v4 로그의 추가 필드를 제외하되 중복 판정용 event_id는 유지한다.
-                document = {
-                    key: value for key, value in document.items() if key in EVENT_DOCUMENT_FIELDS
-                }
-                document["ts"] = parse_time(document["ts"])
-                if document.get("client_ts"):
-                    document["client_ts"] = parse_time(document["client_ts"])
+                # 이전 형식에는 필수 화면·상품 문맥이 없으므로 변환하지 않는다.
+                if set(document) != EVENT_DOCUMENT_FIELDS or document.get("schema_version") != 1:
+                    raise ValueError("새 events 형식 아님")
                 if not document.get("event_id"):
                     raise ValueError("event_id 없음")
+                document["occurred_at"] = parse_time(document["occurred_at"])
+                document["received_at"] = parse_time(document["received_at"])
+                for product in document["products"]:
+                    rental = product["rental_conditions"]
+                    for key in ("start_at", "end_at"):
+                        if rental[key] is not None:
+                            rental[key] = parse_time(rental[key])
             except (ValueError, KeyError, TypeError, AttributeError):
                 invalid += 1
                 continue
-            if since and document["ts"] < since:
+            if since and document["received_at"] < since:
                 continue
             batch.append(document)
             if len(batch) == 50:

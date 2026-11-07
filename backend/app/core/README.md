@@ -6,12 +6,13 @@ B가 1일차부터 쓰므로 A가 가장 먼저 만듭니다. 바꿀 때는 B에
 | --- | --- | --- |
 | `config.py` | `.env` 설정값 (pydantic-settings, `backend/.env.example`의 키) | 전체 |
 | `db.py` | SQLAlchemy 엔진 2개(PyMySQL, `pool_pre_ping`, 세션 시간대 +09:00), `get_db_write()` primary 세션, `get_db_read()` replica 세션(실패하면 primary + 경고 + `db_read_fallback_total`) | 전체 |
-| `mongo.py` | pymongo 클라이언트(앱에 하나, 시간 제한 1초), `user_events` 컬렉션 (인덱스는 만들지 않음) | A |
+| `mongo.py` | pymongo 클라이언트(앱에 하나, 시간 제한 1초), `space_rental_analytics.events` 컬렉션 (인덱스는 만들지 않음) | A |
+| `event_document.py` | 새 15종 이벤트 문서 조립·상품 조건·개인정보 제한 | A |
 | `security.py` | bcrypt 해시·검증, JWT 발급·해석 | A |
 | `deps.py` | `get_current_user()` → `CurrentUser(user_id)`(primary), `get_optional_user()`, `require_internal_key()` | A, B |
 | `errors.py` | `AppError(code, message, status, detail=None)`와 예외 처리기 (Pydantic 오류도 `VALIDATION`으로) | 전체 |
 | `pagination.py` | `?page=&size=`(size 최대 50), `{"items","page","size","total"}` | 전체 |
-| `events.py` | `log_event(session_id, user_id, event_type, venue_id=None, category=None, payload=None, is_synthetic=False)`: `events.log`에 바로 한 줄, MongoDB는 내부 스레드 풀(2개, 대기열 1,000건) | A, B, 배치 |
+| `events.py` | `log_event(session_id, user_id, event_type, venue_id=None, category=None, payload=None, is_synthetic=False, *, products=None)`: `events.log`에 바로 한 줄, MongoDB는 내부 스레드 풀(2개, 대기열 1,000건) | A, B, 배치 |
 | `metrics.py` | `/metrics`, `reservation_counter`(`reservation_total{result}`), `mongo_event_write_failures_total`, `db_read_fallback_total` | A, B |
 | `logging.py` | `app.log`·`events.log` (JSON 한 줄) | 전체 |
 | `clock.py` | `get_today()`, `get_now()`(시간대 없는 한국 시각), `TODAY_OVERRIDE`는 테스트 전용 | 전체 |

@@ -6,7 +6,7 @@ import random
 from collections import Counter, deque
 from datetime import date, datetime
 from pathlib import Path
-from urllib.parse import urlsplit
+from urllib.parse import urljoin, urlsplit
 from urllib.request import Request, urlopen
 from uuid import uuid4
 from zoneinfo import ZoneInfo
@@ -61,12 +61,14 @@ def load_accounts(path: str) -> deque:
 def load_dates(raw: str) -> list[str]:
     try:
         values = [value.strip() for value in raw.split(",") if value.strip()]
-        if not values or any(
-            datetime.fromisoformat(value).date().isoformat() != value for value in values
+        if (
+            not values
+            or len(set(values)) != len(values)
+            or any(datetime.fromisoformat(value).date().isoformat() != value for value in values)
         ):
             raise ValueError
     except ValueError:
-        raise ValueError("LOCUST_DATES에는 실제 YYYY-MM-DD 날짜를 지정하세요.") from None
+        raise ValueError("LOCUST_DATES에는 중복 없는 실제 YYYY-MM-DD 날짜를 지정하세요.") from None
     return values
 
 
@@ -150,6 +152,10 @@ class DailyRun:
             ]
             if not self.dates:
                 raise ValueError("페르소나의 선호 요일에 맞는 LOCUST_DATES가 없습니다.")
+        if self.allow_writes and self.profile != "Explorer" and len(self.dates) < 2:
+            raise ValueError(
+                "쓰기 모드는 페르소나 요일에 맞는 서로 다른 LOCUST_DATES를 2개 이상 지정하세요."
+            )
         self.accounts = (
             deque()
             if self.profile == "Explorer" or not self.allow_writes
@@ -164,6 +170,9 @@ class DailyRun:
             raise ValueError("가상 회원 수가 동시 사용자 수보다 적습니다.")
         self.statuses = Counter()
         self.issues = Counter()
+        self.date_visits = Counter()
+        self.date_cursor = random.randrange(len(self.dates))  # noqa: S311 -- 실행별 날짜 배정 순환점
+        self.claimed_slots = set()
 
     def finish(self):
         stats = self.environment.stats.total
@@ -191,6 +200,8 @@ class DailyRun:
             if stats.num_requests
             else None,
             "outcomes": dict(self.outcomes),
+            "date_visits": dict(self.date_visits),
+            "local_slot_claims": len(self.claimed_slots),
             "performance_verdict": "not_evaluated_daily_run",
             "requests": stats.num_requests,
             "failures": stats.num_failures,
@@ -245,6 +256,26 @@ class DailyRun:
             stream.write(json.dumps(result, ensure_ascii=False) + "\n")
         print(json.dumps(result, ensure_ascii=False), flush=True)
 
+    def assign_date_offset(self) -> int:
+        """여러 실제 날짜에 사용자를 순환 배정해 한 날짜 쏠림을 줄인다."""
+        offset = self.date_cursor
+        self.date_cursor = (self.date_cursor + 1) % len(self.dates)
+        return offset
+
+    def claim_slots(self, venue_id: int, booking_date: str, start_hour: int, hours: int) -> bool:
+        """같은 Locust 프로세스 사용자가 겹치는 칸을 동시에 고르지 않게 한다."""
+        slots = tuple(
+            (venue_id, booking_date, hour) for hour in range(start_hour, start_hour + hours)
+        )
+        if any(slot in self.claimed_slots for slot in slots):
+            return False
+        self.claimed_slots.update(slots)
+        return True
+
+    def release_slots(self, venue_id: int, booking_date: str, start_hour: int, hours: int):
+        slots = ((venue_id, booking_date, hour) for hour in range(start_hour, start_hour + hours))
+        self.claimed_slots.difference_update(slots)
+
 
 @events.test_start.add_listener
 def on_test_start(environment, **_kwargs):
@@ -291,6 +322,24 @@ class Persona(HttpUser):
 
     def on_start(self):
         self.session_id = str(uuid4())
+        self.anonymous_id = f"locust_{uuid4()}"
+        self.event_sequence = 0
+        self.current_page = None
+        self.date_offset = RUN.assign_date_offset()
+        self.visit_count = 0
+        host = urlsplit(self.host)
+        if (
+            host.scheme not in {"http", "https"}
+            or not host.netloc
+            or not host.hostname
+            or host.username
+            or host.password
+        ):
+            RUN.issues["invalid_gateway"] += 1
+            raise StopUser()
+        self.site_origin = f"{host.scheme}://{host.netloc}"
+        self.site_hostname = host.hostname
+        self.landing_url = urljoin(self.site_origin, "/")
         self.headers = {
             "X-Synthetic": "1",
             "X-Synthetic-Key": RUN.key,
@@ -328,12 +377,62 @@ class Persona(HttpUser):
     def booking_budget_available(self) -> bool:
         return self.bookings < RUN.max_bookings_per_user
 
-    def event(self, event_type: str, venue_id: int | None = None):
+    def event(
+        self,
+        event_name: str,
+        *,
+        page_type: str,
+        path: str,
+        product_id: int | None = None,
+        properties: dict | None = None,
+    ):
         if not RUN.allow_writes:
             return True
-        item = {"event_type": event_type, "occurred_at": now_kst()}
-        if venue_id is not None:
-            item["venue_id"] = venue_id
+        self.event_sequence += 1
+        page_view_id = str(uuid4())
+        page_url = urljoin(self.site_origin, path)
+        target_page = {
+            "page_view_id": page_view_id,
+            "site_id": "main",
+            "url": page_url,
+            "path": path,
+        }
+        item = {
+            "schema_version": 1,
+            "event_name": event_name,
+            "occurred_at": now_kst(),
+            "user": {
+                "anonymous_id": self.anonymous_id,
+                "session_id": self.session_id,
+                "session_sequence": self.event_sequence,
+            },
+            "site": {
+                "site_id": "main",
+                "hostname": self.site_hostname,
+                "platform": "desktop_web",
+            },
+            "acquisition": {
+                "landing_url": self.landing_url,
+                "referrer_url": self.current_page["url"] if self.current_page else None,
+                "utm_source": None,
+                "utm_medium": None,
+                "utm_campaign": None,
+            },
+            "page": {
+                "page_view_id": page_view_id,
+                "page_type": page_type,
+                "url": page_url,
+                "path": path,
+                "title": page_type,
+            },
+            "navigation": {
+                "from": self.current_page,
+                "to": target_page,
+                "navigation_type": "internal" if self.current_page else "direct",
+            },
+            "products": [{"product_id": str(product_id)}] if product_id is not None else [],
+            "properties": properties or {},
+        }
         with self.client.post(
             "/api/events",
             json={"session_id": self.session_id, "events": [item]},
@@ -353,6 +452,7 @@ class Persona(HttpUser):
                 RUN.issues["event_failed"] += 1
                 response.failure("가상 이벤트 수집 실패")
                 return False
+            self.current_page = target_page
             return True
 
     def get_json(self, path: str, *, params=None, name: str):
@@ -378,16 +478,41 @@ class Persona(HttpUser):
     def visit(self):
         profile = PROFILES[self.profile]
         category = random.choice(profile["categories"]) if profile["categories"] else None  # noqa: S311 -- 시나리오 선택
-        date = random.choice(RUN.dates)  # noqa: S311 -- 시나리오 선택
+        date = RUN.dates[(self.date_offset + self.visit_count) % len(RUN.dates)]
+        self.visit_count += 1
+        RUN.date_visits[date] += 1
         params = {"page": 1, "size": 10, "date": date}
         if category:
             params["category"] = category
-        if not self.event("search"):
+        if not self.event(
+            "search_submit",
+            page_type="search_results",
+            path="/search",
+            properties={"date": date, "category": category} if category else {"date": date},
+        ):
             return
         listing = self.get_json("/venues", params=params, name="GET /venues")
-        if not isinstance(listing, dict) or not isinstance(listing.get("items"), list):
+        if (
+            not isinstance(listing, dict)
+            or not isinstance(listing.get("items"), list)
+            or type(listing.get("total")) is not int
+            or listing["total"] < 0
+        ):
             RUN.issues["invalid_listing"] += 1
             return
+        page_count = max(1, (listing["total"] + params["size"] - 1) // params["size"])
+        page = random.randint(1, page_count)  # noqa: S311 -- 결과 공간 페이지 분산
+        if page > 1:
+            params["page"] = page
+            listing = self.get_json("/venues", params=params, name="GET /venues")
+            if (
+                not isinstance(listing, dict)
+                or not isinstance(listing.get("items"), list)
+                or type(listing.get("total")) is not int
+                or listing["total"] < 0
+            ):
+                RUN.issues["invalid_listing"] += 1
+                return
         if not listing["items"]:
             return
         venues = listing["items"]
@@ -401,12 +526,25 @@ class Persona(HttpUser):
             if not isinstance(venue_id, int):
                 RUN.issues["invalid_venue"] += 1
                 return
-            if not self.event("view_venue", venue_id):
+            venue_path = f"/venues/{venue_id}"
+            if not self.event(
+                "product_view",
+                page_type="product_detail",
+                path=venue_path,
+                product_id=venue_id,
+            ):
                 return
             detail = self.get_json(f"/venues/{venue_id}", name="GET /venues/{id}")
             if not isinstance(detail, dict):
                 RUN.issues["invalid_detail"] += 1
                 continue
+            if not self.event(
+                "availability_view",
+                page_type="product_detail",
+                path=venue_path,
+                product_id=venue_id,
+            ):
+                return
             slots = self.get_json(
                 f"/venues/{venue_id}/slots",
                 params={"date": date},
@@ -437,8 +575,28 @@ class Persona(HttpUser):
             starts = preferred_hours(self.profile, date, candidate_hours(slots, hours), hours)
             if not starts:
                 continue
-            start = random.choice(starts)  # noqa: S311 -- 시나리오 선택
-            if not self.event("select_slot", venue_id) or not self.event("reserve_try", venue_id):
+            random.shuffle(starts)
+            start = next(
+                (hour for hour in starts if RUN.claim_slots(venue_id, date, hour, hours)),
+                None,
+            )
+            if start is None:
+                continue
+            booking_properties = {"date": date, "start_hour": start, "hours": hours}
+            if not self.event(
+                "rental_slot_select",
+                page_type="product_detail",
+                path=venue_path,
+                product_id=venue_id,
+                properties=booking_properties,
+            ) or not self.event(
+                "reservation_start",
+                page_type="checkout",
+                path="/reserve",
+                product_id=venue_id,
+                properties=booking_properties,
+            ):
+                RUN.release_slots(venue_id, date, start, hours)
                 return
             body = {
                 "venue_id": venue_id,
@@ -466,8 +624,10 @@ class Persona(HttpUser):
                     response.success()
                     return
                 if outcome == "conflict":
+                    RUN.release_slots(venue_id, date, start, hours)
                     response.success()
                     continue
+                RUN.release_slots(venue_id, date, start, hours)
                 RUN.issues["reservation_failed"] += 1
                 response.failure("예약 응답 오류")
                 return

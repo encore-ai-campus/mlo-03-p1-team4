@@ -20,14 +20,16 @@ F-40의 `_as_owned_read`는 `review_id`를 명시적으로 전달받아 null 또
 3. reservations INSERT (끝나는 시각이 지났으면 status = completed, 아니면 confirmed / total_price = price_per_hour × hours)
 4. reservation_slots INSERT × hours   ← 중복 키(1062)면 IntegrityError
 5. payments INSERT (status = paid, paid_at = NOW())
-6. COMMIT → 201, log_event(reserve_ok), reservation_total{result="ok"} +1
+6. COMMIT → 201, log_event(reservation_complete, products=...), reservation_total{result="ok"} +1
    슬롯 1062 → ROLLBACK → primary에서 재시도 예약·겹친 칸 확인
       같은 요청 10분 안: 200 + 기존 예약(추가 이벤트·카운터 없음)
       모두 본인 예약과 충돌: 409 + mine, reservation_id는 겹친 예약 ID 최솟값
-      그 밖의 충돌: 409 + 슬롯 목록, reserve_conflict 이벤트·충돌 카운터 +1
+      그 밖의 충돌: 409 + 슬롯 목록, reservation_conflict 이벤트·충돌 카운터 +1
 ```
 
 - 결제 화면에 들어올 때는 아무것도 잡지 않습니다. 먼저 커밋한 요청이 이깁니다.
 - 3 전에 '빈 칸인지 SELECT'로 막지 않습니다(두 서버가 동시에 '비었음'을 볼 수 있음).
 - 취소: `SELECT … FOR UPDATE` → 시작 전인지 → status = cancelled, 칸 DELETE, payments = refunded(전액) → COMMIT.
 - 자세한 순서: [백엔드_B 6절](../../../docs/백엔드_B_공간_예약_결제_크롤링.md)
+
+F-60(#60·#72): 서버 결과 3종은 primary에서 읽은 공간명과 확정된 예약 조건으로 `products`를 전달합니다. 충돌에는 검증한 시도 조건과 `reason=SLOT_TAKEN`을 기록합니다. 취소는 비활성 공간도 처리하고 시간당 요금은 저장된 총액/이용시간으로 복원합니다. 공간명은 이벤트 시점 DB 값이며 과거 이름을 새로 저장하지 않습니다. 선택적 `event_context`는 기록할 때만 A `ClientEventContext`에 설정하고 `finally`에서 복원합니다. A PR #72의 새 함수·문맥 계약이 필요하므로 두 변경을 함께 검증·배포해야 합니다.

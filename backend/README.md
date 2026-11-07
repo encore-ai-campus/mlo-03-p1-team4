@@ -22,8 +22,12 @@ api1 호출 주소·검증 명령은 B 명세 7절과 `tests/README.md`를 따�
 ```
 routers   →   services   →   repositories   →   MariaDB primary / replica
 (HTTP 입출력)  (업무 규칙·트랜잭션)  (SQL)
-                    └─ core.events.log_event() → events.log(→ Loki) + MongoDB user_events
+                    └─ core.events.log_event() → events.log(→ Loki) + MongoDB space_rental_analytics.events
 ```
+
+F-60 전환 상태(11-06): A 수집 코드는 새 15종·중첩 문서로 `space_rental_analytics.events`에 쓸 준비가 되었습니다. FE PR #59의 새 요청, B의 새 이름·`products` 전달, DB validator의 서버 이벤트 null 허용과 실제 MongoDB 통합 검증이 남았습니다. 옛 `events.log`는 필수 정보를 복원할 수 없으므로 새 재적재에서 제외합니다.
+
+배포 전에 기존 `events.log`를 별도 이름으로 보존하고 새 파일에서 새 형식 기록을 시작합니다. `scripts/replay_events.py`는 새 형식만 재적재하며 옛 `spacecube.user_events`를 수정하지 않습니다. 로컬 `.env`의 기존 `MONGO_DB=spacecube`는 새 이름으로 해석하지만 배포 설정도 `space_rental_analytics`로 갱신해야 합니다.
 
 - 라우터는 요청을 검증하고 서비스를 부를 뿐, SQL을 쓰지 않습니다.
 - 트랜잭션(BEGIN~COMMIT)은 서비스에서 엽니다. 예약·결제 한 번이 대표 예입니다.

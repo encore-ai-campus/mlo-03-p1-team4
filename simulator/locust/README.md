@@ -65,7 +65,7 @@ Locust는 HTTP만 보내 수백~수천 명을 만들고, Playwright는 진짜 �
 | `LOCUST_ALLOW_WRITES` | 기본 0(GET만), 1(쓰기). Windows 실행기는 -Mode Write로 지정 |
 | `PYTHONPATH` | 직접 Locust 실행 시 backend 경로. Windows 실행기는 자동 설정 |
 | `LOCUST_ACCOUNTS_FILE` | 가상 회원 JSON 파일의 절대 경로. 조회 모드·`Explorer`에는 필요 없음 |
-| `LOCUST_DATES` | 서버 예약 범위 안의 실제 날짜 `YYYY-MM-DD`, 여러 날짜는 쉼표로 구분 |
+| `LOCUST_DATES` | 서버 예약 범위 안의 실제 날짜 `YYYY-MM-DD`, 여러 날짜는 쉼표로 구분. Write 모드 예약 페르소나는 요일 필터 후 서로 다른 날짜가 2개 이상이어야 함 |
 | `LOCUST_RUN_LOG` | 실행 요약 JSONL 경로. 생략하면 `simulator/locust/logs/daily-runs.jsonl` |
 | `LOCUST_LOKI_PUSH_URL` | `mon`의 Loki push API 주소 (`http://<mon 주소>:3100/loki/api/v1/push`) |
 
@@ -73,7 +73,7 @@ Locust는 HTTP만 보내 수백~수천 명을 만들고, Playwright는 진짜 �
 
 ```text
 프로그램: powershell.exe
-인수: -NoProfile -ExecutionPolicy Bypass -File simulator/locust/run_daily.ps1 -Profile Student -Mode ReadOnly -Dates <실제날짜> -Duration 10m
+인수: -NoProfile -ExecutionPolicy Bypass -File simulator/locust/run_daily.ps1 -Profile Student -Mode ReadOnly -Dates "<실제날짜1>,<실제날짜2>" -Duration 10m
 시작 위치: C:\<저장소 경로>
 ```
 
@@ -92,14 +92,14 @@ PM이 실제 등록을 마치면 작업 스케줄러의 마지막 실행 결과�
 
 - 일일 상한: Student 20, Worker 15, Gathering 10, Explorer 5. 한 클래스·단일 프로세스만 지원한다. 계정 파일은 저장소 밖 보호 경로에 두고 스케줄러 중복 실행과 다른 시험의 계정 공유를 막는다.
 - 기본 run_daily.ps1은 ReadOnly다. -Mode Write를 명시하면 사용자 시작 시 한 번 로그인하고 토큰을 재사용한다. 이벤트와 예약을 쓰되 사용자당 예약 성공은 최대 1건이며 이후에는 조회를 계속한다. Explorer는 쓰기 모드에서도 예약은 하지 않고 이벤트만 보낸다.
-- 예약은 유효 reservation_id를 받은 201(신규)/200(기존 재전송)을 구분한다. code=SLOT_TAKEN인 409만 예상 충돌이며 다른 공간을 최대 두 번 더 시도한다. 400·401을 정상으로 숨기지 않는다.
-- run_daily.ps1의 Dates는 실제 예약 날짜다. 실행 요일·시각은 작업 스케줄러에서 관리하고 이 코드는 시계 시간으로 실행을 차단하지 않는다. 스케줄 등록·계정 생성·데이터 삭제·DB 설정 변경은 수행하지 않는다.
-- 실행기는 logs/persona-시각-클래스-모드/에 JSONL·CSV·HTML을 저장한다. 직접 python -m locust를 호출한다면 PYTHONPATH=backend와 LOCUST_ALLOW_WRITES를 직접 설정해야 한다.
+- 예약은 유효 reservation_id를 받은 201(신규)/200(기존 재전송)을 구분한다. code=SLOT_TAKEN인 409만 예상 충돌이며 다른 공간을 최대 두 번 더 시도한다. 같은 Locust 프로세스 안에서는 사용자에게 실제 날짜를 순환 배정하고, 필터 결과의 임의 페이지·공간·가능 시작 시각을 고르며, 이미 고른 겹치는 칸은 피한다. 400·401을 정상으로 숨기지 않는다.
+- run_daily.ps1의 Dates는 실제 예약 날짜다. 중복 날짜는 거부한다. Write 모드 예약 페르소나는 요일 조건에 맞는 날짜가 최소 2개여야 하며, 여러 날짜를 사용자에 순환 배정하고 한 사용자는 재방문할 때 다음 날짜로 이동한다. 실행 요일·시각은 작업 스케줄러에서 관리하고 이 코드는 시계 시간으로 실행을 차단하지 않는다. 스케줄 등록·계정 생성·데이터 삭제·DB 설정 변경은 수행하지 않는다.
+- 실행기는 실행마다 `logs/persona-시각-클래스-모드-고유값/`에 JSONL·Locust CSV 파일과 HTML 보고서를 저장한다. 직접 `python -m locust`를 호출한다면 `PYTHONPATH=backend`, `LOCUST_ALLOW_WRITES`, `--csv`, `--html`을 직접 지정해야 한다.
 - JSONL에는 모드·목표/실제 최고 인원·실행 시간·전체 평균/p95/p99·상태별 건수·서버 오류율·예약 신규/재전송/충돌을 기록한다. 4xx가 서버 오류율에서 제외돼도 기능 오류·인원 미도달은 전체 실패다. Loki 전달 결과는 로컬 JSONL에서 확인하고 run_id는 본문에만 둔다. 앱 로그와 run_id 자동 연결은 아직 없으므로 시간·서버로 대조한다.
 
 ### 현재 적재·성능 판정의 한계
 
-현재 백엔드는 event_type API 형식이며 새 이벤트 구조(#60)와 통합 전이다. 이 시나리오는 현재 API 계약을 따른다. 이벤트 202는 수락이고 MongoDB 저장 완료를 보장하지 않는다. MongoDB 제외 환경에서 실제 적재 완료로 보고하지 않는다.
+쓰기 모드 이벤트는 새 `/events` 계약을 따른다: `event_name`, schema version, 사용자·사이트·획득·화면·이동 문맥과 상품 참조를 보낸다. 가상 사용자마다 UUID `X-Session-Id`를 만들고 요청 헤더, 배치 `session_id`, 이벤트 `user.session_id`에 같은 값을 넣으며 이벤트 순번을 올린다. 공간 이벤트에는 `products.product_id`를 보낸다. API의 202는 수락이며 MongoDB 저장 완료를 보장하지 않는다. MongoDB 제외 환경에서 실제 적재 완료로 보고하지 않는다.
 
 PR #73은 109 단일 호스트의 읽기 한계 시험 기록이다. 동시성 100/200 모두 400명에서 제한과 헬스 제외를 관측했으며 DB 병목은 미확인이다. 일일 실행 인원을 그 수준으로 올리지 않는다. DB exporter와 앱 계측 후 재시험한다. #73이 머지 전이면 별도 브랜치의 실행기다.
 

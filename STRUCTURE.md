@@ -26,6 +26,8 @@ Pro_1/
 ├─ environment.yml            [공동] conda 환경 pro_1 (Python 3.12)
 ├─ ruff.toml · verify.ps1     [공동] 파이썬 린트 규칙, 커밋 전 전체 검증
 ├─ pytest.ini                 [공동] pytest 공통 설정(테스트 폴더, backend import 경로)
+├─ conftest.py                [공동] #78 공유 테스트 DB의 pytest session 잠금·소유권 확인
+├─ tests/                     [공동] 테스트 DB 실행 잠금과 프로세스 간 회귀 검증
 ├─ .gitignore                 [공동] .env·node_modules·글꼴 원본 등 제외
 │
 ├─ docs/                      설계 문서 (docs/README.md)
@@ -82,6 +84,7 @@ Pro_1/
 │     └─ check_venue_browser.py·mjs  [B] 별도 실행: 임시 실제 API + Chrome 검색·정렬·NEW·오류·상세·날짜 목록·시간 칸 검증
 │        check_reservation_http.py  [B] 별도 실행: 공식 앱·실제 인증·Postman 예약/재시도·DB 확인, 가상 데이터 정리
 │        check_internal_http.py  [B] 별도 실행: 공식 앱·내부 키·Postman 등록/재전송/갱신·DB 확인, 가상 공간 정리
+│        check_reservation_events_mongo.py [B] 선택적 CHECK_MONGO_URL: 실제 예약 결과 3종·중복 재적재·문맥 null 정책 확인, 가상 이벤트 ID 정리
 │
 ├─ postman/                   [B] Git-native v3 예약·내부 공간 등록 컬렉션·로컬 환경 (CLI 테스트)
 │  ├─ README.md               안전한 실행 방법과 F-30·61 쓰기 요청 안내
@@ -100,7 +103,8 @@ Pro_1/
 │  └─ data/                   기준선·표본 (지우지 않음)
 │
 ├─ simulator/
-│  ├─ generator/              [DB] 과거 데이터 백필 (예정)
+│  ├─ generator/              [B 본체·A 연결 확인·DB 후속] #75 서비스 호출 기반 과거 백필 CLI
+│  │  └─ tests/              고정 방문량·시각·부분 실패·실제 MariaDB 서비스/재개 검증
 │  └─ locust/                 [B] 부하·동시성 (예정)
 │     ├─ daily_locustfile.py   [B] 네 페르소나 일일 조회·명시적 쓰기 시나리오
 │     ├─ run_daily.ps1         [B] pro_1·모드·날짜·실행 로그를 묶는 Windows 실행기

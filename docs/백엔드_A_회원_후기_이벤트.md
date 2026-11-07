@@ -11,7 +11,7 @@
 | core 공통·관측 | F-64, F-65, F-70 | 로그 파일, `/metrics` | — |
 | 회원·인증 | F-01~F-04 | MariaDB `users` | — |
 | 후기 | F-41, F-50, F-51 | MariaDB `reviews` | reservations(B 함수로), venues, categories, `v_venue_rating` |
-| 이벤트 | F-60 | `events.log`(→ Loki) + MongoDB `user_events` | — |
+| 이벤트 | F-60 | `events.log`(→ Loki) + MongoDB `space_rental_analytics.events` | — |
 | 오늘 날짜 | F-63 | — | — |
 
 ### 10-30·11-02에서 바뀐 것
@@ -20,11 +20,11 @@
 | --- | --- | --- | --- |
 | 게시판·댓글 | API 7개, posts·comments 표 | **삭제** | 11-03 결정 3 |
 | 관리자·공지 | role, 공지는 관리자만 | **없음** | `users.role` 삭제 |
-| 이벤트 저장 | `user_events` 표(10-30) → 로그 파일(11-02) | **로그 파일 + MongoDB `user_events`** (`event_id`로 중복 없이 다시 넣기 가능) | 11-03 결정 1, DB 명세 9-1 |
+| 이벤트 저장 | `user_events` 표(10-30) → 로그 파일(11-02) | **로그 파일 + MongoDB `space_rental_analytics.events`** (`event_id`로 중복 없이 다시 넣기 가능) | PR #58·#60 PM 결정 |
 | 서버 로그·지표 | — | 로그 파일 → Alloy → Loki, `/metrics` → Prometheus | 관측 스택 (F-64, F-65) |
 | DB 연결 | 하나 | **primary(쓰기·내 것·인증) + replica(공개 조회)** | master–slave (11-03 팀원 의견) |
 | `get_current_user()` | `{user_id, role}` | **`{user_id}`**, primary에서 확인 | role 삭제, 복제 지연 |
-| `log_event()` | `(db, session_id, user_id, event_type, room_id, payload)` | **`(session_id, user_id, event_type, venue_id=None, category=None, payload=None, is_synthetic=False)`**: `events.log`에 바로 한 줄 + MongoDB에 백그라운드 쓰기 | 저장소 변경 |
+| `log_event()` | `(db, session_id, user_id, event_type, room_id, payload)` | **`(session_id, user_id, event_type, venue_id=None, category=None, payload=None, is_synthetic=False, *, products=None)`**: 앞 7개 인자 유지, 상품 스냅샷 선택 인자 추가 | PR #60 PM 승인 |
 | 오늘 | 서버 날짜 / `get_sim_today()`(11-02) | **`get_today()`**. 기본은 실제 날짜 | 11-03 제안 2의 ③ |
 | 공간별 후기 경로 | `/rooms/{room_id}/reviews` | `/venues/{venue_id}/reviews` | rooms 삭제 |
 | 평점 뷰 | `v_room_rating` | `v_venue_rating` | DB 담당에게 요청 |
@@ -40,7 +40,8 @@ backend/app/
   core/                      # [A]
     config.py                # .env 읽기
     db.py                    # SQLAlchemy primary·replica 엔진(PyMySQL, 세션 시간대 +09:00), get_db_write(), get_db_read()
-    mongo.py                 # pymongo 클라이언트(시간 제한 1초), user_events 컬렉션 (인덱스는 mongo_init.js가 만듦)
+    mongo.py                 # pymongo 클라이언트(시간 제한 1초), space_rental_analytics.events 컬렉션 (인덱스는 mongo_init.js가 만듦)
+    event_document.py        # 새 15종 문서 조립·필수 구조·상품 조건·개인정보 제거
     security.py              # bcrypt, JWT
     deps.py                  # get_current_user(), get_optional_user()
     errors.py                # AppError + 처리기
@@ -84,7 +85,7 @@ infra/monitoring/  alloy.config                # [A] 로그 파일 → Loki, 로
 | `get_optional_user()` | 토큰 없으면 `None` | 이벤트 |
 | `AppError(code, message, status, detail=None)` | `{"code","message","detail"}`로 바뀌는 예외 | A·B |
 | `paginate()` | `{"items","page","size","total"}` | A·B |
-| `log_event(session_id, user_id, event_type, venue_id=None, category=None, payload=None, is_synthetic=False)` | ① `event_id`(UUID)를 붙여 `events.log`에 **바로** 한 줄(→ Loki) ② MongoDB 쓰기는 `core/events.py` 안의 **내부 스레드 풀**(작업자 2개, 대기열 1,000건)에 넘기고 바로 돌아옴. 시간 제한 1초, 실패·대기열 넘침이면 `mongo_event_write_failures_total` +1(그 이벤트는 `events.log`에 있어 replay 가능). `category`는 공간 유형 코드(B는 읽은 공간 값, 프론트 이벤트는 A가 `venue_id`로 채움, 5분 캐시). 라우터·서비스·배치 어디서나 같은 호출(11-03 A1 확정) | B 예약 서비스, 배치 |
+| `log_event(session_id, user_id, event_type, venue_id=None, category=None, payload=None, is_synthetic=False, *, products=None)` | 앞의 7개 인자는 변경하지 않는다. #60 PM 승인에 따라 B는 확정 예약에서 만든 상품 스냅샷을 `products=`로 전달한다. A는 새 15종 구조를 조립해 `events.log`에 먼저 기록하고 MongoDB `space_rental_analytics.events`에는 내부 2작업자·1,000건 대기열로 보낸다. 파일 실패는 이벤트 API 503, MongoDB 실패는 202 및 재적재 대상이다. 현재 B 구형 이벤트 호출은 변경 전까지 새 이벤트로 저장되지 않는다. | B 예약 서비스, 배치 |
 | `reservation_counter` | Prometheus 카운터 `reservation_total{result="ok"\|"conflict"\|"cancel"}` | B 예약 서비스 |
 | `get_today() -> date`, `get_now() -> datetime` | Asia/Seoul 오늘·지금. **`get_now()`는 시간대 없는(naive) 한국 시각**이라 MariaDB `DATETIME`과 그대로 비교·저장. UTC는 `log_event` 안에서만(MongoDB `ts`), 응답 JSON에는 `+09:00`을 붙여 냄. `TODAY_OVERRIDE`가 있으면 그 날짜 + 실제 시각(테스트 전용) (11-03 A1 확정) | A·B 전체 |
 | `is_synthetic_request(request) -> bool` | 헤더 `X-Synthetic: 1` + `X-Synthetic-Key`(= `.env` `SYNTHETIC_API_KEY`)일 때만 true. `X-Synthetic`이 있는데 키가 없거나 틀리면 `AppError("UNAUTHORIZED", …, 401)` (11-05 A6) | A 가입, B 예약 |
@@ -194,19 +195,25 @@ infra/monitoring/  alloy.config                # [A] 로그 파일 → Loki, 로
 | GET | /metrics | 내부(sg-mon만) | Prometheus 수집용. Nginx로 밖에 내보내지 않음 |
 
 ```json
-{"session_id": "4b1c…", "events": [
-  {"event_type": "select_slot", "venue_id": 7, "payload": {"hour": 14}, "occurred_at": "2026-11-03T14:03:11.204+09:00"}
-]}
+{"session_id":"4b1c0000-0000-4000-8000-000000000001","events":[{
+  "schema_version":1,"event_name":"search_submit","occurred_at":"2026-11-06T12:00:00+09:00",
+  "user":{"anonymous_id":"anon_1","session_id":"4b1c0000-0000-4000-8000-000000000001","session_sequence":1},
+  "site":{"site_id":"main","hostname":"localhost","platform":"desktop_web"},
+  "acquisition":{"landing_url":"http://localhost/search","referrer_url":null,"utm_source":null,"utm_medium":null,"utm_campaign":null},
+  "page":{"page_view_id":"page_1","page_type":"search_results","url":"http://localhost/search","path":"/search","title":"search_results"},
+  "navigation":{"from":null,"to":{"page_view_id":"page_1","site_id":"main","url":"http://localhost/search","path":"/search"},"navigation_type":"direct"},
+  "products":[],"properties":{"page":1}
+}]}
 ```
 
-- 받는 `event_type`(프론트): `search`, `view_venue`, `view_dates`, `select_slot`, `reserve_try`, `reserve_cancel`, `review_create`, `login`, `signup`. (`view_room` → `view_venue`, 프론트 수정)
-- 서버가 남기는 것: `reserve_ok`, `reserve_conflict`, `reserve_cancel_ok`.
-- **허용 목록에 없는 `event_type`은 그 건만 버립니다**(11-03 결정). 나머지는 저장하고 202 `{"accepted": n, "ignored": [{"event_type": "…", "count": k}]}`, 서버 로그에 경고 한 줄. 형식이 깨진 묶음(51건 이상, `session_id` 없음 등)만 400입니다.
-- `unselect_slot`·`abandon`은 받지 않습니다(11-03 결정). 이탈은 분석에서 계산합니다: 같은 세션에 `select_slot`은 있고 `reserve_ok`가 없으면 이탈(`산출물_04` 8절).
-- `venue_id`는 이벤트의 맨 위 칸으로 받습니다. `payload` 안의 `venue_id`·`room_id`는 공간 값으로 쓰지 않습니다.
-- 11-02에 있던 `pay_try`·`pay_done`은 홀딩이 없어져 `reserve_try`와 같은 시점이라 뺍니다. `post_view`·`post_create`는 게시판 삭제로 뺍니다. 프론트도 같이 고칩니다.
-- 서버가 붙이는 칸: `event_id`(UUID), `ts`(받은 실제 시각, UTC로 저장), `client_ts`(브라우저 `occurred_at`), `server`, `user_id`, `category`, `is_synthetic`. 문서 형식과 검증 규칙은 `산출물_04` 8절, `docs/db/mongo_init.js`.
-- 이벤트에는 이름·이메일·휴대폰을 넣지 않습니다(`user_id`만).
+- 프론트 이벤트 12종: `page_view`, `product_impression`, `product_view`, `product_section_click`, `search_submit`, `availability_view`, `rental_slot_select`, `reservation_start`, `reservation_cancel_attempt`, `review_create`, `login`, `signup`.
+- 서버 결과 이벤트 3종: `reservation_complete`, `reservation_conflict`, `reservation_cancel_complete`. B가 확정한 `products`를 전달한다. 현재 B의 구형 이름 호출은 새 컬렉션에 기록되지 않으므로 B 변경이 필요하다.
+- **미허용 이름만 그 건을 제외**하고 `202 {"accepted": n, "ignored": [{"event_type": "…", "count": k}]}`. 허용된 이름의 필수 문맥·상품 조건이 틀리거나 51건 이상이면 400이다. 비활성 공간 `review_create`가 정상 이벤트와 섞여도 현재는 묶음 전체 400이며 로그에 쓰지 않는다(PR #72 PM 검토 사항).
+- FE PR #59는 현재 상품 이벤트마다 `product_id` 하나만 보낸다. A는 추가 `product_name`·`price` 입력을 400으로 거절하고 B의 `venue_repo.get_detail()`을 primary에서 호출해 활성 공간의 이름·수집 시점 가격을 채운다(복제 지연 방지). 인증된 `user_id`는 JWT 확인 결과만 사용한다. 같은 묶음의 서로 다른 공간 ID마다 상세 조회 SQL 한 번이 실행되므로 최대 50건 묶음에서 조회도 최대 50회다. DB 명세는 상품을 1개 이상 허용하지만 현재 FE는 한 개씩 보내므로, 다중 상품 이벤트 도입 전 B의 일괄 공간 스냅샷 조회 계약을 협의해야 한다.
+- URL query·fragment를 제거하고 `page.title`은 고정 화면명으로 바꾼다. UTM은 팀 허용 목록 결정 전까지 null, 임의 자유 문자열은 제외한다. `region_id`·`facility_ids`처럼 형식을 확인한 값과 `reservation_conflict.reason=SLOT_TAKEN`은 보존한다.
+- 서버 결과 3종은 문맥이 없을 때 `user.anonymous_id`·`user.session_sequence`·`site`·`acquisition`·`page`·`navigation`을 null로 기록한다(#60 승인). `X-Session-Id`가 없으면 A가 요청 ID로 `user.session_id=server-<request_id>`를 채운다(#60 PM 결정). 예약 응답과 이벤트 수집은 독립적으로 유지한다.
+
+**#60 전환 상태(11-06):** A는 새 문서 조립·저장 대상·재적재 형식을 구현했다. 공식 `mongo_init.js`를 전용 `space_rental_analytics_test`에 적용한 뒤 실제 HTTP 검색 이벤트와 `log_event` 서버 이벤트 각 1건을 `events.log`와 MongoDB에서 확인했고, 같은 로그를 두 번 재적재해도 ID별 1건만 남음을 확인했다. 생성한 두 문서는 삭제했다. 이벤트 pytest 24건·전체 375건, Ruff·프론트 verify가 통과했다. FE PR #59는 develop에 병합됐지만 지역·시설 ID와 예약 문맥 전송은 남았고, B 서버 이벤트 이름·상품 전달도 미완료다. 비활성 공간 `review_create`가 유효한 항목과 섞이면 전체 400인 현행 정책은 PM 후속 논의 대상이다. 옛 로그는 별도로 보존하고 재적재에서 제외한다. HTTP 재전송은 서버가 새 ID를 발급한다.
 
 MongoDB 인덱스·TTL(1년)은 DB 담당의 `mongo_init.js`가 만듭니다. A는 앱 시작 때 만들지 않습니다(두 서버가 동시에 만들지 않게).
 
@@ -258,7 +265,7 @@ user_id·venue_id·session_id는 라벨이 아니라 본문에 둡니다. MongoD
 | test_auth.py | 가입 성공, 필수 입력·동의·휴대폰·birth 형식 오류 400, 만 14세 제한, 이메일 중복 409, **가입 직후 로그인 성공**, 인증된 로그아웃 204, 탈퇴 회원 로그인·만료 토큰 401 |
 | test_users.py | 내 정보 응답에 password_hash 없음, 조회 인증·시간대, 프로필 수정·잘못된 입력, 현재 비밀번호 확인, 새 비밀번호 길이·bcrypt 저장·로그인 변경, **취소 가능 예약 탈퇴 차단·개인정보 익명화·기존 토큰 무효화·이메일 재가입, 예약·후기 보존 및 탈퇴 회원 후기 표시** |
 | test_reviews.py | 자격 4단계 각각(404·403·403·409), 남의 후기 수정 403, 공간별·전체 정렬, 이름 가림, **작성 직후 내 후기에 보임** |
-| test_events.py | 51건 400, 허용 안 된 event_type은 그 건만 빠지고 202 + `ignored`, 202를 먼저 받음, MongoDB 문서 형식, X-Synthetic 반영, **MongoDB가 꺼져도 202이고 events.log에는 남음**, replay로 다시 넣어도 중복 없음 |
+| test_events.py | 50건 허용·51건 400, FE 12종·서버 3종의 상품·문맥 조건, 미허용 `event_name`만 빠지고 202 + `ignored`, MongoDB 장애 202/파일 실패 503, X-Synthetic, 개인정보 제거, 새 `events.log` 재적재 중복 제외. 별도 실험에서 공식 validator를 적용한 테스트 MongoDB에 검색·서버 이벤트 각 1건 저장 확인; B 예약 호출 3종 통합은 별도 |
 | test_metrics.py | `/metrics`에 요청·예약 카운터가 나옴 |
 | test_health.py | primary 끊김 503, replica 끊김 200 degraded, MongoDB 끊김 200 degraded |
 | test_db_routing.py | `DB_READ_URL`이 틀려도 공개 조회가 primary로 대체되어 성공 |
