@@ -3,10 +3,19 @@
 1차 로컬 VM 구성의 `gw`에서 사용합니다. 브라우저 요청을 두 API VM의 Nginx로 라운드로빈 분산합니다. 기준 파일은 `api1:80`·`api2:80` 이름을 사용하고, 실제 배포본은 `render_config.py`로 별도 생성합니다. IP·호스트 이름과 모니터링 접근 허용 CIDR은 배포 시 입력하며 기준 파일에 저장하지 않습니다.
 
 - `GET /api/health`를 2초마다 확인하고 두 번 실패하면 해당 서버를 제외합니다. Nginx는 이 경로만 루프백 `8001/health`로 전달합니다. 업무 Uvicorn `8000`의 동시성 제한과 별도 프로세스로 분리합니다.
-- 서버별 `maxconn 50`, 대기열 시간 제한 5초를 사용합니다. 업무 Uvicorn은 `--workers 2 --limit-concurrency 100 --timeout-keep-alive 5`를 유지합니다. Uvicorn 제한은 워커별 값이며, 50은 그보다 작은 초기값입니다. Nginx 유휴 연결·직접 내부 호출도 연결 수에 영향을 주므로 503이 절대 없다는 보장은 아닙니다. 배포 값을 낮추면 HAProxy 상한도 함께 낮춰야 합니다.
+- 서버별 `maxconn 50`, 대기열 시간 제한 5초를 사용합니다. 이 PR은 업무 Uvicorn의 기동 옵션을 변경하지 않습니다. `maxconn`은 실제 배포된 Uvicorn 제한보다 낮게 설정하고, 배포 값을 낮추면 HAProxy 상한도 재검토해야 합니다. Uvicorn 제한과 동기 엔드포인트의 스레드 풀 처리량은 서로 다른 제한이므로, 수치 비교만으로 실제 처리량이나 503 방지를 보장하지 않습니다.
 - `/api/internal`과 `/api/metrics` 및 하위 경로는 정문에서 거절합니다. `/api/internalized`처럼 접두어만 같은 다른 경로는 통과합니다.
 - `retries 0`으로 예약·결제 POST를 다른 서버로 다시 보내지 않습니다. HAProxy 접근 로그는 메서드·상태·처리 시간·백엔드만 남기고 요청 경로·쿼리·IP·헤더를 제외합니다.
 - `gw:8404/stats`와 `gw:8404/metrics`는 기준 파일에서 loopback만 허용합니다. 배포 시 `--monitor-source`로 실제 mon의 IP/CIDR을 지정합니다. 여러 출발지가 필요하면 옵션을 반복합니다. 자체 시험의 제어 PC 허용 결과는 아래 기록이며, mon scrape는 미검증입니다.
+
+### 환경별 실제 기동값과 검증 범위
+
+| 환경 | 업무 Uvicorn | HAProxy 서버별 maxconn | 근거·범위 |
+| --- | --- | --- | --- |
+| 사용자 자체 구성 bridged 테스트 VM | workers 2, limit-concurrency 100, keepalive 5초 | 50 | 아래 배포·시험 기록의 환경 |
+| 109 부하 시험 서버 | workers 2, limit-concurrency 200, keepalive 5초 | 이 PR의 제안값 50 | PM 리뷰와 #73 배포 정의로 확인. 이 PR을 109에 적용하거나 400명 부하를 검증하지는 않음 |
+
+109의 200을 100으로 내리는 변경은 포함하지 않습니다. 해당 비교는 PM의 별도 실험 순서를 따릅니다. [PM 리뷰](https://github.com/encore-ai-campus/mlo-03-p1-team4/pull/91#issuecomment-6706975316)와 [#73 배포 정의](https://github.com/encore-ai-campus/mlo-03-p1-team4/blob/4ea779e4272bf80d06786cb354905eac983f288c/infra/vm/lab/install-role.sh)를 기준으로 구분했습니다.
 
 ```bash
 # API1_HOST·API2_HOST·MONITOR_CIDR은 배포 환경의 값으로 먼저 지정한다.
@@ -21,11 +30,15 @@ sudo systemctl reload haproxy
 
 ## 독립 헬스 프로세스 (PR #66 후속)
 
-`health_app.py`는 기존 `get_health()`를 재사용합니다. primary 장애는 503, replica·MongoDB 장애만 있으면 200 degraded라는 계약을 유지합니다. 먼저 로컬 업무 API `8000`의 기존 비동기 경로에 `HEAD /openapi.json`을 보내 응답 헤더를 확인합니다. 연결 제한 시간은 0.2초, 연결 후 소켓 제한 시간은 0.3초입니다. 본문을 받거나 업무 스레드 풀·DB를 추가 사용하지 않습니다. 연결 실패·HTTP 무응답·예상 밖 상태는 503으로 판정합니다. 로컬 응답 200과 Uvicorn 과부하 503은 응답 가능으로 처리하고, 별도 `get_health()`로 primary를 반드시 확인합니다. 과부하 503 때문에 두 노드가 함께 제외되는 문제를 피합니다.
+`health_app.py`는 기존 `get_health()`를 재사용합니다. primary 장애는 503, replica·MongoDB 장애만 있으면 200 degraded라는 계약을 유지합니다. 먼저 로컬 업무 API `8000`의 `HEAD /openapi.json` 응답 헤더를 확인합니다. 연결 제한 시간은 0.2초, 연결 후 소켓 I/O 제한 시간은 0.3초이며 전체 health 요청의 총 제한 시간은 아닙니다. 동기 업무 엔드포인트를 호출하지 않고 본문도 읽지 않지만, 앱 이벤트 루프·공통 미들웨어의 영향은 남습니다. 연결 실패·HTTP 무응답·예상 밖 상태는 503으로 판정합니다. 로컬 응답 200과 Uvicorn의 즉시 과부하 503은 응답 가능으로 처리하고, 별도 `get_health()`로 primary를 반드시 확인합니다.
+
+**109의 400명 부하에서 0.3초 제한이 적절한지는 PM 측 확인 대기입니다.** 과부하로 헤더 응답 자체가 늦어지면 이 검사도 실패해 노드가 제외될 수 있습니다. 자체 VM의 TCP 포화 시험이나 CI 통과를 109 부하 검증으로 해석하지 않습니다. PM이 현재 DB 풀 실험 종료 후 같은 배포·데이터 조건에서 health 실패, backend DOWN, 대기열·오류율을 비교하고 필요 시 제한 시간·판정 방식을 별도로 조정합니다.
 
 이 확인은 한 연결의 응답 표본이며 모든 Uvicorn worker의 정상 동작을 보장하지 않습니다. 업무 서비스에서 OpenAPI 경로를 비활성화하거나 변경하면 검사 경로도 함께 검토해야 합니다.
 
-api1·api2 모두 기존 backend 릴리스와 가상환경을 사용합니다. 새 패키지는 필요 없습니다. systemd가 업무 API와 같은 암호화 `backend-env` credential을 전달합니다. 업무 API·문서·지표·이벤트 기록기는 등록하지 않습니다. 상태 확인용 DB 연결은 프로세스별로 추가되므로 DB 연결 예산에 포함합니다.
+### 자체 테스트 VM: 암호화 credential 방식
+
+api1·api2 모두 기존 backend 릴리스와 가상환경을 사용합니다. 새 패키지는 필요 없습니다. 아래 서비스 예시는 systemd가 업무 API와 같은 암호화 `backend-env` credential을 전달하는 자체 테스트 VM용입니다. 업무 API·문서·지표·이벤트 기록기는 등록하지 않습니다. 상태 확인용 DB 연결은 프로세스별로 추가되므로 DB 연결 예산에 포함합니다.
 
 ```bash
 # 새 코드만 배포 디렉터리에 추가한다. 업무 API 릴리스는 교체하지 않는다.
@@ -46,6 +59,91 @@ sudo systemctl enable --now spacecube-health.service
 적용 순서는 **배포 경로 설정 → 헬스 프로세스 기동 → health 응답 확인 → Nginx 설정 검사·reload → 렌더링된 HAProxy 설정 검사·reload**입니다. 프로세스 시작 직후에는 초기화 시간이 필요하므로 health 200을 확인하고 진행합니다. 헬스 프로세스 없이 새 Nginx 설정만 적용하면 `/api/health`가 502가 됩니다. 실제 주소는 렌더링된 VM 배포본에만 들어갑니다.
 
 설정 근거: [Uvicorn resource limits](https://www.uvicorn.org/settings/#resource-limits), [HAProxy 2.8 설정 문서](https://docs.haproxy.org/2.8/configuration.html).
+
+## 109 적용 안내 — PM 재배포·부하 검증 대기
+
+109는 아래 구성이므로 위 credential 전용 unit·`start-health.sh`를 그대로 적용하지 않습니다. [#73의 lab 설정](https://github.com/encore-ai-campus/mlo-03-p1-team4/tree/4ea779e4272bf80d06786cb354905eac983f288c/infra/vm/lab)을 읽어 작성한 적용안이며, 이 PR 브랜치에는 해당 lab 파일들이 포함돼 있지 않습니다. 실제 적용 전에 PM이 현재 배포 지문·unit·경로를 대조합니다.
+
+| 항목 | 109 배치 |
+| --- | --- |
+| 업무 서비스 | `spacecube.service` |
+| 사용자·그룹 | `spacecube:adm` |
+| 업무 설정 | `EnvironmentFile=/etc/spacecube/.env` |
+| backend·venv | `/opt/spacecube/backend`, `/opt/spacecube/venv` |
+| Nginx 기준 | #73의 `infra/vm/lab/nginx.conf` → `/etc/nginx/conf.d/spacecube.conf` |
+| 모니터 주소 | PM 확인값 `192.168.219.217/32`를 배포 시 입력 |
+
+### API1·API2의 health 서비스
+
+기존 서비스·Nginx 파일과 배포 지문을 백업한 뒤 `health_app.py`를 추가합니다. 기존 backend와 환경 파일의 내용은 바꾸지 않습니다.
+
+```bash
+sudo install -d -o root -g adm -m 0750 /opt/spacecube/deploy/health
+sudo install -o root -g adm -m 0640 infra/haproxy/health_app.py /opt/spacecube/deploy/health/health_app.py
+```
+
+`/etc/systemd/system/spacecube-health.service`에는 109용으로 다음 내용을 사용합니다. 기존 `.env`는 systemd가 읽으며, 비밀값을 저장소나 이 문서에 복사하지 않습니다. 이 방식은 암호화 credential용 시작 스크립트를 호출하지 않습니다.
+
+```ini
+[Unit]
+Description=Spacecube isolated health check (109)
+After=network.target spacecube.service
+BindsTo=spacecube.service
+PartOf=spacecube.service
+
+[Service]
+Type=simple
+User=spacecube
+Group=adm
+WorkingDirectory=/opt/spacecube/backend
+EnvironmentFile=/etc/spacecube/.env
+Environment=PYTHONPATH=/opt/spacecube/backend
+ExecStart=/opt/spacecube/venv/bin/uvicorn health_app:app --app-dir /opt/spacecube/deploy/health --host 127.0.0.1 --port 8001 --workers 1 --timeout-keep-alive 1 --no-access-log
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=spacecube.service
+```
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable spacecube-health.service
+sudo systemctl restart spacecube-health.service
+curl --retry 3 --retry-delay 1 --retry-connrefused --max-time 2 -fsS http://127.0.0.1:8001/health
+```
+
+### 109 Nginx의 두 health 경로
+
+`nginx -T`로 활성 설정을 확인하고 기존 server 블록에서 `/health` location을 **교체**, `/api/health` location을 **추가**합니다. 같은 location을 중복 정의하지 않습니다. 109의 정적 파일·로그·metrics 경로를 보존해야 하므로 자체 테스트 VM용 Nginx 파일 전체를 덮어쓰지 않습니다.
+
+```nginx
+location = /health {
+    proxy_pass http://127.0.0.1:8001/health;
+}
+location = /api/health {
+    proxy_pass http://127.0.0.1:8001/health;
+}
+```
+
+기존 109 HAProxy는 `/health`를 확인하고, 이 PR의 기준 설정은 `/api/health`를 확인합니다. 두 경로를 모두 독립 프로세스로 연결해야 어느 설정에서도 업무 Uvicorn의 기존 `/health`로 돌아가지 않습니다. 독립 8001 health가 먼저 200인 것을 확인한 뒤 `nginx -t`·reload, 두 Nginx 경로의 200을 확인합니다.
+
+### gw 설정과 mon 허용
+
+API 주소는 PM의 현재 배포값을 입력합니다. 109 mon은 `192.168.219.217/32`를 `--monitor-source`로 전달하고, gw의 기존 방화벽도 mon의 8404 접근을 허용하는지 확인합니다. 기준 파일의 loopback ACL을 그대로 배포하면 수집이 거절됩니다.
+
+```bash
+MONITOR_CIDR=192.168.219.217/32
+python3 infra/haproxy/render_config.py --api1 "$API1_HOST" --api2 "$API2_HOST" --monitor-source "$MONITOR_CIDR" --output /tmp/spacecube-haproxy.cfg
+sudo haproxy -c -f /tmp/spacecube-haproxy.cfg
+# 기존 설정 백업 후, PM이 비교하려는 단계에서만 설치·reload한다.
+sudo install -o root -g root -m 0644 /tmp/spacecube-haproxy.cfg /etc/haproxy/haproxy.cfg
+sudo systemctl reload haproxy
+```
+
+PM의 순서대로 health 분리와 HAProxy 대기열 변경을 한 항목씩 비교합니다. 109의 400명 Locust 결과는 **PM 측 확인 대기**이며 이 PR에서 실행했다고 기록하지 않습니다. 실패하면 백업한 Nginx·HAProxy 설정 복원 및 검사·reload를 먼저 한 뒤 health 서비스를 중지해, 존재하지 않는 8001로 검사 요청이 남지 않도록 합니다.
+
+월요일 노트북 배치도 서비스 이름·backend/venv·설정 공급 방식을 먼저 확인합니다. `spacecube.service`+`.env` 구조면 위 109 예시, 암호화 credential 구조면 앞의 자체 VM 예시를 사용하며 배포 경로와 mon 주소는 각 환경에 맞게 지정합니다. 월요일 배치에 적용·검증됐다는 의미는 아닙니다.
 
 ## 자체 구성 테스트 환경 배포·시험 기록 (2026-11-07)
 

@@ -41,7 +41,8 @@ def handle_error(request: Request, error: AppError):
 @app.get("/health")
 def health() -> dict[str, str]:
     # TCP accept만 하는 멈춘 업무 프로세스를 정상으로 판정하지 않는다.
-    # 기존 비동기 문서 경로의 헤더만 확인해 업무 스레드 풀과 DB를 사용하지 않는다.
+    # 동기 업무 엔드포인트 대신 문서 경로의 헤더만 확인한다.
+    # 앱 이벤트 루프·미들웨어의 지연 영향은 남으므로 완전한 과부하 격리는 아니다.
     # Uvicorn 동시성 제한의 503은 HTTP 응답 가능으로 취급한다.
     # primary 장애는 아래 독립 get_health()가 판정하므로 503을 숨기지 않는다.
     connection = HTTPConnection("127.0.0.1", 8000, timeout=0.2)
