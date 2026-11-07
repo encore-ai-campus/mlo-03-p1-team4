@@ -29,8 +29,8 @@ def _make_engine(url: str, *, health: bool = False) -> Engine:
         {"poolclass": NullPool}
         if health
         else {
-            "pool_size": 3,
-            "max_overflow": 2,
+            "pool_size": 5,
+            "max_overflow": 5,
             "pool_timeout": 3,
             "pool_recycle": 3600,
             "pool_pre_ping": True,
