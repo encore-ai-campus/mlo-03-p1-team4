@@ -213,9 +213,13 @@ def parse_space(source_id: str | int, html: str) -> SpaceInfo:
     address = business.get("address") or {}
     if not isinstance(address, dict):
         address = {}
-    street = address.get("streetAddress") or ""
-    if not isinstance(street, str):
-        street = ""
+    # 스페이스클라우드는 상세 도로명을 제공하지 않는다. 지역·법정동만
+    # 조합하고 streetAddress는 상세 주소일 수 있으므로 읽거나 보존하지 않는다.
+    address_parts = []
+    for key in ("addressRegion", "addressLocality"):
+        value = address.get(key)
+        if isinstance(value, str):
+            address_parts.extend(value.split())
     rating = business.get("aggregateRating") or {}
     if not isinstance(rating, dict):
         rating = {}
@@ -229,7 +233,7 @@ def parse_space(source_id: str | int, html: str) -> SpaceInfo:
         open_hours=(
             hours.get_text(" ", strip=True).removeprefix("영업시간").strip() if hours else None
         ),
-        address_region=" ".join(street.split()[:2]) or None,
+        address_region=" ".join(address_parts[:2]) or None,
         area_m2=float(area.group(1)) if area else None,
         rating=_optional_float(rating.get("ratingValue")),
         review_count=_optional_int(rating.get("reviewCount")),

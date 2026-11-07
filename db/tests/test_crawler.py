@@ -45,11 +45,12 @@ def test_crawler_cli_imports_from_repository_root():
     assert "baseline" in result.stdout
 
 
-def test_spacecloud_parser_does_not_keep_name_or_address():
+def test_spacecloud_parser_uses_region_and_locality_without_detail_address():
     html = """
     <script type="application/ld+json">{
       "@type":"LocalBusiness","name":"실제 업체 이름",
-      "address":{"streetAddress":"서울특별시 마포구 상세로 123"},
+      "address":{"streetAddress":"서울특별시 영등포구 상세로 123",
+                 "addressRegion":"서울특별시","addressLocality":"마포구"},
       "aggregateRating":{"ratingValue":"4.5","reviewCount":"12"}
     }</script>
     <ul class="list_detail">
@@ -68,6 +69,19 @@ def test_spacecloud_parser_does_not_keep_name_or_address():
     assert "name" not in row
     assert "상세로" not in json.dumps(row, ensure_ascii=False)
     assert "실제 업체" not in json.dumps(row, ensure_ascii=False)
+
+
+def test_spacecloud_parser_keeps_city_and_legal_dong_only():
+    html = """
+    <script type="application/ld+json">{
+      "@type":"LocalBusiness","name":"실제 업체 이름",
+      "address":{"addressRegion":"서울","addressLocality":"봉천동",
+                 "streetAddress":"서울특별시 영등포구 상세로 123"}
+    }</script>
+    """
+    space = parse_space("53074", html)
+    assert space.address_region == "서울 봉천동"
+    assert "상세로" not in json.dumps(asdict(space), ensure_ascii=False)
 
 
 def test_shareit_uses_only_explicit_hourly_goods():
@@ -219,6 +233,56 @@ def test_unknown_or_ambiguous_region_is_excluded():
     mapped, reason = map_space("spacecloud", space, maps)
     assert mapped is None
     assert "나뉜 옛 구" in reason
+
+
+@pytest.mark.parametrize(
+    ("address", "expected"),
+    [
+        ("서울 봉천동", ("서울", "관악구")),
+        ("천안 두정동", ("충남", "천안시")),
+        ("서울 양평동1가", ("서울", "영등포구")),
+        ("인천 가정동", ("인천", "서해구")),
+        ("인천 가좌동", ("인천", "서해구")),
+        ("인천 원당동", ("인천", "검단구")),
+    ],
+)
+def test_official_legal_dong_mapping(address, expected):
+    maps = SeedMaps.load()
+    space = SpaceInfo(
+        "1",
+        ["카페"],
+        5,
+        1,
+        [],
+        [{"amount": 10000, "unit": "시간", "per_person": False}],
+        None,
+        address,
+    )
+    mapped, reason = map_space("spacecloud", space, maps)
+    assert reason is None
+    assert (mapped["sido"], mapped["sigungu"]) == expected
+
+
+def test_ambiguous_and_missing_legal_dong_have_distinct_exclusion_reasons():
+    maps = SeedMaps.load()
+    space = SpaceInfo(
+        "1",
+        ["카페"],
+        5,
+        1,
+        [],
+        [{"amount": 10000, "unit": "시간", "per_person": False}],
+        None,
+        "서울 신사동",
+    )
+    mapped, reason = map_space("spacecloud", space, maps)
+    assert mapped is None
+    assert reason == "동 이름 겹침"
+
+    space.address_region = "서울 등록되지않은동"
+    mapped, reason = map_space("spacecloud", space, maps)
+    assert mapped is None
+    assert reason == "동 대응 없음"
 
 
 def test_sitemap_index_and_detail_ids():

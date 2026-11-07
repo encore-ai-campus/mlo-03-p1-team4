@@ -11,10 +11,11 @@
 
 | 파트 | 담당자 | 지금 | 다음 할 일 | 막힌 것 |
 | --- | --- | --- | --- | --- |
+| B·일일 페르소나 | 이세훈·PM 보완 | #69 변경은 PR #69로 develop 병합. #74·#76·#80 예약 결과 이벤트·예외 안전 처리, #77 생성기, #79 공유 테스트 DB 직렬화도 병합됨. #75 109 api1 파일럿은 100명·30일·1,260세션, 예약 841(완료 757·취소 84)·충돌 396·후기 189·이벤트 10,368건까지 확인. PM은 크롤링 뒤 유형별 활성 공간 6곳 바닥선만 DB에서 재계산해 부족분을 채우고, 안정적인 synthetic source_id를 쓰도록 결정 | #75 공간 보충 기능·기존 5개 `default-*` 공간의 새 ID 처리·FE/PM 그래프 확인, #73 Draft 읽기/쓰기 재시험, #8 api1 cron | `pro_1` Locust 2.43.1과 고정 2.47.0 불일치. #73 재시험은 SSH·앱/mon 연결 타임아웃으로 중단됨. A7 혼합 부하와 7대 운영 검증은 별도 |
 | 프론트 | 노진산(FE·PM) | FE-1~9 확정안 반영, Claude 시안 대조·FE 오류/모바일 결제/가입 UX 재검토 및 목업·화면 검증. 11-06 C안 화풍(흰 바탕·검은 글자·주칠)과 유형별 일러스트 5장 유지. CCL 분위기 참고 사진 40장(유형별 8장)을 정적 경로로 연결하고 유형·venue ID 해시로 안정 선택, 사진 표시·크레딧 추가(API `art:` 계약 그대로) | A·B 구현 후 실제 API 연결·오류·예약 동시성 통합 검증 | 실제 API 미구현 |
-| FastAPI A | [이름] | 회원·후기 A 기능 구현. F-60 공식 `mongo_init.js`를 전용 테스트 DB에 적용하고 실제 HTTP 202→파일→MongoDB 저장·재적재 중복 제외를 확인. 헤더 없는 서버 이벤트에 `server-<request_id>` 적용. 이벤트 관련 pytest 24건·전체 375건, Ruff, FE verify 통과 | B 서버 이벤트 3종 새 이름·상품 전달 및 FE 남은 지역·시설 ID/예약 문맥 통합 | 비활성 공간 `review_create`가 정상 건과 섞이면 전체 400(기존 계약, PM 후속 논의). UTM 허용 값 미확정 |
-| FastAPI B | 이세훈 | `feat/B-F60-events`에서 #60·#72 예약 결과 3종 이름·상품값·선택적 문맥 연결. A `d75deea`와 임시 통합에서 관련 pytest 77건·전체 375건·실제 HTTP/Postman 7요청/15검증·지정 MongoDB 결과 3종 저장/중복 제외/정리 확인. FE verify 67건·빌드 통과 | B 변경 리뷰 후 A #72와 함께 통합·배포. #8 api1 cron·생성기 백필 지원은 별도 | A의 세션 헤더 없는 요청 ID 보완 미반영, 원격 MongoDB 서버 문맥 null validator 동기화 필요. 실제 api1·replica·브라우저 E2E 미검증 |
-| DB | [이름] | `0001_init.sql`·`mongo_init.js` 검증(설치형 11.8·compose 11.4 둘 다 29건 통과), seed(유형 5·시설 20·지역 230 → `seed.sql`), `infra/local` compose. F-61 두 수집원 파서·매핑·적재 코드와 오프라인 테스트 작성, `feat/DB-F-61-crawler2`에 보존. API 제외 운영 저장 검증에서 MongoDB `crawl.crawl_raw`와 MariaDB `spacecube.crawl_jobs` 각 1건 삽입·재조회·해당 건 정리 성공. `environment.yml`로 `pro_1`(Python 3.12.16) 설치, 크롤러 오프라인 pytest 17건·Ruff 전체 린트·포맷 통과. FE verify(단위 67건·빌드) 통과. 별도 Compass DB의 events·event_daily 속성 정리 v1을 docs/db에 공유 | 실제 단건 파서 확인 → 시연용 공간 선별·API 등록(B와) → 부족분·과거 30일 행동 데이터 생성기 | 운영 저장소 쓰기 경로는 확인했으나 실제 외부 수집·`venues` 등록은 접속 URL·내부 키가 빈 `backend/.env`와 내부 API 미기동으로 미실행 |
+| FastAPI A | [이름] | 회원·후기와 F-60 구현. PR #86에서 #75 업무/이벤트 시각 경계 비교 24건, MariaDB 11.4.13 `spacecube_test` backend/db 전체 407건, CI DB·백엔드 테스트·Ruff 통과 후 develop 병합. PR #89에서 예약 이벤트 예외 회귀 6건, `test_reservations.py` 58건, F-60 선택 테스트 11건 통과 후 develop 병합. 109 api1 생성 이벤트 10,368건의 과거 `occurred_at`·실제 `received_at` 분리 및 중복 0건 확인 | #5 FE 예약·취소 `event_context`, 검색 `region_id`/`facility_ids`는 남음. `page_view`·목록 노출·섹션 클릭은 PM 로컬 109 브랜치에 적용됐으나 develop PR·최신 배포·브라우저 확인 대기. #17 MongoDB 중단/replay와 별도 테스트 DB 접근. #90 PM 피드백의 pull/로그/주소/UID/보존 정렬과 최신 develop 반영 후 VM 실검증 | #90은 base `97b533a`로 현재 develop `eca5a0e`보다 뒤처짐. 13.0.2 동시성 결과는 공식 11.4 판단에 쓰지 않음. #17의 MariaDB 테스트 서버 관리자 경로 응답 대기. UTM 허용값 미확정 |
+| FastAPI B | 이세훈 | #67 Nginx·#66 HAProxy, #69 일일 실행, #74·#76 예약 이벤트, #77 생성기, #79 공유 테스트 DB 잠금 방지, #80 상품 생성 실패 격리 모두 develop 병합. #75 109 파일럿은 PR #87 기록대로 완료; 크롤러 뒤 유형별 활성 공간 6곳 미만만 실제 DB 기준으로 보충하고 `source_site=synthetic`·결정적 `source_id`·`art:` 이미지로 등록하기로 PM 결정. api1에 #85 기본 공간에서 수동 등록한 5개 `default-*` 공간의 새 ID 전환은 미정 | #75 자동 공간 보충·기존 5개 source_id 결정·FE/PM 그래프 확인, #8 api1 cron. #73 Draft 부하 재시험과 최신 develop 반영 | #73은 base `97b533a`로 현재 develop `eca5a0e`보다 뒤처짐. `pro_1` Locust 2.43.1과 고정 2.47.0 불일치. 실제 api1/replica 운영 확인과 브라우저 E2E 미검증 |
+| DB | [이름] | `0001_init.sql`·`mongo_init.js` 검증(설치형 11.8·compose 11.4 둘 다 29건 통과), seed(유형 5·시설 20·지역 230 → `seed.sql`), `infra/local` compose. F-61 최신 #10 댓글의 SpaceCloud `addressRegion`+`addressLocality` 파싱, 공식 법정동 CSV·지역 매핑·제외 사유, 회귀 테스트 반영. API 제외 운영 저장 검증에서 MongoDB `crawl.crawl_raw`와 MariaDB `spacecube.crawl_jobs` 각 1건 삽입·재조회·해당 건 정리 성공. 최신 변경 후에도 실제 크롤러 저장 함수로 MongoDB `crawl.crawl_raw`·MariaDB `spacecube.crawl_jobs` 검증 문서/작업 각 1건 저장·재조회·삭제 및 잔존 없음 확인. 크롤러 pytest 25건·수정 파일 Ruff 린트·포맷 확인 통과. 실제 `fetch 53074`에서 `address_region` 비어 있지 않음을 확인. FE verify(단위 67건·빌드) 통과. 별도 Compass DB의 events·event_daily 속성 정리 v1을 docs/db에 공유. 기본 DDL·시드 스냅샷 PR #85는 11-07 develop에 병합됨(시드에서 회원 행 제외). 원본 덤프의 INSERT 11문·값 598행을 Git 밖 별도 파일로 추출(미적용) | #10 최신 PM 결정에 따른 쉐어잇 `ok` 후보 2건 api1 bootstrap 결과(등록 수·제외 사유) 확인; 전체 15~20개 속성 기반 등록과 #19 보충 포함 총 30개는 별도 확인 | 공식 쉐어잇 약관은 2026-11-07 브라우저에서 본문과 2026-07-08 시행일 확인. robots.txt는 /venue를 차단하지 않음. PM은 11-05 기준과 같이 비영리 수업 시연에서 속성만 참고하기로 결정했으며, 실행 직전 약관 버전 확인·변경 시 중단 조건을 둠. 현재 셸은 Windows 개발 PC이고 localhost:8000 내부 API가 떠 있지 않아 api1 bootstrap은 미실행. DB DDL 변경 없음 |
 
 ## 기능 진행표
 
@@ -23,7 +24,7 @@
 | F-ID | 기능 | 담당 | 상태 |
 | --- | --- | --- | --- |
 | F-01~04 | 회원가입·로그인·내 정보·로그아웃·탈퇴 | A | 가입·회원·탈퇴 구현 및 수동 확인, 전체 pytest 230건 통과. 탈퇴와 동시 예약은 B 협의 대기 |
-| F-04 지원 | 탈퇴 전 취소 가능 예약 수 | B / A 연계 | #50에서 예약 전 회원 FOR UPDATE·활성 재확인, 슬롯 충돌 롤백 후 재잠금, 재시도 200 커밋·잠금 해제, count_cancellable의 FOR UPDATE 최신 읽기를 유지. #49 병합 develop 통합 뒤 예약/탈퇴 양방향 경합·인증 스냅샷·실패/재시도 잠금 해제 및 취소 경합 포함 관련 101건·전체 354건·FE 56건·HTTP 7요청/15검증 통과. CI·리뷰/병합 대기 |
+| F-04 지원 | 탈퇴 전 취소 가능 예약 수 | B / A 연계 | #50의 회원 잠금·재확인·슬롯 충돌 재시도와 `count_cancellable` 최신 읽기 구현, 관련 통합·HTTP 검증 후 PR #50이 11-06 develop에 병합됨. #49 취소·이용 완료 배치도 develop 병합됨 |
 | F-10 | 공간 유형 목록 조회 | B | 검증: 11-05 로컬 MariaDB `localhost:3306/spacecube_test`에서 pytest 5건 통과(공개 읽기·실제 DB 응답·5분 캐시·오류 처리) |
 | F-11·기준 정보 | 지역·시설 목록 조회 | B | 검증: 활성 지역 필터·시도/시군구 응답·시설 전체 조회·공유 스냅샷·5분 캐시·공개 읽기·검증 오류. 기존 F-10 포함 test_catalog 19건 통과 |
 | F-12 | 공간 검색 | B | 검증: GET `/venues`. q·유형·지역·날짜·시간·인원·복수 시설 필터, 검색 뒤 페이지 total, replica 조회. MariaDB 전용 테스트와 실제 HTTP 검색 계약·입력 오류 확인 |
@@ -32,18 +33,21 @@
 | F-20 | 공간 상세 | B / A·FE 연계 | B 상세 API 구현·검증: test_venues 28건, 공간 모델 DDL 3건, 실제 API Chrome 1건 통과. 공개 읽기 경로 3건·기존 목업 E2E 59건 통과. A 후기 목록·FE 실제 서버 연결은 별도 통합 항목 |
 | F-21 | 예약 가능 날짜 | B | 검증: 공개 available-dates API 구현. 빈 칸 총수·min_hours 이상 연속 빈 칸 판정, 음수 offset·days 1~31·기간 양끝·0일 설정·마지막 페이지 잘림·큰 offset·점유 분리·재조회·SQL 2회·400/404·읽기 의존성 등 48건 추가. test_venues 114건, 전체 pytest 153건, 실제 HTTP Chrome 1건 통과. FE 전체 연결은 별도 |
 | F-22 | 날짜별 시간 칸 | B | 검증: 공개 GET /venues/{venue_id}/slots?date=YYYY-MM-DD 구현. 엄격한 날짜·설정 범위 양끝·0일 설정, 공간/날짜별 점유·완료 칸·past·F-20 일치·재조회·400/404·읽기 의존성 등 38건 추가. test_venues 총 66건, 전체 pytest 105건, 실제 HTTP Chrome 1건 통과 |
-| F-30~32 | 예약+모의 결제 한 번, 중복 차단 | B | 공식 앱의 POST /reservations 등록·A 공통 가상 키 검증 사용. API 21건·경쟁 3건 포함 전체 MariaDB pytest 241건 통과. PR #39의 취소·환불 재시도 제외 및 취소 후 재예약·타인 선점 회귀 검증 반영. 동시 다른 회원 50명: 201 1건/409 49건, 같은 회원: 201 1건/200 49건. 실제 인증·Postman 4요청/8검증에서 OpenAPI 200·무인증 401·생성 201·재시도 200 확인, DB 3개 표·합성 표시·카운터 검증·테스트 데이터 정리 완료 |
+| F-30~32 | 예약+모의 결제 한 번, 중복 차단 | B | #76 PM 후속: 상품 팩토리를 이벤트 래퍼 안에서 호출. 상품 생성 실패 시 예약 201·취소 200·충돌 409와 저장·환불·슬롯 결과 유지 회귀 추가. 생성기 흐름에서 운영 상품 빌더 억제 확인. `verify.ps1` Ruff 109파일·pytest 434건·FE 단위 67건·린트/색 검사/빌드 통과. FE 조건문 린트 경고와 Starlette 사용 중단 경고 각 1건 |
 | F-34 | 예약 취소·환불 | B | #49에서 develop 3a729f2와 코드 충돌 해결. 실제 취소 API 뒤 F-40 목록/상세가 같은 cancelled·refunded 상태인지 검증. 활성/비활성 공간 5개 유형 category 기록과 원자 환불·슬롯 반납·동시 취소·재예약 유지. 관련 94건·전체 347건·HTTP 7요청/15검증·CI 통과 후 #49가 55ebd23으로 develop 병합됨 |
 | F-35 | 이용 완료 배치 | B | #49의 primary 조건부 일괄 UPDATE·get_now 1회·commit/rollback·CLI·완료 뒤 칸/결제 보존을 develop 통합 후 재검증. test_jobs 6건 포함 관련 94건·전체 347건 통과. 실제 api1 시간별 cron 등록·실행은 미완료이므로 #8 유지 |
-| F-40~41 | 내 예약, 내 후기 | B / A | #46 조회·필수 nullable review_id·필드 생략 해제는 develop 병합됨. #49·#50 후속 병합도 완료. #45 브랜치에서 A `get_review_ids`를 목록·상세에 연결하고 미작성 null·작성/삭제 이력 ID·페이지당 SQL 1회·소유권 차단을 MariaDB/HTTP로 검증. PR 리뷰·병합 대기. F-41은 A 범위 |
+| F-40~41 | 내 예약, 내 후기 | B / A | #46·#49·#50·#51·#55·#57·#61 관련 구현과 A/B 후기 연결 PR이 모두 develop에 병합됨. 목록·상세의 후기 ID null/유지, 삭제 이력, 페이지당 일괄 조회와 소유권 차단을 MariaDB/HTTP에서 검증. F-41 A 후기 기능은 별도 통합 완료 상태 |
 | F-50 지원 | A 후기 작성용 예약 소유권 조회 | B | 예약·칸·결제 모델 및 `get_owned()`를 이전 프로젝트에서 가져옴. DDL 일치·매퍼 구성 4건, 실제 MariaDB 소유권·A 후기 작성 연결 10건 통과. 예약 생성 API 구현 완료를 뜻하지 않음 |
 | F-51 지원 (#43) | A 후기 목록용 예약·공간·유형 조회식 | B / A 연계 | 검증: B 4열 `review_context_query(*, active_only=True)` PR #44, A 직접 import·공개 비활성 공간 제외·내 후기 유지 PR #47이 develop 병합됨. 로컬 MariaDB 관련 테스트 58건 통과. Swagger 실제 데이터 수동 확인은 별도 |
 | F-50~51 | 후기 작성·조회(후기 모아보기) | A | B get_owned·review_context_query 연결, 작성·목록·수정·삭제 및 탈퇴 후 예약·후기 보존·작성자 익명화 로컬 MariaDB 검증. 공개 비활성 공간 제외·내 후기는 포함. 전체 backend pytest 318건 통과 |
-| F-60, F-62~65 | 이벤트(로그 파일 + MongoDB), 가상 데이터, `get_today`, 서버 로그, 지표 | A | 진행: #60 승인 구조로 FE 12종·서버 3종 문서·파일 우선·새 로그 재적재 구현. 공식 `mongo_init.js`를 `space_rental_analytics_test`에 적용하고 검색 HTTP 202·서버 공용 함수 이벤트 각 1건의 파일·MongoDB 저장, 개인정보 제거, 두 차례 재적재 중복 제외, 생성 문서 정리를 확인. MongoDB 장애 202·파일 실패 503 테스트 통과. 비활성 공간 `review_create` 혼합 전체 400 재현; 정책 변경 없이 PM 후속 논의. 이벤트 pytest 24건·전체 375건, Ruff·FE verify(67건/빌드) 통과. B 새 호출·FE ID/예약 문맥 통합은 미검증이므로 #5 완료 아님 |
-| F-60 B 지원 (#60·#72) | 예약 결과 3종·상품 스냅샷·선택적 브라우저 문맥 | B / A·DB 연계 | B 구현·A d75deea 임시 통합 검증: 관련 pytest 77건·전체 375건, Postman 7요청/15검증, 지정 MongoDB에서 결과 3종 실저장·동일 ID 중복 제외·가상 데이터 정리. A의 server-요청 ID 보완 및 원격 validator null 허용 반영 전 최종 완료 아님 |
-| F-61 | 크롤링 신규 등록 | DB / B | 진행: B POST /internal/venues 구현·로컬 검증 완료(35건·같은 출처 동시 8건·HTTP 6요청/12검증). DB 두 파서·유형/지역 매핑·crawl_raw·crawl_jobs·API 재시도와 오프라인 테스트 작성, `feat/DB-F-61-crawler2`에 보존. API 제외 운영 저장 검증에서 MongoDB `crawl_raw`·MariaDB `crawl_jobs` 각 1건 삽입·재조회·정리 성공. `pro_1` 크롤러 오프라인 pytest 17건·Ruff·FE verify 통과. `venues` 등록·실제 외부 수집은 별도 미검증; `backend/.env` 접속 값·키 미설정 |
-| #19 생성기 | 시연용 공간 부족분 생성·과거 30일 백필(회원·예약·결제·후기·이벤트)·`event_daily` 집계 | DB (api1 실행 환경 A, 과거 시각 저장 지원 B) | 설계 확정(11-05 #38), 코드 전. 100명으로 먼저 검증 → 11-07까지 규모 확정 |
+| F-60, F-62~65 | 이벤트(로그 파일 + MongoDB), 가상 데이터, `get_today`, 서버 로그, 지표 | A | 진행: #60 승인 구조의 파일 우선·새 로그 재적재 구현. 테스트 MongoDB에서 FE 검색·서버 이벤트 저장, 개인정보 제거, 재적재 중복 제외·MongoDB 장애 202·파일 실패 503 확인. #5 후속 PR #89에서 B #80 병합 뒤 예약 이벤트 예외 경계 6건, `test_reservations.py` 58건 및 F-60 선택 11건 통과 후 develop 병합. 통합 묶음 72 passed·4 failed·6 errors: Windows MariaDB 13.0.2에서 동시성 4건 실패, 기본 pytest 임시 경로 권한 오류 6건. #5 FE 예약·취소 `event_context`·검색 ID, 최신 배포/브라우저 흐름이 남아 미완료. `page_view`·목록 노출·섹션 클릭은 PM 109 로컬 브랜치에 있어 develop PR 확인 필요 |
+| F-60 B 지원 (#60·#72) | 예약 결과 3종·상품 스냅샷·선택적 브라우저 문맥 | B / A·DB 연계 | #72 A 새 문서 구조, #74 B 이벤트 3종, #76 이벤트 실패 격리, #80 상품 빌더 실패 격리가 develop 병합됨. 서버 `X-Session-Id` 없을 때 A가 `server-<request_id>`로 기록하고 DB validator는 해당 3종의 브라우저 문맥 null을 허용. 운영 브라우저 경로는 #5의 FE 연결·배포 검증 대기 |
+| #20·#69 | 일일 네 페르소나·안전 실행·실험 기록 | B | PM 댓글의 새 이벤트 문맥·사용자별 `X-Session-Id`·예약 날짜/공간/시간 분산·실행별 `logs/` CSV·HTML 반영. 전용 pytest 32건, Ruff·Locust 클래스 목록 통과. 실제 Write·보고서 생성·Loki 적재 및 고정 Locust 2.47.0 미검증 |
+| F-61 | 크롤링 신규 등록 | DB / B | PR #82의 두 수집원 크롤러·저장 경로 기본 구현은 develop 병합. 현재 작업 트리에는 SpaceCloud `addressRegion`+`addressLocality` 파싱, 현행 법정동 CSV·모호/누락 제외 처리와 회귀 테스트 25건 통과 기록이 있으며 아직 미커밋. #10 PM 109 실험은 수동 지역표로 상세 20건 중 19건 등록했으나 최신 자동 매핑의 bootstrap 검증은 아님. `fetch 53074`와 저장소 fixture 검증은 별도 완료. 남음: 최신 PM 조건으로 쉐어잇 `ok` 후보 2건부터 api1 bootstrap 시험(아직 미실행); 법정동 자동 매핑 수정은 현재 미커밋이며, 전체 15~20개 등록 및 #19 보충 포함 총 30개를 별도 확인 |
+| #19·#75 생성기 | 과거 30일 회원·예약·결제·후기·이벤트 백필 | B 본체·A 연결 확인·DB 공간/집계/CSV | 로컬 서비스 검증: 100명·1,260세션·예약 912·취소 91·완료 821·후기 205·이벤트 10,089건, 재개 추가 0·validator 오류 121 확인. 별도 109 api1 파일럿(PR #87, PR #86 A 검증): 공간 31곳, 100명·30일, 1,260세션·예약 841(완료 757·취소 84)·충돌 396·후기 189·이벤트 10,368건. 생성 이벤트 모두 `is_synthetic=true`, `server=generator`; `occurred_at` 10-07 23:00Z~11-06 10:42Z, `received_at` 11-07 09:58Z, 중복 0. PM 보고 `event_daily` 32일 3,974행·재실행 신규 0 및 법정동 대응 109 적용. 남음: 유형별 활성 공간 6곳 바닥선 자동 보충·기존 수동 공간 source_id 결정·FE/PM 그래프 확인. 공식 MariaDB 기준 11.4, 실험 VM 10.11.14 |
+| #54 | HAProxy 정문·서버별 Nginx | B / A / DB | #67 자체 구성한 테스트 환경의 api1(.232)·api2(.233)에 Nginx/FastAPI 동배치 적용. Nginx 1.24 nginx -t·캐시/MIME·404/internal 차단·loopback API keepalive 확인. primary health와 GET categories 200(읽기 전용), MongoDB 주소 미제공으로 degraded. 테스트 VM의 배포·설정·백업 경로는 infra/nginx/README.md. HAProxy 장애 제외/복귀는 #66 별도 |
 | F-70 | 헬스체크 3단계 | A | 설계 확정 |
+| #78 공통 검증 | 공유 테스트 DB 병렬 실행의 회원 재가입 500 방지 | 공동(B 구현) | 루트 conftest의 프로세스 간 잠금·테스트 전 소유권 확인·최대 대기 600초·종료 해제 구현. 회귀 29건·기존 두 프로세스 재가입 각 5회 및 전체 verify(Python 407건·FE 67건) 통과. PR #79가 11-06 develop에 병합됨. 잠금 미적용 checkout 및 pytest 외 DDL 작업은 순차 실행 필요 |
 | — | 같은 칸 동시 50건 중 1건만 성공 | B / DB | 설계 확정 (MVP 통과 조건) |
 | — | F-33 결제 대기 만료, F-52 자유게시판·댓글, F-53 공지 | — | 11-03 삭제 |
 
@@ -51,6 +55,8 @@
 
 | 날짜 | 결정 | 근거 |
 | --- | --- | --- |
+| 11-06 | #78: 같은 로컬 spacecube_test의 pytest는 공통 session 명명 잠금으로 직렬화한다. 전용 AUTOCOMMIT 연결로 GET_LOCK/소유권 확인/RELEASE_LOCK만 실행하며 업무 코드는 변경하지 않는다. 직접 pytest·verify·CI에 적용하고, 같은 suite 안의 예약 50요청 동시성은 유지. 구버전 checkout·pytest 외 DB 초기화는 잠금 규약 밖이므로 갱신/순차 실행한다 | 사용자 요청 · 이슈 #78 · tests/README.md |
+| 11-06 | #75: B가 생성기 본체·세션·예약 담당. api1 별도 프로세스에서 A 회원/후기 및 B 예약/취소 서비스 직접 호출, 100명·30일·42세션/일, 페르소나 35/25/20/20·409 재시도 1회·취소 10%·후기 25%·별점 5/4/3/2/1=40/30/15/10/5. 과거 업무 시각과 실제 received_at을 분리하고 새 표 없이 manifest/state·UUID5로 재개. DB는 유형별 공간 6개 보충·집계·CSV·정리, FE는 그래프 확인 | 사용자 지시 · #75 PM 댓글 issuecomment-6684120999 · simulator/generator/README.md |
 | 11-06 | 사진은 유형별 8장씩 40개의 CCL 분위기 참고 이미지로 사용한다. 프론트가 venue ID와 유형으로 안정 선택하고 실제 공간 사진이 아님을 알린다. 원본·저작자·라이선스·편집 사실은 화면과 `SOURCES.md`에 표시하고 `art:` API·DB 계약은 바꾸지 않는다 | 사용자 요청 · `frontend/public/photos/credits.html` · `docs/데이터_수집_명세.md` |
 | 11-06 | #60: 서버 결과 3종에 한해 `user.anonymous_id`·`user.session_sequence`·`site`·`acquisition`·`page`·`navigation` null 허용. `log_event`의 기존 7개 인자를 보존하고 키워드 전용 `products=None` 추가. FE는 공간 ID만 보내고 A가 활성 공간 이름·현재 가격 조회. 옛 로그 보존, 새 로그만 재적재. UTM 코드는 허용값 결정 전 null로 제한 | #60 PM 댓글 · PR #58 |
 | 11-06 | 사용자 이벤트 저장 구조는 DB가 만든 `space_rental_analytics`의 `events`·`event_daily`(`docs/db/events_event_daily_컬렉션_속성정리_v1.md`)를 기준으로 채택. 행동 이름 15종·중첩 필드로 바꾸고, 백엔드 A·B·FE·`mongo_init.js`·`산출물_04` 9절을 이 문서에 맞춘다(대응표: PR #58 코멘트). 서버 이벤트의 화면 정보 전달 방식 등 4가지는 11-07 오전까지 결정 | PM 결정 · PR #58 |
@@ -175,7 +181,86 @@ A1~A4는 11-03에 확정했고, **A5~A8은 추후 확정**으로 미뤘다(11-03
 
 ## 최근 변경 (최신이 위)
 
+- 11-07 · DB · #10 최신 PM 댓글 확인: 쉐어잇은 11-05 기준에 따라 비영리 수업 시연용 속성만 참고하기로 결정. 약관 2026-07-08 시행본과 robots.txt를 재확인했으며, api1 시험은 현 개발 PC에 내부 API가 없어 실행하지 않음. README·데이터 수집 명세·상태표 갱신. 미커밋/미푸시 유지.
+
+- 11-07 · A · 원격 PR 상태/최신 리뷰 확인: #89는 #5 예약 이벤트 경계 회귀 기록(선별 6건·test_reservations 58건·F-60 선택 11건)을 담아 develop `eca5a0e`로 병합됨. 전체 묶음은 Windows MariaDB 13.0.2 동시성 4건과 기본 pytest 임시 경로 문제 6건으로 72 passed·4 failed·6 errors였으므로 11.4 검증으로 오해하지 않음. #5는 열어 두며 FE `event_context`·검색 ID 통합, 최신 코드 배포/브라우저 검증이 남음. PR #89 댓글에 따르면 `page_view`·목록 노출·섹션 클릭은 PM 로컬 109 브랜치에 먼저 적용됐고 develop용 FE PR은 별도 예정.
+
+- 11-07 · 공동 · PR #87은 #86의 MariaDB 11.4.13 전체 407건 통과와 #75 api1 파일럿 수치를 반영해 `f654676`으로 병합됨. 109 파일럿은 공간 31곳·100명/30일·1,260세션·예약 841(완료 757·취소 84)·충돌 396·후기 189·생성 이벤트 10,368건; 행동 `occurred_at`과 실제 `received_at` 분리, 중복 0. PM 보고 `event_daily` 32일 3,974행·재실행 신규 0. #75는 그래프 확인과 공간 보충 기능이 남아 열려 있음.
+
+- 11-07 · B·DB · #75 최신 PM 댓글: 크롤러 작업 직후 실제 DB의 유형별 활성 공간 수를 다시 세고 6곳 미만만 부족분 생성, `source_site=synthetic`·결정적 `source_id`·`art:` 이미지 사용. 크롤링 실공간을 우선하고 6곳을 넘은 보충 공간은 삭제하지 않음. 109 파일럿용으로 #85 기본 공간에서 수동 등록된 5개 `default-*` 공간을 새 규칙으로 전환할지는 미정. 공식 DB 기준은 MariaDB 11.4, 10.11.14는 실험 VM으로 구분.
+
+- 11-07 · A · #17 최신 코멘트 확인: PM은 로그 재적재 중복만 측정 기준으로 승인했으며, API 재전송은 별도 계약 전까지 중복 0 근거로 보지 않음. 남은 것은 MongoDB 5분 중단/replay, 별도 `spacecube_test` 준비. A가 관리자 접속 경로를 안전하게 요청했으며 아직 DB 변경은 없음.
+
+- 11-07 · DB · PR #85 기본 스키마·시드 스냅샷은 develop 병합됨. PM 확인 기준은 공간 21곳·이미지 105행·유형 5개·시설 22개·지역·`crawl_jobs` 2건이며 회원·예약·결제 개인 데이터와 DROP/DELETE는 없었음. 리뷰 후속은 snapshot 파일 위치/이름 구분, 시설 22개와 `seed.sql` 20개 차이 확인, INSERT 컬럼 목록 추가, 테스트 DB 전용 복구 절차 문서화.
+
+- 11-07 · DB · #10 PM의 109 수동 매핑 시험은 상세 20건 중 19건 등록 성공이었고 시험 DB에 남아 있음. 이 결과는 손으로 보완한 매핑표를 쓴 실험이므로 현재 작업 트리의 자동 법정동 매핑을 검증한 것은 아님. PR #82 기본 크롤러 코드는 develop 병합됐고, 최신 PM 결정으로 쉐어잇은 비영리 시연용 속성만 조건부 수집하기로 함. 남은 것은 api1 bootstrap 시험과 결과 기록.
+
+- 11-07 · A·공동 · #15/#13 및 PR #90/#73 최신화: #90은 열려 있고 Ruff CI 통과, PM은 109 기존 Prometheus pull/job·`server` 라벨, 실제 로그 경로·mon IP·datasource UID·보존 기간과 맞춘 뒤 VM에서 확인하도록 요청; 7대 실검증 전 머지 보류. PR #90·#73의 base는 `97b533a`로 현재 develop `eca5a0e`보다 뒤처짐. #73은 코멘트 없는 Draft로, DB 풀 3+2→5+5 실험 뒤 재시험이 SSH·앱/mon 연결 타임아웃으로 중단돼 새 결과 없음. 109 api1/api2는 `.214/.215`, gw `.218`, mon `.217`; DB VM 연결 전 `/health` 503. 11-09 오전 4대 노트북·7 VM 배치 전 브리지 어댑터 확인.
+- 11-07 · DB · 사용자 요청으로 현재 F-61 저장 경로 적재 검증. `backend/.env` 설정 대상 MariaDB `spacecube`에서 `start_job`·`finish_job`로 `crawl_jobs` 작업 1건, MongoDB 크롤링용 `crawl.crawl_raw`에 API 호출 없이 제외 상태 fixture 1건을 저장하고 각각 재조회. 매핑된 지역·유형·조회/등록 건수·완료 상태 일치를 확인한 뒤 고유 작업 ID와 출처 ID로 해당 행을 각 1건 삭제하고 잔존 없음 확인. TCP·SELECT·Mongo ping 모두 응답. 실제 사이트를 다시 크롤링하거나 `/internal/venues`를 호출하지 않음.
+
+- 11-07 · DB · 이슈 #10 최신 PM 댓글 반영: SpaceCloud JSON-LD에서 `addressRegion`+`addressLocality`만 파싱하고 `streetAddress`는 읽지 않음. 행정안전부 2026-07 법정동 코드 전체자료에서 말소 코드를 제외해 `db/seed/legal_dong.csv` 생성(34,514 키, 모호 2,108키); 동일 시·도 안에서 서로 다른 법정 시군구에 걸리는 이름은 ambiguous로 제외. 봉천동→관악구, 천안 두정동→천안시, 양평동1가→영등포구, 2026 인천 가정동·가좌동→서해구·원당동→검단구 및 모호·누락 회귀 포함 크롤러 pytest 25건, Ruff 린트·포맷 확인 통과. robots 규칙을 지켜 `fetch 53074` 단건 실행, `address_region` 비어 있지 않음을 확인. 쉐어잇 약관(2026-07-08 시행)과 robots.txt를 재확인했고 `/venue`는 차단되지 않음. 최신 PM 결정은 11-05 기준대로 비영리 수업 시연용 속성만 참고하며, 실행 직전 약관 버전 확인·변경 시 중단·발표 전 A8 재검토를 조건으로 둠. 크롤러 UA·3초 간격·20건 상한·보호 경로 제외를 코드에서 확인. 현 셸은 api1이 아니고 localhost:8000이 미기동이라 bootstrap은 미실행. 약관 결정과 실행 조건을 crawler/README.md·docs/데이터_수집_명세.md에 반영. DB DDL 변경 없음.
+
+- 11-07 · DB · F-61 적재 검증: 크롤러 등록 함수로 운영 `spacecube`에 합성 테스트 공간을 보내 HTTP 201을 받고, `venues` 재조회와 `venue_images` 3건을 확인한 뒤 테스트 행 1건을 삭제해 잔존 0건을 확인. Spacecloud 53074 상세 1건은 robots.txt와 3초 요청 간격을 준수해 조회했으나 전처리 매핑 제외로 API 등록하지 않음. 전체 `verify.ps1`: Ruff 통과, pytest 128 passed·9 skipped·4 failed·310 errors(CHECK_DB_URL 미설정), Node PATH 누락으로 프론트 단계 실패. Node 경로를 지정한 `npm run verify`: 71 테스트·빌드 통과. 로컬 MariaDB 미기동으로 `db/tests/check_ddl.py` 미실행.
+
+- 11-07 · DB · 이전 임시 INSERT 파일이 정리되어, 사용자 제공 `spacecube.sql`의 INSERT 11문을 외래키 순서로 다시 추출해 Git 작업 폴더 밖 별도 파일에 저장했다. 원본 11문과 문자 단위 일치 확인, DB 미적용.
+
+- 11-07 · DB · 사용자 제공 `spacecube.sql`의 INSERT 값만 파싱해 Git 작업 폴더 밖 임시 `spacecube_values_only.json`에 테이블별 배열로 추출했다. 12개 테이블, INSERT 11문, 총 598행이며 각 행의 값 수를 원본 테이블 컬럼 수와 대조했다. 실제 DB 적용은 하지 않았다.
+
+- 11-07 · DB · 요청한 DDL·시드 파일을 `feat/DB-spacecube-default`의 `1fafcaa`로 커밋·푸시. 시드에서 회원 INSERT 1건을 제외했다. staged diff check 통과, DB 테스트는 미실행.
+
+- 11-07 · DB · 사용자 제공 `spacecube.sql`에서 INSERT 문 11개를 외래키 순서로 추출해 Git 작업 폴더 밖의 임시 `spacecube_inserts_only.sql`에 보관했다. 원본 INSERT 11개와 문자 단위 일치를 확인했고, DB 적용은 하지 않았다. 회원 데이터가 포함되어 저장소에는 추가하지 않았다.
+
+- 11-07 · DB · 사용자 요청으로 `db/0001_create_tables_and_view.sql`의 `v_venue_rating` 정의를 기준 `0001_init.sql`과 동일하게 복원하고, 12개 테이블의 명시적 `DEFAULT CHARSET`·`COLLATE`를 제거했다. 파일 상단 차이 주석을 현재 SQL에 맞춰 갱신했으며 실제 DB 적용은 하지 않았다.
+
+- 11-07 · DB · `db/0001_create_tables_and_view.sql` 상단에 기준 `db/migrations/0001_init.sql`과의 차이를 주석으로 기록했다. 덤프에만 있는 `ck_users_email_at`, 명시된 `fk_slot_resv` 인덱스, 문자셋 표기, 뷰 생성 구문과 MariaDB 덤프 표기 차이를 적었고 실행 SQL은 변경하지 않았다.
+
+- 11-07 · DB · 사용자 제공 `spacecube.sql` 덤프에서 데이터 없이 테이블 12개·뷰 1개를 만드는 `db/0001_create_tables_and_view.sql`을 추출했다. 원본의 `DROP`·`INSERT`·계정 지정 `DEFINER` 및 테이블별 AUTO_INCREMENT 현재값을 제외하고, `db/migrations/README.md`에 맞춰 스키마 생성·선택 구문 없이 빈 스키마를 먼저 선택해 실행하도록 했다. 실제 DB 적용은 하지 않았다.
+
 - 11-07 · DB · 사용자 요청으로 `feat/DB-F-61-crawler`의 원격 푸시를 취소하고 로컬·원격 브랜치를 삭제. F-61 변경 커밋 `ae5fc32`는 새 `feat/DB-F-61-crawler2`에 먼저 푸시해 보존했고, 새 브랜치의 원격 HEAD를 확인했다. `develop`은 변경하지 않았다.
+
+- 11-07 · DB · Compass의 같은 MongoDB 연결에서 `space_rental_analytics_test.events` validator는 공식 `mongo_init.js`의 서버 결과 3종 null 문맥 허용 분기를 포함했으나 `space_rental_analytics.events`와 달랐다. 테스트 validator를 기준으로 production validator를 `collMod`해 일치시켰고, 두 컬렉션 모두 `strict`/`error`, validator 동일 및 서버 결과 3종 목록을 셸에서 확인. Compass Shell은 `load()`를 지원하지 않아 공식 파일을 직접 실행하지 않았으며, 기존 공식 초기화가 적용된 테스트 validator를 production에 복사했다. 문서 데이터 변경 없음.
+
+- 11-07 · B · PR #69 PM 댓글 반영: 최신 develop을 병합하고 `/events` 요청을 `event_name`·schema version·사용자/사이트/획득/페이지/이동 문맥·상품 참조 형식으로 수정. 가상 사용자마다 다른 `X-Session-Id`와 이벤트 순번을 사용한다. Write 예약은 고유한 실제 날짜 2개 이상을 요구하고 사용자별 날짜 순환, 검색 결과 페이지 분산, 프로세스 내 겹치는 슬롯 선점 방지로 409 쏠림을 낮춘다. 기존 `run_daily.ps1`의 실행별 `logs/` CSV·HTML 출력을 문서에서 확인. 전용 pytest 32건, Ruff·format, Locust 네 클래스 목록 통과(gevent/SSL 경고 1개). 실서버 Write·실제 보고서 파일/Loki 적재는 미검증; 설치 Locust 2.43.1은 `environment.yml` 고정 2.47.0과 다름.
+
+- 11-06 B·PM: #69에 실험 #73의 제한·기록 주의점을 반영했다. 네 페르소나 기본 조회 모드, 명시적 이벤트/예약 쓰기, 20/15/10/5명 상한·사용자당 예약 1건, 목표/실제 인원·오류·응답시간 요약을 보완했다. 가짜 응답 회귀 27건, 실제 Explorer 조회 1명·10초 12건 실패 0. A7 판정과 실제 쓰기 적재는 미검증.
+- 11-07 · B · #67 테스트 환경 검증: 자체 구성한 api1(.232)·api2(.233) 테스트 VM에 Nginx 1.24와 FastAPI/Uvicorn을 같이 설치하고 API를 loopback 8000에 바인딩. develop `e7db36f` 프론트 빌드를 양쪽 테스트 VM에 배포하고 이전 릴리스를 보존. VM별 systemd encrypted credential로 DB·JWT·internal·synthetic 설정 보관. `/api/health`·읽기 전용 `/api/categories` 200, asset 1년 immutable·WebP image/webp/7일·index no-cache·404 차단·loopback stub_status 200, health 8회 후 각 VM keepalive 연결 1개를 확인. MariaDB primary(.212)는 SSH·DDL·쓰기 없이 health와 GET categories만 확인. MongoDB 주소 미제공으로 health 본문은 `degraded`/`mongo: down`. 최신 develop 통합 후 verify.ps1 통과(Ruff·115 파일 포맷·pytest 451·FE 67·린트·색 검사·빌드; 기존 경고 2건). HAProxy 장애 제외/복귀는 #66에서 확인.
+
+- 11-07 · B · PR #67 PM 코멘트 확인 후 전용 워크트리 `.worktrees/pr-67-nginx`의 `feat/B-nginx`에서 origin/develop 1583778 병합·STATE 충돌 해결. 최신 A·DB·생성기 기록과 기존 Nginx 검증 이력을 보존. 로컬 FastAPI upstream keepalive 16·유휴 4초 및 WebP MIME 명시, 서버별 assets/사진 캐시·없는 파일 404·keepalive·#66 장애 시험 확인 절차 작성. verify.ps1 전체 통과(exit 0): Ruff 115파일·pytest 451건·FE 단위 67건·린트/색 검사/빌드. 기존 Starlette·FE 조건문 경고 각 1건. git diff --check 통과. 수정본 nginx -t·실제 HTTP·api1/api2 적용·#66 장애 시험·E2E는 미실행. SSH 접속 정보와 VM 소유자 확인 대기, Draft 유지.
+
+- 11-07 · B · 사용자 승인으로 #54 nginx 후보안 커밋·푸시·Draft PR 준비. 제목 [B] #54 nginx 설정 초안, develop 대상·Refs #54로 연결. 커밋 전 verify.ps1에서 Ruff 린트·90파일 포맷·pytest 362건 통과(경고 1); 프론트 verify는 이 워크트리 의존성 미설치로 run-s를 찾지 못해 실패(exit 1). Nginx 원본 VM 문법 검사 및 git diff --check 통과. HTTP·HAProxy·실제 적용은 미검증이며 비교·검토용 초안 유지.
+
+- 11-07 · B · 사용자 제공 VM에 SSH 접속해 #54 원본 Nginx 후보 검사. Ubuntu 24.04.4·Nginx 1.24.0, 원본 SHA256 일치 확인. /tmp의 별도 최상위 설정에서 원본 후보를 include한 sudo nginx -t 통과(exit 0); 포트·경로·upstream 치환 없음. 기존 Nginx active 및 80번 listener 유지 확인, 임시 디렉터리 삭제·SSH 종료. 설정 설치·서비스 reload·패키지 설치 없음. HTTP·실제 API·HAProxy·장애 복구 시험 및 기존 운영 설정 전체와의 충돌 검사는 미실행. 접속 비밀번호는 파일에 저장하지 않음.
+
+- 11-06 · B · #54 Nginx 공통 후보안: `infra/nginx/spacecube.conf`를 api1·api2용으로 수정하고 `infra/nginx/README.md`를 로컬 VM 기준으로 정리. HAProxy는 서버 선택, Nginx는 Vue 정적 파일과 `127.0.0.1:8000` 전달을 맡음. `/api/internal`·`/api/metrics` 차단, 로컬 `stub_status`, 개인정보를 남기지 않는 JSON 접근 로그 반영. `git diff --check`와 정적 검토 통과; Windows에 Nginx가 없어 `nginx -t` 미실행, HTTP·실제 VM 배포 미검증. `127.0.0.1:8000`과 `mon`의 8000 직접 scrape 표기 불일치 확인 필요.
+- 11-06 · B · nginx 작업 트리 feat/B-nginx에 최신 origin/develop(9b9b223, 22개 커밋)을 fast-forward 반영. 기존 미커밋 설정은 복원하고 문서 충돌은 최신 진행 상태를 유지해 정리. #14 종료·#54 이관 및 HAProxy 정문 → 서버별 Nginx 구조 확인. spacecube.conf는 이전 정문 후보안이라 서버용 수정 필요. 기존 변경 원본은 nginx-develop-sync-2026-11-06 stash에 보존. 이번 작업은 Git 동기화·파일 확인이며 실행 테스트·배포 없음.
+
+- 11-07 · B · PR #76 PM 후속으로 `_event_product()`를 이벤트 래퍼 내부에서 실행하도록 `product_factory`를 전달. 예약·충돌·취소 각 API가 상품 조립 실패에도 201·409·200과 커밋 결과를 유지하는 회귀, HistoricalRuntime에서 상품 팩토리 미호출 및 MariaDB 생성기 전체 흐름을 운영 상품 빌더 실패 상태로 검증하는 테스트를 추가. `verify.ps1` 통과: Ruff 109파일, pytest 434건, FE 단위 67건·린트·색 검사·빌드. 기존 Starlette 사용 중단·FE 조건문 린트 경고 각 1건. 브랜치 `fix/B-issue5-product-factory`, 미커밋·미푸시, PR 후속 리뷰 대기.
+
+- 11-07 · 공동(B) · 사용자 승인으로 `fix/B-generator-db-race`와 재검증 기록 커밋을 푸시하고 develop 대상 PR #79([B] F-62 생성기 검증 시 공유 테스트 DB 경합 방지)를 생성. Closes #78 및 앞서 확인한 로컬 검증 결과를 본문에 포함. jinsan02·naturedevworks 자동 리뷰 요청과 open·비초안·충돌 없음 상태 확인. GitHub 연결 도구의 생성 권한 부족 및 기존 gh 인증 만료는 정상 Git 인증을 통한 CLI 실행으로 처리했으며 인증정보는 출력·파일 저장하지 않음. 이번 게시 작업에서 제품 코드 수정·테스트 재실행·머지 없음. 원격 CI 결과는 후속 확인.
+
+- 11-07 · 공동(B) · 사용자 요청으로 `fix/B-generator-db-race`의 경합 수정 커밋 ef39125(#78)를 로컬 MariaDB spacecube_test에서 재검증. `python -m pytest tests -q` 29건 통과, 재가입 대상 pytest 두 프로세스를 각각 5회 실행해 총 10회 통과하고 실제 잠금 대기 후 진행 확인. `verify.ps1` Ruff 98파일·pytest 407건(예약 50요청 동시성 포함)·FE 단위 67건·린트/색 검사/빌드 통과. backend 폴더 직접 pytest의 잠금 fixture 적용과 재가입 1건 통과도 확인. 기존 Starlette 사용 중단 경고·FE 조건문 린트 경고 각 1건. DDL 검사·E2E·원격 CI는 미실행. 제품 코드 수정 없이 검증 기록만 갱신하고 develop 대상 PR 제목·본문을 채팅으로 제시. 커밋·푸시·PR 생성 없음.
+
+- 11-07 · 공동(B) · 사용자 요청으로 #78의 공통 테스트 DB 잠금·29건 회귀·verify/CI 경로·문서를 `fix/B-test-db-lock` 로컬 커밋 대상으로 확정하고 develop 대상 PR 제목·본문을 준비. 최종 verify.ps1 pytest 407건·FE 67건·Ruff/린트/빌드 및 병렬 재가입 두 프로세스 5+5건 통과 결과를 사용한다. 이번 커밋 준비에서는 제품 코드 변경·테스트 재실행 없음. 생성기 PR #77과 분리하며, 잠금 미적용 checkout·pytest 외 DDL 작업은 보호하지 못하는 범위를 본문에 명시한다. 푸시·PR 생성은 하지 않음.
+
+- 11-06 · 공동(B) · 사용자 요청으로 최신 develop f387df2에서 `fix/B-test-db-lock` 생성, 원인·완료 조건을 이슈 #78에 등록. 공통 conftest/session 잠금·매 테스트 전 소유권 확인·제한 시간·비밀값 없는 오류·연결 종료 해제를 추가하고 tests/ 공통 회귀·verify/CI 탐색 경로·기여 안내를 갱신. 회원 서비스·API 응답·DDL·패키지는 변경하지 않음. 회귀 29건 통과, 수정 전 1213→1305→500이 나던 동일 재가입 테스트 두 프로세스가 수정 후 각각 5건 통과하며 한쪽의 실제 대기/해제 후 진행 확인. 첫 전체 검사에서 새 하위 프로세스 출력 테스트 1건이 Windows CP949/UTF-8 차이로 실패(406건 통과)해 UTF-8 출력·해석을 고정했고, 이후 회귀 29건 및 verify.ps1 전체 407건·FE 단위 67건·Ruff 98파일·린트/빌드 모두 통과. 기존 Starlette 사용 중단·FE 린트 경고 각 1건. backend/ 폴더에서 공통 fixture 탐색도 확인. DDL 검사·E2E·원격 CI는 미실행. 커밋·푸시·PR은 아직 하지 않음.
+
+- 11-06 · B · 사용자 요청으로 생성기 커밋 `8c9aef4`를 `feat/B-F-62-generator`에 푸시하고 develop 대상 PR #77(`[B] F-62 과거 데이터 생성기 구현 및 재실행 중복 방지 (#75)`)을 생성. 검토한 본문에 최종 verify.ps1 399건·FE 67건·지정 MongoDB 생성기 21건 결과와 공유 테스트 DB 병렬 검증 500 재현·별도 방지 PR 계획을 명시. DB·FE 후속이 남아 Refs #75·#19로 연결하고 자동 종료하지 않음. 코드 변경 없이 기존 검증 결과를 사용했으며 이 등록 기록만 추가함.
+
+- 11-06 · B · 사용자 요청으로 #75 생성기 구현·테스트·기준 문서 변경을 `feat/B-F-62-generator`의 로컬 커밋 대상으로 정리하고 develop 대상 PR 제목·본문을 준비. 최종 verify.ps1 399건·FE 67건 및 실제 MongoDB 생성기 21건 검증 결과를 사용하며, 이번 커밋 준비에서는 코드 변경·테스트 재실행 없음. 공유 테스트 DB 병렬 실행의 1213→1305→500 방지 코드는 별도 후속 PR로 분리한다. #75는 DB 집계·CSV·공간 보충·api1 운영 적재/FE 결과 확인이 남아 자동 종료하지 않는다. 푸시·PR 생성은 하지 않음.
+
+- 11-06 · B · 사용자 요청으로 회원 재가입 500 원인 진단. 제품 코드 변경 없이 임시 진단 훅으로 단독 40회·원래 순서 포함 261건 통과를 확인하고, 같은 로컬 spacecube_test를 두 프로세스가 공유하는 병렬 실행에서 두 차례 동일 테스트의 재가입 500을 재현. DBAPI 원인 1213(교착상태) 뒤 SQLAlchemy SAVEPOINT 롤백 1305가 이어지는 예외 체인과 InnoDB의 users.uq_users_email 상호 잠금 대기를 확인. fixture는 테스트 전체 외부 트랜잭션+요청별 create_savepoint라 서비스 commit이 실제 잠금을 해제하지 않으며, deadlock의 전체 롤백 뒤 savepoint가 사라진다. #76 코드와 호출 경로는 다르지만 검증이 동일 DB에서 겹치면 간접 영향 가능. 최초 실패 예외는 미보존이므로 최초 건도 같은 원인이었다는 것은 추정. 당장은 공유 DB 검증을 순차 실행하고, 테스트 공용 잠금 또는 DB 분리는 A/공동 후속으로 권고. 진단 보고서 logs/signup-root-cause.json, 잠금 요약 logs/innodb-signup-deadlock.json. 이 병렬 재현은 의도한 진단 실패이며 기존 최종 verify.ps1 통과 기록과 구분한다.
+
+- 11-06 · B · #75 커밋 전 verify.ps1 최종 재검사 전체 통과: pytest 399건, FE 단위 67건·린트·빌드, Ruff 104파일. 첫 통합 실행에서 기존 회원 탈퇴 후 같은 이메일 재가입이 500으로 한 번 실패했으나 단독 1건·회원 묶음 15건·전체 399건 재실행은 모두 통과. 제품 회원 코드는 수정하지 않았으며, 이후 공유 테스트 DB 병렬 실행에서 같은 재가입 500과 1213→1305 예외 체인을 재현함(최초 실패와의 동일성은 추정). MongoDB 실저장 검증은 전용 컬렉션의 10,089건·재개 추가 0건 보고서를 유지. 브랜치만 생성했고 커밋·푸시는 하지 않음.
+
+- 11-06 · B · #75 PM 결정대로 `feat/B-F-62-generator`에 생성기 CLI·세션 계획·A/B 서비스 연결·시각/관측 컨텍스트·manifest/state·MongoDB 적재/중복 대조를 구현. B 예약 복구 조회와 실행 소유 가상 예약 한 건 완료 처리를 추가하고 기존 API·DDL은 유지. 기본 100명 파일럿을 포함한 생성기 21건 통과. 최종 verify.ps1 전체 통과(pytest 399건·FE 67건·Ruff·린트·빌드). 사용자 지정 MongoDB의 전용 테스트 컬렉션에서 공식 validator·TTL·UNIQUE 적용 후 이벤트 10,089건 저장, 동일 실행 재개 0건 추가·잘못된 문서 121 거절 확인. MariaDB는 spacecube_test 외부 트랜잭션 롤백, 원격 검증 결과는 DB 확인용으로 보존. 보고서는 logs/generator-validation-2fb310d4-928e-5e7a-8cbf-577df43591a9/report.json. api1 운영 적재·집계·CSV·FE 그래프는 별도이며 커밋·푸시는 아직 하지 않음.
+
+- 11-06 · B · 사용자 요청으로 #5 B 수정 브랜치 `fix/B-issue5-reservation-events`의 원격 푸시·develop 대상 PR 등록 진행. 준비한 제목·본문과 기존 검증 결과를 사용하고 `Refs #5`로 연결해 전체 이슈는 자동 종료하지 않음. 생성기 작업 트리는 그대로 유지.
+
+- 11-06 · B · 사용자 요청으로 #5 B 수정 4파일을 `fix/B-issue5-reservation-events`에서 커밋하고 develop 대상 PR 제목·본문 초안 준비. 검증 결과는 위 수정의 최종 실행 기록을 사용하며 이번 커밋 준비에서는 코드 변경·테스트 재실행 없음. #5는 FE·DB 후속이 남아 PR에서 `Refs #5`로 연결하고 자동 종료하지 않음. 생성기 미커밋 작업은 포함하지 않으며 푸시·PR 생성은 하지 않음.
+
+- 11-06 · B · #5 최종 검증: `verify.ps1`을 pro_1 실행기로 실행해 Ruff 93파일·로컬 MariaDB `spacecube_test` pytest 381건·FE 단위 67건·린트·빌드 모두 통과. 최종 예외 주입·문맥 복원 3건도 별도 통과. 실제 Uvicorn/JWT/Postman 7요청/15검증 및 임시 데이터 정리 통과. 기존 Starlette·FE 린트 경고 각 1건. MongoDB 실저장·배포·브라우저 E2E는 미실행. 커밋·푸시·PR은 하지 않음.
+
+- 11-06 · B · #5 최신 PM 결정(issuecomment-6683005424)에 따라 `_log_reservation_event()` 전체에 예외 경계를 적용하고 기존 문맥 복원 유지. 수정 전 model_dump·log_event 예외 주입에서 500 재현, 수정 후 로컬 MariaDB `spacecube_test`에서 201·예약/칸/결제 저장·성공 카운터 회귀 2건 및 문맥 복원 1건 통과. 예약·동시성 65건, Ruff, 실제 Uvicorn/JWT/Postman 7요청/15검증·임시 데이터 정리 통과. 최신 develop `f387df2`의 별도 작업 트리 `.worktrees/fix-B-issue5-reservation-events`에서만 수정하며 `feat/B-F-62-generator` 미커밋 작업은 포함하지 않음. #5 전체 종료는 FE·DB 후속 통합 후 담당자가 판단.
 
 - 11-07 · DB · 사용자 재요청으로 로컬에 보존한 F-61 크롤러 코드·문서·테스트와 실행 환경 기록을 같은 기능 브랜치에 다시 커밋·푸시. 크롤러 오프라인 pytest 17건, Ruff 린트·포맷, 프론트 verify 통과; 전체 `verify.ps1`은 `CHECK_DB_URL` 미설정으로 pytest 실패. 실제 외부 수집·`venues` 등록은 미검증이고 이슈 #10은 진행 상태로 유지.
 
@@ -215,6 +300,8 @@ A1~A4는 11-03에 확정했고, **A5~A8은 추후 확정**으로 미뤘다(11-03
 - 11-06 · A · #5·#48·#60 및 PR #58·#59 최신 결정을 반영해 F-60 실행 코드의 대상과 문서 구조를 `space_rental_analytics.events`로 전환. FE 12종·서버 3종, 필수 문맥, 상품 스냅샷, URL query/fragment 제거, 제한된 properties, 파일 우선·새 형식 로그 재적재를 구현. 기존 7개 `log_event` 인자는 보존하고 `products` 키워드 선택 인자만 추가. 공통 계약·이벤트 pytest 21건, Ruff 92파일, FE 단위 56건·린트·빌드 통과. 전체 verify는 로컬 `spacecube_test` 계정 인증 1045로 DB 테스트가 막혀 실패(4 failed, 59 passed, 299 errors); 로컬 Mongo 미기동으로 새 validator 실제 저장 미검증. B 구형 호출/상품값·FE PR #59 남은 작업·DB validator가 연결되기 전까지 F-60 완료 아님. stash·DB/FE/B 구현 파일과 기존 미추적 임시 항목 보존.
 
 - 11-06 · A · PR #58 새 `events` 명세와 #5·#48 합의를 대조. 기존 이벤트 payload는 형식 확인된 코드·날짜·정수만 남기고 자유 문자열을 제외하며, `events.log` 실패 문서를 MongoDB 대기열에도 보내지 않도록 보강. 신규 `test_events.py`에서 개인정보·혼합 이벤트·파일 실패를 검증. `verify.ps1` 통과: Ruff 91파일, pytest 357건, FE 단위 56건·린트·빌드. Starlette·기존 FE lint 경고 각 1건. 필수 화면 문맥을 B 서버 이벤트에서 채우는 정책 미정으로 새 MongoDB 전환·실저장·재적재는 보류. stash·DB/FE/B 코드는 변경하지 않음.
+- 11-06 · B · #54 정문 HAProxy 설정 초안: 별도 `chore/B-haproxy-conf` 브랜치에 gw:80 라운드로빈·/api/health 2초 능동 확인·내부 경로 차단·8404 지표/통계 설정과 README 작성. 실제 VM 검증·PM 안 비교 후 채택 대기.
+
 - 11-06 · FE · 사용자가 승인한 CCL 참고 사진 25장을 더해 5개 유형별 8장, 총 40장을 맞춤. 모두 1200×780 WebP(약 34~167KB, 합계 3.29MB). `RoomArt.vue`가 정적 `/photos/...` 경로에서 유형별 사진을 venue ID 해시로 고르고, 상세 갤러리는 슬롯 번호로 별도 선택. 사진 로드 실패 시 일러스트로 대체한다. 실제 등록 공간 사진이 아님을 이미지와 푸터에 표시하고, 40개 출처·저작자·라이선스·편집 기록을 파일 원장과 사용자용 크레딧 페이지에 연결. 기존 `art:` API·DB 계약 변경 없음. `npm run verify`: 린트 오류 0(기존 경고 1), 단위 62건, 빌드 통과. E2E는 74개 결과가 모두 출력(성공 67, 조건부 건너뜀 7)됐으나 CLI가 결과 요약 없이 70초간 종료되지 않아 중단, 전체 명령 통과로 집계하지 않음. Playwright 브라우저에서 상세 사진·배지·푸터 링크와 크레딧의 40개 이미지(전부 1200×780), 출처 링크 40·라이선스 링크 40 확인.
 
 - 11-06 · FE · 사용자 요청으로 Wikimedia Commons CCL 사진 후보를 유형별 3장씩 15장 수집, 파일별 라이선스·저작자·원본·변경 내역을 `frontend/public/photos/SOURCES.md`에 기록. README의 크기 기준에 맞춰 1200×780 WebP로 통일하고 얼굴·상호·간판·화이트보드 글씨를 검토, 카페 2장·강의실 1장·파티룸 1장의 식별 글자를 생성형 편집으로 제거. [후보 미리보기](docs/사진_후보_미리보기_2026-11-06.jpg) 추가. 기존 `art:` UI·API는 그대로이며 실제 공간 사진으로 연결하지 않음. 이미지 크기 15장 확인, 프론트 테스트는 실행하지 않음
