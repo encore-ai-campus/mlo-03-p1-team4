@@ -31,7 +31,7 @@ test('가입 필수 동의와 만 14세 검증 뒤 가입하고 로그인한다'
   await expect(submit).toBeDisabled()
   await form.getByLabel('[필수] 개인정보 수집·이용', { exact: true }).check()
   await expect(submit).toBeEnabled()
-  await form.getByRole('button', { name: '시연용 이용약관 전문 보기' }).click()
+  await form.getByRole('button', { name: '이용약관 전문 보기' }).click()
   await expect(form.getByText(/실제 결제나 공간 이용 계약은 발생하지 않습니다/)).toBeVisible()
   await submit.click()
   await expect(form.getByText('만 14세 이상부터 가입할 수 있어요.', { exact: true })).toBeVisible()
