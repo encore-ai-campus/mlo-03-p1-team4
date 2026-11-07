@@ -1,0 +1,39 @@
+prometheus.remote_write "mon" {
+  external_labels = { vm = "api2" }
+  endpoint { url = "http://mon:9090/api/v1/write" }
+}
+loki.write "mon" {
+  endpoint { url = "http://mon:3100/loki/api/v1/push" }
+}
+prometheus.exporter.unix "host" {}
+prometheus.scrape "node" {
+  targets = prometheus.exporter.unix.host.targets
+  job_name = "node"
+  forward_to = [prometheus.remote_write.mon.receiver]
+}
+loki.source.journal "system" {
+  labels = { vm = "api2", source = "journal" }
+  forward_to = [loki.write.mon.receiver]
+}
+prometheus.scrape "fastapi" {
+  targets = [{ "__address__" = "127.0.0.1:8000", "instance" = "api2", "vm" = "api2" }]
+  job_name = "fastapi"
+  forward_to = [prometheus.remote_write.mon.receiver]
+}
+prometheus.scrape "nginx" {
+  targets = [{ "__address__" = "127.0.0.1:9113", "instance" = "api2", "vm" = "api2" }]
+  job_name = "nginx"
+  forward_to = [prometheus.remote_write.mon.receiver]
+}
+loki.source.file "app" {
+  targets = [{ "__path__" = "/var/log/spacecube/app.log", "vm" = "api2", "source" = "app" }]
+  forward_to = [loki.write.mon.receiver]
+}
+loki.source.file "events" {
+  targets = [{ "__path__" = "/var/log/spacecube/events.log", "vm" = "api2", "source" = "events" }]
+  forward_to = [loki.write.mon.receiver]
+}
+loki.source.file "nginx_access" {
+  targets = [{ "__path__" = "/var/log/nginx/access.log", "vm" = "api2", "source" = "nginx_access" }]
+  forward_to = [loki.write.mon.receiver]
+}

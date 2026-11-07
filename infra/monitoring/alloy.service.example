@@ -1,0 +1,6 @@
+# 각 VM: apt 패키지의 alloy.service 는 그대로 사용한다.
+# systemctl cat alloy 로 확인 후 사용자/그룹 보완이 필요할 때만 override한다.
+# 설정 경로와 추가 인자는 /etc/default/alloy 의 CONFIG_FILE, CUSTOM_ARGS로 지정한다.
+[Service]
+User=alloy
+Group=alloy

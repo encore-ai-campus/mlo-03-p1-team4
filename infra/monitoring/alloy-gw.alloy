@@ -1,0 +1,22 @@
+prometheus.remote_write "mon" {
+  external_labels = { vm = "gw" }
+  endpoint { url = "http://mon:9090/api/v1/write" }
+}
+loki.write "mon" {
+  endpoint { url = "http://mon:3100/loki/api/v1/push" }
+}
+prometheus.exporter.unix "host" {}
+prometheus.scrape "node" {
+  targets = prometheus.exporter.unix.host.targets
+  job_name = "node"
+  forward_to = [prometheus.remote_write.mon.receiver]
+}
+loki.source.journal "system" {
+  labels = { vm = "gw", source = "journal" }
+  forward_to = [loki.write.mon.receiver]
+}
+prometheus.scrape "haproxy" {
+  targets = [{ "__address__" = "127.0.0.1:8404", "instance" = "gw", "vm" = "gw" }]
+  job_name = "haproxy"
+  forward_to = [prometheus.remote_write.mon.receiver]
+}
