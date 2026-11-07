@@ -11,6 +11,26 @@ from app.schemas.venues import VenueRegionRead
 type ReservationStatus = Literal["confirmed", "completed", "cancelled"]
 
 
+class ReservationEventContext(BaseModel):
+    """선택적 브라우저 문맥. 상품·인증 정보는 서버가 별도로 구성한다."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    user: dict | None = None
+    site: dict | None = None
+    acquisition: dict | None = None
+    page: dict | None = None
+    navigation: dict | None = None
+
+
+class ReservationCancel(BaseModel):
+    """본문 없는 기존 취소 요청도 유지한다."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    event_context: ReservationEventContext | None = None
+
+
 class ReservationCreate(BaseModel):
     """결제 버튼 한 번에 예약할 공간과 이용 조건을 받는다."""
 
@@ -23,6 +43,7 @@ class ReservationCreate(BaseModel):
     headcount: Annotated[StrictInt, Field(ge=1)]
     # 잘못된 수단은 공통 VALIDATION 대신 명세의 INVALID_METHOD로 반환한다.
     method: str
+    event_context: ReservationEventContext | None = None
 
 
 class PaymentRead(BaseModel):

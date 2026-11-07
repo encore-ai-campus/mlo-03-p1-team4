@@ -5,11 +5,11 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Body, Depends, Request
 
 from app.core.deps import CurrentUser, get_optional_user
 from app.core.synthetic import is_synthetic_request
-from app.schemas.events import EventBatchCreate, EventBatchRead
+from app.schemas.events import EVENT_BATCH_EXAMPLES, EventBatchCreate, EventBatchRead
 from app.services import event_service
 
 router = APIRouter()
@@ -17,7 +17,10 @@ router = APIRouter()
 
 @router.post("", status_code=202)
 def events(
-    body: EventBatchCreate,
+    body: Annotated[
+        EventBatchCreate,
+        Body(openapi_examples=EVENT_BATCH_EXAMPLES),
+    ],
     request: Request,
     user: Annotated[CurrentUser | None, Depends(get_optional_user)],
 ) -> EventBatchRead:

@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     db_write_url: SecretStr | None = None
     db_read_url: SecretStr | None = None
     mongo_url: SecretStr | None = None
-    mongo_db: str = "spacecube"
+    mongo_db: str = "space_rental_analytics"
     jwt_secret: SecretStr | None = None
     jwt_expire_minutes: int = Field(default=60, ge=1)
     internal_api_key: SecretStr | None = None
@@ -36,6 +36,12 @@ class Settings(BaseSettings):
     booking_past_days: int = Field(default=365, ge=0)
     booking_future_days: int = Field(default=365, ge=0)
     today_override: str | None = None
+
+    @field_validator("mongo_db")
+    @classmethod
+    def migrate_legacy_mongo_db(cls, value: str) -> str:
+        # 기존 개발 .env의 MONGO_DB=spacecube가 새 컬렉션으로 잘못 쓰이지 않게 한다.
+        return "space_rental_analytics" if value == "spacecube" else value
 
     @field_validator("db_write_url", "db_read_url")
     @classmethod

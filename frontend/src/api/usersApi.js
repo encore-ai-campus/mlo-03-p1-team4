@@ -1,6 +1,7 @@
 import { USE_MOCK, mockDelay, request } from './client';
 import { currentUser, fail, reservationItem, reservations, stamp } from './mock/db';
 import { validation } from './authApi';
+import { uuid } from '@/utils/uuid';
 const publicUser = u => ({
   user_id: u.user_id, email: u.email, name: u.name, phone: u.phone, birth: u.birth, gender_digit: u.gender_digit, marketing_agreed: u.marketing_agreed
 });
@@ -52,7 +53,7 @@ export async function withdraw(token) {
       count
     });
   Object.assign(u, {
-    deleted: true, deleted_at: stamp(), name: '탈퇴회원', phone: null, birth: '000000', email: `deleted+${u.user_id}@invalid`, password: crypto.randomUUID(), marketing_agreed: false
+    deleted: true, deleted_at: stamp(), name: '탈퇴회원', phone: null, birth: '000000', email: `deleted+${u.user_id}@invalid`, password: uuid(), marketing_agreed: false
   });
   return mockDelay(null);
 }

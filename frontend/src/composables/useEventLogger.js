@@ -1,5 +1,6 @@
 import { getSessionId, request, USE_MOCK } from '@/api/client';
 import { useAuthStore } from '@/stores/auth';
+import { uuid } from '@/utils/uuid';
 
 // 사용자 행동 이벤트. 구조는 docs/db/events_event_daily_컬렉션_속성정리_v1.md(11-06 PM 채택, 대응표는 PR #58 코멘트).
 // 서버가 확인하는 reservation_complete·reservation_conflict·reservation_cancel_complete는 B가 보내고, 여기서는 보내지 않는다.
@@ -39,7 +40,7 @@ function pageContext() {
   const { origin, pathname } = window.location;
   if (!current || current.path !== pathname) {
     previous = current;
-    current = { page_view_id: crypto.randomUUID(), site_id: 'main', url: origin + pathname, path: pathname };
+    current = { page_view_id: uuid(), site_id: 'main', url: origin + pathname, path: pathname };
     const ref = document.referrer && bare(document.referrer);
     navigationType = previous ? 'internal' : ref && !ref.startsWith(origin) ? 'external' : 'direct';
   }
@@ -60,11 +61,11 @@ export function buildEvent(event_name, payload = {}) {
     utm_source: params.get('utm_source'), utm_medium: params.get('utm_medium'), utm_campaign: params.get('utm_campaign'),
   }));
   return {
-    event_id: crypto.randomUUID(),
+    event_id: uuid(),
     schema_version: 1,
     event_name,
     occurred_at: new Date().toISOString(),
-    user: { anonymous_id: stored(localStorage, ANON_KEY, () => crypto.randomUUID()), session_id: getSessionId(), session_sequence: ++sequence },
+    user: { anonymous_id: stored(localStorage, ANON_KEY, () => uuid()), session_id: getSessionId(), session_sequence: ++sequence },
     site: { site_id: 'main', hostname: window.location.hostname, platform: window.matchMedia?.('(max-width: 767px)').matches ? 'mobile_web' : 'desktop_web' },
     acquisition,
     page,
@@ -104,7 +105,13 @@ export function useEventLogger() {
     log(event_name, payload = {}) {
       if (!FRONTEND_EVENTS.includes(event_name))
         return;
-      queue.push(buildEvent(event_name, payload));
+      // 기록 실패가 화면 흐름(날짜·시간 칸 불러오기 등)을 막지 않게 한다.
+      try {
+        queue.push(buildEvent(event_name, payload));
+      }
+      catch {
+        return;
+      }
       if (queue.length >= 20)
         void flush();
     }, flush

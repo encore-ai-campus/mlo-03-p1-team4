@@ -8,6 +8,8 @@
 
 HAProxy가 서버 선택과 `/api/health` 확인을 담당한다. 각 VM의 Nginx는 Vue 파일 제공과 로컬 FastAPI 전달만 맡으며, api1·api2를 upstream으로 두거나 다른 VM으로 재시도하지 않는다.
 
+로컬 `spacecube_local_api` upstream은 `127.0.0.1:8000` 하나만 사용한다. `keepalive 16`으로 워커당 유휴 연결을 최대 16개 재사용하고, HTTP/1.1과 빈 `Connection` 헤더를 함께 설정한다. `keepalive_timeout 4s`는 Uvicorn 기본 유휴 만료 5초보다 짧다. 실제 Uvicorn 설정이 더 짧으면 Nginx 쪽도 맞춰야 한다. 이 풀 크기는 활성 연결 수 제한이 아니다. 근거: [Nginx upstream keepalive](https://nginx.org/en/docs/http/ngx_http_upstream_module.html#keepalive).
+
 ## 설치 위치와 기본 사이트
 
 로컬 VM 기준은 Ubuntu Server 24.04와 apt 설치다. Nginx 패키지 설정이 `/etc/nginx/conf.d/*.conf`를 `http` 블록 안에서 불러오므로, 이 파일을 두 서버에 같은 경로로 복사한다.
@@ -34,7 +36,7 @@ sudo install -d -o root -g root -m 0755 /var/www/frontend
 sudo cp -a /tmp/spacecube-dist/. /var/www/frontend/
 ```
 
-`/tmp/spacecube-dist/`는 각 VM으로 전송한 `frontend/dist/` 내용의 임시 위치다. 해시가 붙은 `/assets/` 파일은 1년 캐시하고, `/index.html`은 재검증하도록 `no-cache`를 보낸다. `/photos/`는 실제 파일만 응답하고 없는 파일을 Vue 화면으로 넘기지 않는다. `.webp`는 7일 캐시한다. 시스템 `/etc/nginx/mime.types`에 `image/webp` 매핑이 있는지도 확인한다.
+`/tmp/spacecube-dist/`는 각 VM으로 전송한 `frontend/dist/` 내용의 임시 위치다. 해시가 붙은 `/assets/` 파일은 1년 캐시하고, `/index.html`은 재검증하도록 `no-cache`를 보낸다. `/photos/`는 실제 파일만 응답하고 없는 파일을 Vue 화면으로 넘기지 않는다. `.webp`는 7일 캐시하며 해당 location에 `image/webp` MIME을 명시한다. 사진 안내 문서는 기본 캐시 정책을 따른다. `/assets/`의 `expires`와 `add_header`는 각각 Cache-Control 필드를 보낼 수 있으므로 두 필드를 합쳐 판정한다. 근거: [Nginx 응답 헤더](https://nginx.org/en/docs/http/ngx_http_headers_module.html#expires).
 
 ## 경로와 접근 경계
 
@@ -69,7 +71,42 @@ sudo nginx -t
 
 문법 검사 통과 후 실제 적용은 VM 소유자가 한다. 이번 작업에서는 서버 적용이나 reload를 하지 않았다.
 
-## 이번 후보안 검증 기록
+## PR #67 적용 후 확인
+
+각 VM 소유자가 설정·빌드를 배치하고 `sudo nginx -t` 통과 후 reload한다. 다음 검사는 **api1·api2 각각**에서 수행하고 응답 헤더와 검사 시각을 남긴다. 파일명은 배포된 빌드에 존재하는 경로를 골라 사용한다.
+
+```bash
+# 각 VM 안에서 실행한다. 접근 로그에 검색어나 인증정보를 넣지 않는다.
+asset=$(find /var/www/frontend/assets -maxdepth 1 -type f -name '*.js' -printf '%f\n' | head -n 1)
+photo=$(find /var/www/frontend/photos -type f -name '*.webp' -printf '%P\n' | head -n 1)
+test -n "$asset" && curl -sSI "http://127.0.0.1/assets/$asset"
+test -n "$photo" && curl -sSI "http://127.0.0.1/photos/$photo"
+curl -sSI http://127.0.0.1/index.html
+curl -sS -o /dev/null -w '%{http_code}\n' http://127.0.0.1/photos/not-present.webp
+curl -sS -o /dev/null -w '%{http_code}\n' http://127.0.0.1/assets/not-present.js
+curl -sS -o /dev/null -w '%{http_code}\n' http://127.0.0.1/api/health
+curl -sS -o /dev/null -w '%{http_code}\n' http://127.0.0.1/api/internal/venues
+curl -sS -o /dev/null -w '%{http_code}\n' http://127.0.0.1/api/metrics
+curl -sS http://127.0.0.1:8080/stub_status
+```
+
+| 항목 | 기대 결과 |
+| --- | --- |
+| `/assets/<파일>.js` | 200, Cache-Control에 `max-age=31536000`·`public`·`immutable` |
+| `/photos/<파일>.webp` | 200, `Content-Type: image/webp`, `max-age=604800` |
+| `/index.html` | 200, `Cache-Control: no-cache` |
+| 없는 사진·asset | 404, SPA HTML이나 장기 캐시 헤더 없음 |
+| `/api/health` | 200, FastAPI `/health` 응답 |
+| 내부 API·metrics | 404 |
+| loopback `stub_status` | 200, Nginx 상태 본문 |
+
+keepalive는 `sudo nginx -T`로 풀·HTTP 버전·Connection 헤더 설정을 확인한 뒤, 다른 트래픽을 배제한 상태에서 `/api/health`를 연속 호출하고 `ss -ntp`의 로컬 8000 연결이 재사용되는지 확인한다. `nginx -t` 통과만으로 실제 연결 재사용을 검증했다고 기록하지 않는다.
+
+정문 검증은 #66 담당자·각 VM 소유자와 함께 진행한다. `gw`에서 두 서버 정상 응답과 내부 API 차단을 확인한 뒤 api2 중단·복구 시 HAProxy 제외(4초 이내)·재편입을 확인한다. 노트북 종료·오류율·중복 예약 시험은 #54 완료 조건과 A7(#16)에 따른다. 두 서버 적용과 장애 시험이 끝나기 전에는 PR #67을 Draft로 유지한다.
+
+## 이전 후보안 검증 기록 (d715a6a)
+
+아래 결과는 keepalive 풀·WebP MIME 보완 전 설정의 기록이다. 현재 수정본의 `nginx -t`·HTTP 검증 결과로 대신하지 않는다.
 
 - `git diff --check`: 추적 중인 수정 파일 통과.
 - 정적 확인: 새 `spacecube.conf`를 포함한 수정 파일에 끝 공백이 없고, 필수 경로·접근 경계·loopback 전달·로그 필드가 맞는지 확인해 통과.
@@ -77,3 +114,11 @@ sudo nginx -t
 - HTTP 요청, `api1`·`api2` 실제 파일 배포, HAProxy 연동: 미검증.
 
 - 커밋 전 전체 검증: Ruff 린트·90파일 포맷·pytest 362건 통과(경고 1). 프론트 verify는 이 워크트리의 의존성 미설치로 run-s를 찾지 못해 실패해 전체 verify.ps1은 exit 1. 프론트 코드 변경 없음.
+
+## PR #67 후속 수정 로컬 검증 (2026-11-07)
+
+- develop 1583778 통합 및 STATE 충돌 해결.
+- verify.ps1 전체 통과(exit 0): Ruff 린트·115파일 포맷, pytest 451건, FE 단위 67건·린트·색 검사·빌드. 기존 Starlette 사용 중단 경고와 FE 조건문 린트 경고 각 1건.
+- git diff --check 통과.
+- Windows에 Nginx 실행 환경이 없어 수정본 nginx -t·HTTP 캐시/MIME/keepalive 검증은 미실행. api1·api2 실적용·HAProxy 장애 시험·브라우저 E2E도 미실행.
+- 실제 SSH 접속 정보와 각 VM 소유자의 적용 가능 여부를 확인한 뒤 위 절차로 검증하고 Ready로 전환한다.
