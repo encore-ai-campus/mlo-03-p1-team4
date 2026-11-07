@@ -61,13 +61,24 @@ test('지난 시간 결제는 이용 완료로 저장하고 후기 입구를 보
   await expect(page.getByRole('link', { name: '바로 후기 쓰기' })).toHaveAttribute('href', /\/me\?tab=completed/)
 })
 
-test('최소 이용시간보다 짧은 선택은 결제로 갈 수 없다', async ({ page }) => {
+test('최소 이용시간 공간은 한 번에 최소 칸을 잡고, 그보다 짧게 줄이면 막고 안내한다', async ({ page }) => {
+  // 11-07 팀 피드백: 최소 2시간 공간(venue 2)은 첫 칸을 누르면 2칸이 함께 잡힌다.
   await loginFirst(page, '/venues/2')
-  const hours = await pickTwoFreeSlots(page)
-  expect(hours).not.toBeNull()
-  await slot(page, hours[1]).click()
-  await expect(page.getByRole('button', { name: '예약 신청하기' })).toBeDisabled()
-  await expect(page.getByText(/최소 2시간부터 예약할 수 있어요/)).toBeVisible()
+  const card = page.locator('#booking')
+  const free = card.getByRole('button', { name: /^\d{2}:00부터 1시간$/ })
+  await expect(free.first()).toBeVisible()
+  const labels = await free.evaluateAll((els) => els.map((el) => el.getAttribute('aria-label')))
+  const hours = labels.map((t) => Number(t.slice(0, 2)))
+  const h = hours.find((x) => hours.includes(x + 1))
+  expect(h).toBeDefined()
+  await slot(page, h).click()
+  await expect(slot(page, h)).toHaveAttribute('aria-pressed', 'true')
+  await expect(slot(page, h + 1)).toHaveAttribute('aria-pressed', 'true')
+  // 끝 칸을 빼면 1시간이 되므로 빠지지 않고 안내한다
+  await slot(page, h + 1).click()
+  await expect(page.getByText('이 공간은 최소 이용시간이 2시간이라 2시간 미만은 예약할 수 없어요')).toBeVisible()
+  await expect(slot(page, h + 1)).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.getByRole('button', { name: '예약 신청하기' })).toBeEnabled()
 })
 
 

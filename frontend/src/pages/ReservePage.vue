@@ -64,8 +64,9 @@ async function pay() {
   if (paying.value || !validSelection.value) return
   if (!form.agree) { errors.agree = '이용 규칙과 환불 규정에 동의해야 결제할 수 있어요.'; return }
   paying.value = true
-  log('reservation_start', { venue_id: venue.value.venue_id, date: date.value, start_hour: selected.value[0], hours: selected.value.length })
   try {
+    // 기록 실패가 결제 요청·로딩 해제를 막지 않게 try 안에서 따로 감싼다(http 배포 주소의 randomUUID 없음 사례).
+    try { log('reservation_start', { venue_id: venue.value.venue_id, date: date.value, start_hour: selected.value[0], hours: selected.value.length }) } catch { /* 관측 오류 무시 */ }
     result.value = await createReservation({ venue_id: venue.value.venue_id, date: date.value, start_hour: selected.value[0], hours: selected.value.length, headcount: Number(people.value), method: form.method }, token.value)
     toast.success('모의 결제를 마쳤어요.')
     window.scrollTo({ top: 0 })
@@ -116,7 +117,7 @@ async function pay() {
               <p class="num">{{ dateLabel(date) }} · 최소 {{ venue.min_hours }}시간, 최대 4시간</p>
               <p v-if="conflict" role="alert">{{ conflict }}</p>
               <RouterLink v-if="mine" to="/me">내 예약 확인하기</RouterLink>
-              <SlotGrid :model-value="selected" :slots="slots" :columns="5" label="결제할 시간 칸" @update:model-value="updateSelection" />
+              <SlotGrid :model-value="selected" :slots="slots" :columns="5" :min="venue.min_hours" label="결제할 시간 칸" @update:model-value="updateSelection" />
               <p v-if="!validSelection" class="err">최소 {{ venue.min_hours }}시간의 빈 칸을 이어서 골라 주세요.</p>
               <UiSelect v-model="people" label="인원" :options="peopleOptions" />
               <p v-if="isPast" class="note">지난 시간이에요. 결제하면 이용 완료로 저장되어 바로 후기를 쓸 수 있어요.</p>

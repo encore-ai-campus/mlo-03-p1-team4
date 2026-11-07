@@ -134,7 +134,7 @@ const summary = computed(() => {
   if (!selectedRoom.value || !sel.value.hours.length) return null
   const n = sel.value.hours.length
   const short = checkingSelection.value || n < minHours.value
-  return { room: selectedRoom.value, time: rangeLabel(sel.value.hours), n, total: won(selectedRoom.value.price_per_hour * n), short }
+  return { room: selectedRoom.value, time: rangeLabel(sel.value.hours), n, total: won(selectedRoom.value.price_per_hour * n), short, checking: checkingSelection.value }
 })
 
 function selectionFor(venueId) {
@@ -214,6 +214,7 @@ function resetFilters() {
           <div class="result__slots">
             <SlotGrid
               :slots="r.slots"
+              :min="r.min_hours ?? 1"
               :model-value="selectionFor(r.venue_id)"
               :label="`${r.name} 시간 칸`"
               @update:model-value="(h) => setSelection(r.venue_id, h)"
@@ -243,7 +244,8 @@ function resetFilters() {
         <p class="sumbar__text">
           <strong>{{ summary.room.name }}</strong>
           <span class="num">{{ dateLabel(date) }} · {{ summary.time }} ({{ summary.n }}시간)</span>
-          <span v-if="summary.short" class="sumbar__warn">이 공간은 최소 {{ minHours }}시간부터 예약할 수 있어요</span>
+          <span v-if="summary.checking" class="sumbar__warn">최소 이용시간 확인 중</span>
+          <span v-else-if="summary.short" class="sumbar__warn">이 공간은 최소 {{ minHours }}시간부터 예약할 수 있어요</span>
           <strong v-else class="sumbar__total num">{{ summary.total }}</strong>
         </p>
         <BaseButton size="lg" :loading="booking" :disabled="summary.short" @click="submit">예약 신청하기</BaseButton>

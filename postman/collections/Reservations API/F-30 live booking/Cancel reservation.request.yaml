@@ -5,6 +5,8 @@ order: 5000
 url: '{{base_url}}/reservations/{{reservation_id}}/cancel'
 method: POST
 headers:
+  - key: X-Session-Id
+    value: '{{session_id}}'
   - key: Accept
     value: application/json
 auth:

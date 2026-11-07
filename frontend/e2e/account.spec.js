@@ -31,7 +31,7 @@ test('가입 필수 동의와 만 14세 검증 뒤 가입하고 로그인한다'
   await expect(submit).toBeDisabled()
   await form.getByLabel('[필수] 개인정보 수집·이용', { exact: true }).check()
   await expect(submit).toBeEnabled()
-  await form.getByRole('button', { name: '시연용 이용약관 전문 보기' }).click()
+  await form.getByRole('button', { name: '이용약관 전문 보기' }).click()
   await expect(form.getByText(/실제 결제나 공간 이용 계약은 발생하지 않습니다/)).toBeVisible()
   await submit.click()
   await expect(form.getByText('만 14세 이상부터 가입할 수 있어요.', { exact: true })).toBeVisible()
@@ -58,6 +58,8 @@ test('헤더 사용자 메뉴에서 로그아웃하면 홈으로 가고 회원 �
 
 test('내 예약 내역의 내 메뉴에서도 로그아웃할 수 있다', async ({ page }) => {
   await loginFirst(page, '/me')
+  // 화면 전환(페이드)이 끝나 내 예약 화면이 그려진 뒤에 넓은 화면/좁은 화면 메뉴를 판단한다
+  await expect(page.getByRole('heading', { level: 1, name: '예약 내역' })).toBeVisible()
   const button = page.getByRole('button', { name: '로그아웃', exact: true })
   if (!(await button.first().isVisible())) await page.getByRole('button', { name: '내 메뉴', exact: true }).click()
   await page.getByRole('button', { name: '로그아웃', exact: true }).filter({ visible: true }).first().click()

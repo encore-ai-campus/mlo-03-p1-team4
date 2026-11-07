@@ -1,6 +1,7 @@
 import { USE_MOCK, mockDelay, request } from './client';
 import { users, tokens, fail } from './mock/db';
 import { todayISO } from '@/utils/date';
+import { uuid } from '@/utils/uuid';
 export function validation(fields) {
   if (fields.length)
     fail('VALIDATION', 400, '입력한 내용을 다시 확인해 주세요.', {
@@ -15,7 +16,7 @@ export function validateSignup(b) {
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(b.email ?? '') || b.email.length > 100)
     bad('email', '이메일 형식을 확인해 주세요.');
   if (typeof b.password !== 'string' || b.password.length < 8 || new TextEncoder().encode(b.password).length > 72)
-    bad('password', '8자 이상, 72바이트 이하로 입력해 주세요.');
+    bad('password', '8자 이상으로 입력해 주세요. 너무 길면(영문 72자·한글 24자 초과) 쓸 수 없어요.');
   if (!b.name?.trim())
     bad('name', '이름을 입력해 주세요.');
   if (!/^01\d-?\d{3,4}-?\d{4}$/.test(b.phone ?? ''))
@@ -75,7 +76,7 @@ export async function login(body) {
   const u = users.find(u => !u.deleted && u.email === body.email);
   if (!u || typeof body.password !== 'string' || body.password.length < 8 || (u.password !== null && u.password !== body.password))
     fail('INVALID_CREDENTIALS', 401, '이메일 또는 비밀번호가 맞지 않아요.');
-  const access_token = `mock-${crypto.randomUUID()}`;
+  const access_token = `mock-${uuid()}`;
   tokens.set(access_token, {
     user_id: u.user_id, expires: Date.now() + 3600000
   });

@@ -139,7 +139,8 @@ def main() -> None:
             env.update(
                 DB_WRITE_URL=os.environ["CHECK_DB_URL"],
                 DB_READ_URL=os.environ["CHECK_DB_URL"],
-                MONGO_URL="",
+                MONGO_URL=os.environ.get("CHECK_MONGO_URL", ""),
+                MONGO_DB="space_rental_analytics",
                 JWT_SECRET=jwt_secret,
                 SYNTHETIC_API_KEY=synthetic_key,
                 TODAY_OVERRIDE=today.isoformat(),
@@ -287,17 +288,31 @@ def main() -> None:
                         .splitlines()
                     ]
                     cancelled_events = [
-                        item for item in events if item["event_type"] == "reserve_cancel_ok"
+                        item
+                        for item in events
+                        if item["event_name"] == "reservation_cancel_complete"
                     ]
                     assert len(cancelled_events) == 1
-                    assert cancelled_events[0]["category"] == category_code
-                    assert cancelled_events[0]["venue_id"] == venue_id
-                    assert cancelled_events[0]["payload"] == {"reservation_id": reservation_id}
+                    assert cancelled_events[0]["properties"]["category"] == category_code
+                    assert cancelled_events[0]["products"][0]["product_id"] == str(venue_id)
+                    assert cancelled_events[0]["properties"]["reservation_id"] == reservation_id
                     assert cancelled_events[0]["is_synthetic"] is True
                     print(
                         "HTTP/DB verified: one synthetic cancelled reservation, refunded payment, "
                         "released slots, booking and cancellation counters, cancellation event category"
                     )
+
+                    if os.environ.get("CHECK_MONGO_URL"):
+                        from check_reservation_events_mongo import check_mongo_events
+
+                        check_mongo_events(
+                            client=client,
+                            engine=engine,
+                            token=token,
+                            synthetic_key=synthetic_key,
+                            venue_id=venue_id,
+                            today=today,
+                        )
 
                     review_headers = {
                         "Authorization": f"Bearer {token}",

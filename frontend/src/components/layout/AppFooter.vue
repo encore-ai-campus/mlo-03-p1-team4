@@ -50,7 +50,7 @@ const REPO = 'https://github.com/encore-ai-campus/mlo-03-p1-team4'
       <div class="footer__bottom">
         <div class="footer__camp">
           <strong>[SK네트웍스 Family 엔코아AI캠퍼스] AI 레디 데이터 엔지니어링 캠프 3기 1차 프로젝트</strong>
-          <span>© 2026 팀 방조 · 교육용 데모로 실제 예약과 결제는 이루어지지 않아요.</span>
+          <span>© 2026 팀 방조</span>
         </div>
         <span class="footer__faint">발표 2026-11-09</span>
       </div>
