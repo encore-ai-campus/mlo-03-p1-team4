@@ -50,6 +50,8 @@ class SeedMaps:
     categories: dict[tuple[str, str], str]
     sido_alias: dict[str, str]
     sigungu_alias: dict[tuple[str, str], str]
+    legal_dong: dict[tuple[str, str, str], tuple[str, str] | None]
+    legal_dong_city_aliases: set[str]
     regions: set[tuple[str, str]]
     facilities: set[str]
     # (시·도, 법정동) → 시·군·구들, (시 이름, 법정동) → (시·도, 시·군·구)들. db/seed/dong_sigungu.csv(#10)
@@ -58,6 +60,7 @@ class SeedMaps:
 
     @classmethod
     def load(cls, seed_dir: Path = SEED_DIR) -> SeedMaps:
+        legal_dong_rows = _csv_rows(seed_dir / "legal_dong.csv")
         return cls(
             categories={
                 (row["source_site"], row["source_type"]): row["category_code"]
@@ -69,6 +72,15 @@ class SeedMaps:
             sigungu_alias={
                 (row["sido"], row["alias"]): row["sigungu"]
                 for row in _csv_rows(seed_dir / "sigungu_alias.csv")
+            },
+            legal_dong={
+                (row["scope"], row["alias"], row["locality"]): (
+                    (row["sido"], row["sigungu"]) if row["status"] == "unique" else None
+                )
+                for row in legal_dong_rows
+            },
+            legal_dong_city_aliases={
+                row["alias"] for row in legal_dong_rows if row["scope"] == "city"
             },
             regions={(row["sido"], row["sigungu"]) for row in _csv_rows(seed_dir / "regions.csv")},
             facilities={row["name"] for row in _csv_rows(seed_dir / "facilities.csv")},
@@ -187,11 +199,22 @@ def map_space(site: str, space: SpaceInfo, maps: SeedMaps) -> tuple[dict | None,
         return None, "수용인원 이상"
     min_hours = chosen_price.get("min_hours") or space.min_hours or 1
     address = space.address_region or ""
-    region, reason = resolve_region(address, maps)
+    region, reason = resolve(
+        address,
+        maps.sido_alias,
+        maps.sigungu_alias,
+        maps.regions,
+        maps.legal_dong,
+        maps.legal_dong_city_aliases,
+    )
     if region is None:
         if reason in {"동 이름 겹침", "동 대응 없음"}:
             return None, reason
         # resolve()의 상세 이유에는 입력 주소 일부가 들어가므로 고정 문구만 저장한다.
+        if reason == "동 이름 겹침":
+            return None, "동 이름 겹침"
+        if reason == "동 대응 없음":
+            return None, "동 대응 없음"
         if reason.startswith("나뉜 옛 구"):
             return None, "나뉜 옛 구"
         if reason.startswith("모르는 시·도"):
