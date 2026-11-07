@@ -12,7 +12,7 @@
 | 파트 | 담당자 | 지금 | 다음 할 일 | 막힌 것 |
 | --- | --- | --- | --- | --- |
 | 프론트 | 노진산(FE·PM) | FE-1~9 확정안 반영, Claude 시안 대조·FE 오류/모바일 결제/가입 UX 재검토 및 목업·화면 검증. 11-06 C안 화풍(흰 바탕·검은 글자·주칠)과 유형별 일러스트 5장 유지. CCL 분위기 참고 사진 40장(유형별 8장)을 정적 경로로 연결하고 유형·venue ID 해시로 안정 선택, 사진 표시·크레딧 추가(API `art:` 계약 그대로) | A·B 구현 후 실제 API 연결·오류·예약 동시성 통합 검증 | 실제 API 미구현 |
-| FastAPI A | [이름] | 회원·후기 A 기능 구현. F-60 공식 `mongo_init.js`와 이벤트 파일·Mongo 저장을 검증. #75에서 `override_business_time()`으로 가입 스키마/서비스·후기 서비스의 과거 업무 시각만 고정하고 `build_document(occurred_at=...)`와 실제 `received_at`을 분리하는 지원 및 사용 지침 반영 | 최신 develop 생성기의 가입·후기·이벤트 경로와 A 시각 함수 통합 확인, 같은 seed 재실행 안전 처리. FE 지역·시설 ID/예약 문맥 통합도 진행 | 최신 develop 생성기는 런타임 패치로 계측을 억제하지만 A override 함수 직접 호출은 없음. 이번 #75 A 경계·회원·후기 로컬 MariaDB 테스트 56건 통과, 관련 비DB 테스트 31건 통과, Ruff 통과. 최신 develop 생성기는 아직 override_business_time() 대신 런타임 패치를 사용하므로 결합 검증은 남음. 비활성 공간 이벤트 혼합 처리·UTM 허용 값은 별도 결정 |
+| FastAPI A | [이름] | 회원·후기 A 기능 구현. F-60 공식 `mongo_init.js`와 이벤트 파일·Mongo 저장을 검증. #75에서 `override_business_time()`으로 가입 스키마/서비스·후기 서비스의 과거 업무 시각만 고정하고 `build_document(occurred_at=...)`와 실제 `received_at`을 분리하는 지원 및 사용 지침 반영 | A·F-63 과거 업무 시각 지원 및 생성기 연계 지침 반영. 회원·후기·이벤트 경계 테스트 수행| 생성기의 HistoricalRuntime과 A override_business_time() 결과가 같은지 비교 테스트 추가 후 11.4 CI 결과 확인. DB/FE 후속 통합은 담당자 진행| Windows MariaDB 13.0.2 전체 테스트 동시성 4건 실패, VM MariaDB 10.11.14 전체 406건 통과. 시각 방식 직접 비교 테스트 및 MariaDB 11.4 확인은 남음
 | FastAPI B | 이세훈 | #74·#76 develop 병합: 예약 결과 이벤트 새 형식, 커밋 후 이벤트 문맥 조립·기록 실패에도 예약 응답 유지(회귀 테스트 포함). #77 `feat/B-F-62-generator`에서 #75 생성기 본체·서비스 연결·재개 구현, 실제 MongoDB 100명/30일 검증 완료 | #75 A 연결 확인·DB 공간 보충/집계/CSV·api1 수동 파일럿. #79 공유 테스트 DB 경합 방지. #8 api1 cron | 원격 MongoDB 서버 문맥 null validator 동기화 필요. 실제 api1·replica·브라우저 E2E 미검증 |
 | DB | [이름] | `0001_init.sql`·`mongo_init.js` 검증(설치형 11.8·compose 11.4 둘 다 29건 통과), seed(유형 5·시설 20·지역 230 → `seed.sql`), `infra/local` compose, 크롤러 시제품(옛 필터). 1차 수집원 2곳+부족분 생성 방향 확정. 별도 Compass DB의 events·event_daily 속성 정리 v1을 docs/db에 공유 | 스페이스클라우드 새 필터·쉐어잇 파서/사이트별 robots 확인 → 속성 기반 시연용 공간 선별·`/internal/venues` 등록(B와) → 부족한 공간·과거 30일 행동 데이터 생성기 | 없음(A2 결정을 팀원에게 공유) |
 
@@ -177,6 +177,14 @@ A1~A4는 11-03에 확정했고, **A5~A8은 추후 확정**으로 미뤘다(11-03
 - 개인 기억(Claude 자동 메모리 등)은 팀에 공유되지 않는다. 팀이 알아야 할 것은 이 파일과 `docs/`에 쓴다.
 
 ## 최근 변경 (최신이 위)
+
+- 11-07 · A · 동일 MariaDB 10.11.14 VM에서 MongoDB 8.0.34 테스트 서버를 함께 연결해 생성기 서비스 pytest 3건 통과. 전용 space_rental_analytics_test.generator_validation_bd7d60618758442c84f05e74b4201966에 100명·1,260세션의 이벤트 10,111건 실제 저장, 재개 시 추가 0건/중복 10,111건, 공식 validator 적용 및 121 거절 확인. MariaDB 테스트 거래는 롤백해 기존 회원 3명 유지, 공간·예약·후기 0건. Mongo 테스트 컬렉션은 DB 담당 확인용 보존, 운영 events 변경 없음.
+
+- 11-07 · A · MariaDB VM 100.100.100.31(10.11.14)에 현재 #75 병합 커밋 2bfc5b6을 별도 복사하고 environment.yml로 Linux conda pro_1을 구성. VM 로컬 spacecube_test에서 회원·후기·A 시각·생성기·동시성 집중 pytest 88건 및 backend/db/생성기 전체 pytest 406건 통과(Starlette 경고 1건). Windows MariaDB 13.0에서 실패한 동시성 4건도 VM 실행에서 통과. 테스트 후 원격 DB 기존 회원 3명 유지, 공간·예약·후기 0건. MongoDB 8.0.34 전용 테스트 컬렉션 실저장 10,033건과 중복 재실행 0건은 별도 Windows+로컬 MariaDB 실행에서 검증했으며 운영 Mongo 컬렉션은 변경하지 않음. 팀 목표 MariaDB 11.4 실검증은 남음.
+
+- 11-07 · A · #75 원격 테스트 환경 확인: MariaDB 10.11.14 VM의 spacecube_test에 기존 13개 표 유지, 비어 있던 기준 seed(유형 5·시설 20·지역 230)만 적용하고 기존 회원 3명은 보존. MongoDB 8.0.34 VM 복구 후 전용 space_rental_analytics_test.generator_validation_* 컬렉션에서 생성기 서비스 테스트 3건 통과. 100명·1,260세션·예약 916·취소 91·완료 825·후기 206·이벤트 10,033건 저장, 같은 실행 재개 시 추가 0건/중복 10,033건, 공식 validator 및 오류 121 확인. 초기 구성 후 SSH로 VM pro_1을 구성하고 10.11.14 전체 pytest 406건을 통과함. 이 Mongo 테스트에서 MariaDB는 Windows 로컬 13.0.2 트랜잭션 롤백으로 사용함. 테스트 Mongo 컬렉션은 DB 담당 확인용으로 보존.
+
+- 11-07 · A · #75 브랜치에 최신 develop의 생성기 본체를 로컬 병합하고 A 시간 경계·생성기 테스트를 실행. 로컬 MariaDB 13.0.2에서 생성기+A 집중 pytest 25건 통과, Ruff 통과. 전체 pytest는 402건 통과·예약/탈퇴 동시성 4건 실패(1020 Record has changed, 50명 경쟁에서 409 수량 불일치), Starlette 경고 1건. 실제 MongoDB 저장은 CHECK_MONGO_URL 없이 실행해 미검증. 생성기는 A override_business_time() 대신 별도 HistoricalRuntime 패치를 사용하므로 계약 정리 필요.
 
 - 11-06 · A · #75 백필 연계 지침 갱신. 기존 로컬 `override_business_time()`은 가입 입력 객체 생성·`auth_service.signup()`·`review_service.create_review()` 범위에 한정하고, 이벤트 발생 시각은 `build_document(occurred_at=...)`, 수신 시각은 실제 `get_event_time()`으로 분리한다. `SERVER_NAME=generator`는 생성 프로세스에만 지정하도록 문서화. 중복 회원·후기 재사용 기준과 B 자동 이벤트·예약 지표 오염 위험 및 필요한 내부 억제 옵션을 기록했다. A 경계·회원·후기 로컬 MariaDB 13.0 테스트 56건, 관련 비DB 테스트 31건·Ruff 통과(11-07). 최신 develop 생성기는 런타임 패치를 사용해 A override 함수와 직접 연결되지 않으므로 결합 검증은 남음.
 - 11-07 · 공동(B) · 사용자 승인으로 `fix/B-generator-db-race`와 재검증 기록 커밋을 푸시하고 develop 대상 PR #79([B] F-62 생성기 검증 시 공유 테스트 DB 경합 방지)를 생성. Closes #78 및 앞서 확인한 로컬 검증 결과를 본문에 포함. jinsan02·naturedevworks 자동 리뷰 요청과 open·비초안·충돌 없음 상태 확인. GitHub 연결 도구의 생성 권한 부족 및 기존 gh 인증 만료는 정상 Git 인증을 통한 CLI 실행으로 처리했으며 인증정보는 출력·파일 저장하지 않음. 이번 게시 작업에서 제품 코드 수정·테스트 재실행·머지 없음. 원격 CI 결과는 후속 확인.
