@@ -14,7 +14,7 @@
 | 프론트 | 노진산(FE·PM) | FE-1~9 확정안 반영, Claude 시안 대조·FE 오류/모바일 결제/가입 UX 재검토 및 목업·화면 검증. 11-06 C안 화풍(흰 바탕·검은 글자·주칠)과 유형별 일러스트 5장 유지. CCL 분위기 참고 사진 40장(유형별 8장)을 정적 경로로 연결하고 유형·venue ID 해시로 안정 선택, 사진 표시·크레딧 추가(API `art:` 계약 그대로) | A·B 구현 후 실제 API 연결·오류·예약 동시성 통합 검증 | 실제 API 미구현 |
 | FastAPI A | [이름] | 회원·후기 A 기능 구현. F-60 공식 `mongo_init.js`를 전용 테스트 DB에 적용하고 실제 HTTP 202→파일→MongoDB 저장·재적재 중복 제외를 확인. 헤더 없는 서버 이벤트에 `server-<request_id>` 적용. 이벤트 관련 pytest 24건·전체 375건, Ruff, FE verify 통과 | B 서버 이벤트 3종 새 이름·상품 전달 및 FE 남은 지역·시설 ID/예약 문맥 통합 | 비활성 공간 `review_create`가 정상 건과 섞이면 전체 400(기존 계약, PM 후속 논의). UTM 허용 값 미확정 |
 | FastAPI B | 이세훈 | #74·#76 develop 병합: 예약 결과 이벤트 새 형식, 커밋 후 이벤트 문맥·상품 생성·기록 실패에도 업무 응답 유지. 후속 수정은 `fix/B-issue5-product-factory`에서 검증 대기. #77 `feat/B-F-62-generator`에서 #75 생성기 본체·서비스 연결·재개 구현, 실제 MongoDB 100명/30일 검증 완료 | #76 PM 상품 팩토리 후속 리뷰·병합. #75 A 연결 확인·DB 공간 보충/집계/CSV·api1 수동 파일럿. #79 공유 테스트 DB 경합 방지. #8 api1 cron | 원격 MongoDB 서버 문맥 null validator 동기화 필요. 실제 api1·replica·브라우저 E2E 미검증 |
-| DB | [이름] | `0001_init.sql`·`mongo_init.js` 검증(설치형 11.8·compose 11.4 둘 다 29건 통과), seed(유형 5·시설 20·지역 230 → `seed.sql`), `infra/local` compose, 크롤러 시제품(옛 필터). 1차 수집원 2곳+부족분 생성 방향 확정. 별도 Compass DB의 events·event_daily 속성 정리 v1을 docs/db에 공유 | 스페이스클라우드 새 필터·쉐어잇 파서/사이트별 robots 확인 → 속성 기반 시연용 공간 선별·`/internal/venues` 등록(B와) → 부족한 공간·과거 30일 행동 데이터 생성기 | 없음(A2 결정을 팀원에게 공유) |
+| DB | [이름] | `0001_init.sql`·`mongo_init.js` 검증(설치형 11.8·compose 11.4 둘 다 29건 통과), seed(유형 5·시설 20·지역 230 → `seed.sql`), `infra/local` compose. F-61 두 수집원 파서·매핑·적재 코드와 오프라인 테스트 작성. API 제외 운영 저장 검증에서 MongoDB `crawl.crawl_raw`와 MariaDB `spacecube.crawl_jobs` 각 1건 삽입·재조회·해당 건 정리 성공. `environment.yml`로 `pro_1`(Python 3.12.16) 설치, 크롤러 오프라인 pytest 17건·Ruff 전체 린트·포맷 통과. FE verify(단위 67건·빌드) 통과. 별도 Compass DB의 events·event_daily 속성 정리 v1을 docs/db에 공유 | 실제 단건 파서 확인 → 시연용 공간 선별·API 등록(B와) → 부족분·과거 30일 행동 데이터 생성기 | 운영 저장소 쓰기 경로는 확인했으나 실제 외부 수집·`venues` 등록은 접속 URL·내부 키가 빈 `backend/.env`와 내부 API 미기동으로 미실행 |
 
 ## 기능 진행표
 
@@ -41,7 +41,7 @@
 | F-50~51 | 후기 작성·조회(후기 모아보기) | A | B get_owned·review_context_query 연결, 작성·목록·수정·삭제 및 탈퇴 후 예약·후기 보존·작성자 익명화 로컬 MariaDB 검증. 공개 비활성 공간 제외·내 후기는 포함. 전체 backend pytest 318건 통과 |
 | F-60, F-62~65 | 이벤트(로그 파일 + MongoDB), 가상 데이터, `get_today`, 서버 로그, 지표 | A | 진행: #60 승인 구조로 FE 12종·서버 3종 문서·파일 우선·새 로그 재적재 구현. 공식 `mongo_init.js`를 `space_rental_analytics_test`에 적용하고 검색 HTTP 202·서버 공용 함수 이벤트 각 1건의 파일·MongoDB 저장, 개인정보 제거, 두 차례 재적재 중복 제외, 생성 문서 정리를 확인. MongoDB 장애 202·파일 실패 503 테스트 통과. 비활성 공간 `review_create` 혼합 전체 400 재현; 정책 변경 없이 PM 후속 논의. 이벤트 pytest 24건·전체 375건, Ruff·FE verify(67건/빌드) 통과. B 새 호출·FE ID/예약 문맥 통합은 미검증이므로 #5 완료 아님 |
 | F-60 B 지원 (#60·#72) | 예약 결과 3종·상품 스냅샷·선택적 브라우저 문맥 | B / A·DB 연계 | B 구현·A d75deea 임시 통합 검증: 관련 pytest 77건·전체 375건, Postman 7요청/15검증, 지정 MongoDB에서 결과 3종 실저장·동일 ID 중복 제외·가상 데이터 정리. A의 server-요청 ID 보완 및 원격 validator null 허용 반영 전 최종 완료 아님 |
-| F-61 | 크롤링 신규 등록 | DB / B | 진행: B POST /internal/venues 구현·로컬 검증 완료(35건·같은 출처 동시 8건·HTTP 6요청/12검증). DB 크롤러 새 필터·쉐어잇 파서·crawl_raw 연결과 api1 배포는 후속 |
+| F-61 | 크롤링 신규 등록 | DB / B | 진행: B POST /internal/venues 구현·로컬 검증 완료(35건·같은 출처 동시 8건·HTTP 6요청/12검증). DB 두 파서·유형/지역 매핑·crawl_raw·crawl_jobs·API 재시도와 오프라인 테스트 작성. API 제외 운영 저장 검증에서 MongoDB `crawl_raw`·MariaDB `crawl_jobs` 각 1건 삽입·재조회·정리 성공. `pro_1` 크롤러 오프라인 pytest 17건·Ruff·FE verify 통과. `venues` 등록·실제 외부 수집은 별도 미검증; `backend/.env` 접속 값·키 미설정 |
 | #19·#75 생성기 | 과거 30일 회원·예약·결제·후기·이벤트 백필 | B 본체·A 연결 확인·DB 공간/집계/CSV | 구현·검증: CLI·고정 세션·서비스 호출·과거 업무 시각/실제 received_at·관측 억제·manifest/state 재개. 최종 verify.ps1 통과(pytest 399건·FE 67건·린트/빌드), 생성기 21건(실제 MariaDB 및 지정 MongoDB) 통과. 100명·1,260세션·예약 912·취소 91·완료 821·후기 205·이벤트 10,089건, 재개 추가 적재 0건·validator 121 거절 확인. 운영 api1 파일럿·DB 후속 산출물은 별도 |
 | F-70 | 헬스체크 3단계 | A | 설계 확정 |
 | #78 공통 검증 | 공유 테스트 DB 병렬 실행의 회원 재가입 500 방지 | 공동(B 구현) | 최신 develop f387df2에서 독립 브랜치로 구현. 루트 conftest의 session 잠금·테스트 전 소유권 확인·대기 600초/조정·종료 해제. 실제 DB 잠금 회귀 29건, 기존 실패 재현 두 프로세스 각각 5건 통과(대기 후 진행), 최종 verify.ps1 pytest 407건·FE 67건·린트/빌드 통과. API·DDL·업무 트랜잭션·기존 동시성 검증은 유지. 11-07 ef39125에서 회귀 29건·병렬 재가입 5+5회·전체 verify(Python 407건·FE 67건) 및 하위 폴더 실행 1건 재통과. PR #79(develop) 생성·리뷰 대기. 잠금 미적용 checkout 및 pytest 외 DDL 작업은 별도 순차 실행 필요 |
@@ -205,6 +205,28 @@ A1~A4는 11-03에 확정했고, **A5~A8은 추후 확정**으로 미뤘다(11-03
 - 11-06 · B · #5 최종 검증: `verify.ps1`을 pro_1 실행기로 실행해 Ruff 93파일·로컬 MariaDB `spacecube_test` pytest 381건·FE 단위 67건·린트·빌드 모두 통과. 최종 예외 주입·문맥 복원 3건도 별도 통과. 실제 Uvicorn/JWT/Postman 7요청/15검증 및 임시 데이터 정리 통과. 기존 Starlette·FE 린트 경고 각 1건. MongoDB 실저장·배포·브라우저 E2E는 미실행. 커밋·푸시·PR은 하지 않음.
 
 - 11-06 · B · #5 최신 PM 결정(issuecomment-6683005424)에 따라 `_log_reservation_event()` 전체에 예외 경계를 적용하고 기존 문맥 복원 유지. 수정 전 model_dump·log_event 예외 주입에서 500 재현, 수정 후 로컬 MariaDB `spacecube_test`에서 201·예약/칸/결제 저장·성공 카운터 회귀 2건 및 문맥 복원 1건 통과. 예약·동시성 65건, Ruff, 실제 Uvicorn/JWT/Postman 7요청/15검증·임시 데이터 정리 통과. 최신 develop `f387df2`의 별도 작업 트리 `.worktrees/fix-B-issue5-reservation-events`에서만 수정하며 `feat/B-F-62-generator` 미커밋 작업은 포함하지 않음. #5 전체 종료는 FE·DB 후속 통합 후 담당자가 판단.
+
+- 11-07 · DB · 사용자 재요청으로 로컬에 보존한 F-61 크롤러 코드·문서·테스트와 실행 환경 기록을 같은 기능 브랜치에 다시 커밋·푸시. 크롤러 오프라인 pytest 17건, Ruff 린트·포맷, 프론트 verify 통과; 전체 `verify.ps1`은 `CHECK_DB_URL` 미설정으로 pytest 실패. 실제 외부 수집·`venues` 등록은 미검증이고 이슈 #10은 진행 상태로 유지.
+
+- 11-07 · DB · 사용자 요청으로 `feat/DB-F-61-crawler`의 원격 HEAD를 `d59c777`에서 두 커밋 전 `f387df2`로 `--force-with-lease` 복원. 브랜치는 유지하고 `156e1d5`·`d59c777`의 파일 변경은 로컬 스테이징에 보존했다. PR #81은 이미 닫힌 미병합 상태이며, `develop`은 변경하지 않았다.
+
+- 11-07 · DB · F-61 브랜치 추가 기록 커밋 전 `verify.ps1` 실행: Ruff 린트·99파일 포맷 확인, 프론트 verify는 통과. 전체 pytest는 `CHECK_DB_URL`이 설정되지 않아 DB 연동 테스트 다수가 설정 단계에서 실패해 검증 명령은 종료 1. 같은 조건의 전체 검증은 반복하지 않고, 앞서 크롤러 오프라인 pytest 17건 통과 결과를 유지. 루트 README의 기존 빈 줄 변경은 보존.
+
+- 11-07 · DB · 사용자가 기존 루트 `.env`를 비운 뒤 설정 형식을 요청해 `backend/.env.example`의 키·기본값을 루트 `.env`와 `backend/.env`에 작성. 두 파일은 Git 제외 대상이며 실제 DB_WRITE_URL·MONGO_URL·INTERNAL_API_KEY·JWT_SECRET 등 비밀값은 비어 있어 접속·API 검증은 미실행. 기존 연결 값은 복원할 수 없음.
+
+- 11-07 · DB · 공식 Miniconda를 사용자 폴더에 설치하고 `environment.yml`로 `pro_1`(Python 3.12.16)을 생성. `python -m pip check` 충돌 없음, 크롤러 오프라인 pytest 17건 통과, Ruff 전체 린트와 99파일 포맷 확인 통과. 전체 `verify.ps1`은 로컬 `spacecube_test`의 `CHECK_DB_URL`이 없어 실행하지 않음. 실제 외부 수집·API 등록은 아직 미실행.
+
+- 11-07 · DB · F-61 브랜치 커밋 전 검증: 작업 폴더 Ruff 0.17.3으로 전체 Python 99파일 린트·포맷 확인 통과, 프론트 `npm run verify`는 설치된 Node 24를 명령에 지정해 린트(경고 1·오류 0)·단위 67건·빌드 통과. `pro_1`이 없어 `verify.ps1`의 pytest는 실행하지 못함. 이슈 #10의 실제 수집·15~20개 API 등록은 미완료로 유지.
+
+- 11-07 · DB · 사용자 요청으로 API를 제외한 운영 저장소 쓰기 시험 실행. 루트 `.env`의 `spacecube` MariaDB와 `crawl` MongoDB에 검증용 각 1건을 커밋·삽입하고 재조회 결과를 확인한 뒤 삽입한 각 1건만 삭제했다(`WRITE_READBACK_OK mongo=1 mariadb=1`, `CLEANUP_OK mongo=1 mariadb=1`, 종료 0). `pro_1`이 없어 설치된 동일 버전 PyMongo·PyMySQL로 일회성 진단을 했으며 진단 파일은 제거. 실제 사이트 크롤링·`venues` API 등록·pytest는 실행하지 않음.
+
+- 11-07 · DB · 요청 범위를 API 제외한 저장 검증으로 좁혀 `db/tests/check_crawler_storage.py` 추가. `spacecube_test`가 아닌 MariaDB URL은 쓰기 전에 거부하고, MongoDB `crawl.crawl_raw`와 MariaDB `crawl_jobs`에 각 1건을 저장·재조회한 뒤 해당 건만 정리하도록 구성. 현재 루트 `.env`는 애플리케이션 `spacecube`이고 `pro_1`·`backend/.env`가 없어 실제 스크립트 실행은 대기.
+
+- 11-07 · DB · F-61 실제 적재 요청에 따라 실행 환경 재확인. 새 루트 `.env`의 `DB_HOST`·`MONGODB_URI`는 각각 MariaDB·MongoDB에 TCP 연결되며 공간 대여 DB·`crawl` DB를 가리킨다. 크롤러가 읽는 `backend/.env`의 `DB_WRITE_URL`·`MONGO_URL`·`INTERNAL_API_KEY`, `pro_1`, 실행 중인 내부 API는 여전히 없다. 외부 수집·MongoDB `crawl_raw`·MariaDB `crawl_jobs`/`venues` 적재는 시작하지 않았고 실행 환경 제공을 요청함.
+
+- 11-07 · DB · F-61 실행기 루트 모듈 경로·허용 사이트의 비표준 포트 차단·파서 실패 시 조회 건수 기록을 점검하고 회귀 테스트를 추가. 작업 폴더의 Ruff 0.17.3으로 전체 98개 Python 파일 린트·포맷 확인 통과. `pro_1`과 `backend/.env`가 없어 pytest·실제 수집/등록은 실행하지 못함. 실행 결과의 조회·등록과 공개 API 전체 공간 수 확인 방법을 크롤러 README에 기록.
+
+- 11-06 · DB · 사용자 요청으로 최신 develop `f387df2`에서 `feat/DB-F-61-crawler`를 만들고 F-61 크롤러 코드 작성. 기존 다른 경로의 Python 파일 3개는 해시가 같아 복사하지 않고 요청 클라이언트·스페이스클라우드 파서를 재사용. 쉐어잇 구조화 데이터 파서, 사이트별 robots·3초 간격·실행당 상세 20건, 유형/지역 매핑, MongoDB `crawl_raw`와 MariaDB `crawl_jobs`, B 내부 API 업서트·재시도, 생성 이름·`art:` 3개와 오프라인 테스트를 추가. 두 경로 모두 과거 표본 `crawler/data`가 없음. 현재 PC에 `pro_1`과 `backend/.env`가 없어 Ruff·pytest·실제 DB/API/사이트 단건 검증은 대기. 기존 README 미커밋 변경은 보존.
 
 - 11-06 · B · 사용자 요청으로 `feat/B-F60-events`를 푸시하고 GitHub CLI에서 Draft PR #74를 develop 대상으로 생성. B 변경만 포함하며 A #72 의존성과 서버 세션 ID·원격 MongoDB validator 후속 항목을 PR 본문에 명시. 이전 통합 검증 결과를 그대로 첨부했고 이번 PR 작성 작업에서는 테스트를 재실행하지 않음.
 
