@@ -93,7 +93,7 @@ PR(`develop`·`main` 대상)을 올리거나 고칠 때마다, 그리고 `develo
 | Ruff | 항상 | 파이썬 린트·포맷(`ruff.toml`) | `verify.ps1` |
 | 프론트 verify | `frontend/`가 바뀌었을 때 | 린트·단위 테스트·빌드 | `npm run verify` |
 | 프론트 E2E | `frontend/`가 바뀌었을 때 | Playwright(Chromium) 데스크톱·폰, 목업 데이터. 실패하면 trace를 Artifacts에 올림 | `npm run test:e2e` |
-| DB·백엔드 테스트 | `backend/`·`db/`·`docs/db/`·`infra/local/`·`environment.yml`이 바뀌었을 때 | `infra/local` compose로 MariaDB 11.4·MongoDB 7을 띄워 ① STRICT·시간대·seed 수 ② `check_ddl.py`(제약 29건 + 동시 결제) ③ `check_mongo_init.js` ④ 테스트 파일이 있으면 `spacecube_test`에 0001 + seed를 넣고 pytest | `check_ddl.py`, `verify.ps1` |
+| DB·백엔드 테스트 | `backend/`·`db/`·`docs/db/`·`infra/local/`·`infra/haproxy/`·`infra/nginx/`·`environment.yml` 등이 바뀌었을 때 | `infra/local` compose로 MariaDB 11.4·MongoDB 7을 띄워 ① STRICT·시간대·seed 수 ② `check_ddl.py`(제약 29건 + 동시 결제) ③ `check_mongo_init.js` ④ `spacecube_test`에 0001 + seed를 넣고 기본 pytest(독립 health·배포 주소 회귀 포함) | `check_ddl.py`, `verify.ps1` |
 | CI 결과 | 항상 | 위 결과를 모아 하나라도 실패하면 실패 | — |
 
 - `develop`·`main`에 머지될 때는 바뀐 곳과 상관없이 전부 돕니다. `workflow_dispatch`로 Actions 탭에서 손으로 돌릴 수도 있습니다.

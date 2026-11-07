@@ -1,0 +1,4 @@
+# 비밀값이 아닌 배포 경로만 지정한다. VM의 실제 backend와 venv 경로로 바꾼다.
+# backend-env 암호화 credential의 DB·JWT 값은 이 파일에 복사하지 않는다.
+SPACECUBE_BACKEND_DIR=/opt/spacecube/current/backend
+SPACECUBE_VENV_DIR=/opt/spacecube/venv

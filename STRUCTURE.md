@@ -116,7 +116,8 @@ Pro_1/
 │
 ├─ infra/
 │  ├─ local/                  [DB] docker compose: MariaDB 11.4(3308) + MongoDB 7, 첫 실행 때 0001·seed·mongo_init 자동 (11-04)
-│  ├─ haproxy/                [B] 정문 haproxy.cfg·README: api1·api2 분산, /api/health 확인 (11-06 B안 초안)
+│  ├─ haproxy/                [B] 정문 설정·주소 생성기·독립 health·systemd·배포 경로 예시: api1·api2 분산, /api/health 확인
+│  │  └─ tests/              [B] 독립 health HTTP 응답·과부하 격리·primary 장애 회귀, 실제 DB 연결 없음
 │  ├─ nginx/                  [B] 서버마다: 정적 파일 + /api → 127.0.0.1:8000 (11-06 B안, README에 초안)
 │  ├─ monitoring/             [A] docker-compose, alloy.config, grafana/dashboards (예정)
 │  ├─ vm/                     [공동] 로컬 VM 7대 설치 체크리스트 (11-05, 1차 배포)

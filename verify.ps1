@@ -28,7 +28,7 @@ Step 'ruff 린트' { & $py -m ruff check . }
 Step 'ruff 포맷 확인' { & $py -m ruff format --check . }
 
 # 백엔드·DB 테스트 파일이 생기면 pytest를 돌린다
-$tests = Get-ChildItem tests, backend\tests, db\tests -Recurse -Include 'test_*.py', '*_test.py' -ErrorAction SilentlyContinue
+$tests = Get-ChildItem tests, backend\tests, db\tests, simulator\generator\tests, infra\haproxy\tests -Recurse -Include 'test_*.py', '*_test.py' -ErrorAction SilentlyContinue
 if ($tests) { Step 'pytest' { & $py -m pytest -q } } else { Write-Host "`n== pytest: 테스트 파일 없음, 건너뜀" -ForegroundColor DarkGray }
 
 Step '프론트 verify (린트·색 검사·단위 테스트·빌드)' { npm --prefix frontend run verify }

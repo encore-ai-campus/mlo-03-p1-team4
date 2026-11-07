@@ -1,0 +1,19 @@
+[Unit]
+Description=Spacecube isolated health check
+After=network.target spacecube-api.service
+BindsTo=spacecube-api.service
+PartOf=spacecube-api.service
+
+[Service]
+Type=simple
+User=spacecube
+Group=spacecube
+WorkingDirectory=/opt/spacecube/deploy/health
+LoadCredentialEncrypted=backend-env:/etc/credstore.encrypted/spacecube-backend.cred
+EnvironmentFile=/etc/spacecube/health-deploy.conf
+ExecStart=/opt/spacecube/deploy/start-health.sh
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=spacecube-api.service
