@@ -63,9 +63,11 @@ def _event_product(*, venue, day, start_hour, end_hour, headcount, price_per_hou
     ]
 
 
-def _log_reservation_event(*args, event_context=None, **kwargs):
+def _log_reservation_event(*args, event_context=None, product_factory=None, **kwargs):
     """문맥을 복원하고, 문맥 조립·기록 실패가 예약 결과로 전파되지 않게 한다."""
     try:
+        if product_factory is not None:
+            kwargs["products"] = product_factory()
         context = None
         if event_context is not None:
             user = event_context.user or {}
@@ -234,7 +236,7 @@ def _handle_slot_conflict(
         category=venue["category_code"],
         payload=log_event_payload,
         is_synthetic=is_synthetic,
-        products=_event_product(
+        product_factory=lambda: _event_product(
             venue=venue,
             day=body.date,
             start_hour=body.start_hour,
@@ -334,7 +336,7 @@ def create_reservation(
             "hours": body.hours,
         },
         is_synthetic=is_synthetic,
-        products=_event_product(
+        product_factory=lambda: _event_product(
             venue=venue,
             day=reservation.reserve_date,
             start_hour=reservation.start_hour,
@@ -502,7 +504,7 @@ def cancel_reservation(
         category=venue["category_code"],
         payload={"reservation_id": reservation_id},
         is_synthetic=reservation.is_synthetic,
-        products=_event_product(
+        product_factory=lambda: _event_product(
             venue=venue,
             day=reservation.reserve_date,
             start_hour=reservation.start_hour,
