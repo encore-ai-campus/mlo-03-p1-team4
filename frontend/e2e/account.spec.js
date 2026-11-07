@@ -58,6 +58,8 @@ test('헤더 사용자 메뉴에서 로그아웃하면 홈으로 가고 회원 �
 
 test('내 예약 내역의 내 메뉴에서도 로그아웃할 수 있다', async ({ page }) => {
   await loginFirst(page, '/me')
+  // 화면 전환(페이드)이 끝나 내 예약 화면이 그려진 뒤에 넓은 화면/좁은 화면 메뉴를 판단한다
+  await expect(page.getByRole('heading', { level: 1, name: '예약 내역' })).toBeVisible()
   const button = page.getByRole('button', { name: '로그아웃', exact: true })
   if (!(await button.first().isVisible())) await page.getByRole('button', { name: '내 메뉴', exact: true }).click()
   await page.getByRole('button', { name: '로그아웃', exact: true }).filter({ visible: true }).first().click()
