@@ -10,6 +10,7 @@ const props = defineProps({
   room: { type: Object, required: true },
   rank: { type: Number, default: 0 }, // 1~3이면 '인기 n위'를 글자로
   index: { type: Number, default: 0 }, // 스태거 순서
+  fresh: { type: Boolean, default: false }, // 메인 추천순 앞에 세운 최근 등록 공간
 })
 
 const available = computed(() => props.room.slots?.some((s) => !s.taken && s.hour > nowInSeoul().hour))
@@ -45,7 +46,7 @@ onBeforeUnmount(() => observer?.disconnect())
         </h3>
         <span class="rating num"><Star :size="15" class="star" fill="currentColor" aria-hidden="true" />{{ Number(room.rating_avg ?? 0).toFixed(1) }} <span class="rating__count">({{ room.review_count }})</span></span>
       </div>
-      <p class="card__meta"><strong v-if="rank && rank <= 3" class="card__rank">인기 {{ rank }}위 · </strong>{{ room.category.name }} · {{ room.region.sido }} {{ room.region.sigungu }} · 최대 {{ room.capacity_max }}인</p>
+      <p class="card__meta"><strong v-if="rank && rank <= 3" class="card__rank">인기 {{ rank }}위 · </strong><strong v-else-if="fresh" class="card__rank">NEW · </strong>{{ room.category.name }} · {{ room.region.sido }} {{ room.region.sigungu }} · 최대 {{ room.capacity_max }}인</p>
       <p class="card__now" :class="{ 'is-now': available }">{{ available ? '지금 이용 가능' : next ? `다음 빈 시간 ${next}:00` : '오늘 예약 마감' }}</p>
       <p class="card__desc">{{ room.facilities?.map((f) => typeof f === 'string' ? f : f.name).join(' · ') }}</p>
       <p class="price num"><strong>{{ won(room.price_per_hour) }}원</strong> / 1시간</p>
