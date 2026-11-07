@@ -1,8 +1,6 @@
-"""사이트맵 공간 id에서 무작위 표본을 뽑아 공간유형·지역 분포를 추정한다.
+"""스페이스클라우드 공간유형 표본(실행당 상세 20건 이하).
 
-전체 14,137개를 다 열면 3초 간격으로 약 12시간이 걸리므로, 표본으로 카테고리별 공간 수를 어림한다.
-
-    uv run --with httpx --with beautifulsoup4 python sample_categories.py --n 200
+예전 200건 표본은 이력을 위한 결과이며 이 명령으로 다시 수집하지 않는다.
 """
 
 from __future__ import annotations
@@ -10,48 +8,46 @@ from __future__ import annotations
 import argparse
 import json
 import random
-import sys
-from dataclasses import asdict
+from pathlib import Path
 
 import httpx
-from spacecloud_crawler import (
-    BASE_URL,
-    DATA_DIR,
-    SITEMAP_IDS_FILE,
+
+from crawler.spacecloud_crawler import (
+    MAX_DETAIL_PER_RUN,
+    SPACE_BASE_URL,
     PoliteClient,
-    load_json,
+    fetch_sitemap_ids,
     parse_space,
+    sanitized_dict,
 )
+
+DATA_DIR = Path(__file__).parent / "data"
 
 
 def main() -> None:
-    sys.stdout.reconfigure(encoding="utf-8")
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--n", type=int, default=200)
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--n", type=int, default=20)
     parser.add_argument("--seed", type=int, default=20261030)
     args = parser.parse_args()
-
-    ids = load_json(SITEMAP_IDS_FILE, [])
-    if not ids:
-        sys.exit("먼저 spacecloud_crawler.py baseline을 실행하세요.")
-    sample = random.Random(args.seed).sample(ids, args.n)  # noqa: S311 표본 뽑기용(보안 무관), 시드로 재현
-
-    client = PoliteClient()
-    out_path = DATA_DIR / f"sample_{args.seed}_{args.n}.jsonl"
-    with out_path.open("w", encoding="utf-8") as f:
-        for i, source_id in enumerate(sample, 1):
-            try:
-                row = asdict(parse_space(source_id, client.get(f"{BASE_URL}/space/{source_id}")))
-                row["status"] = "ok" if row["space_types"] else "no_detail"
-            except httpx.HTTPStatusError as exc:
-                row = {"source_id": source_id, "status": f"http_{exc.response.status_code}"}
-            except (httpx.HTTPError, PermissionError) as exc:
-                row = {"source_id": source_id, "status": f"error: {exc}"}
-            f.write(json.dumps(row, ensure_ascii=False) + "\n")
-            f.flush()
-            if i % 20 == 0:
-                print(f"{i}/{args.n}")
-    print(f"저장: {out_path}")
+    if not 1 <= args.n <= MAX_DETAIL_PER_RUN:
+        parser.error("--n은 1~20이어야 합니다.")
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    with PoliteClient() as client:
+        ids = fetch_sitemap_ids(client, "spacecloud")
+        chosen = random.Random(args.seed).sample(ids, args.n)  # noqa: S311 재현 가능한 표본 추출
+        path = DATA_DIR / f"sample_{args.seed}_{args.n}.jsonl"
+        with path.open("x", encoding="utf-8") as output:
+            for source_id in chosen:
+                try:
+                    space = parse_space(
+                        source_id, client.get(f"{SPACE_BASE_URL}/space/{source_id}")
+                    )
+                    row = sanitized_dict(space)
+                    row["status"] = "ok" if row["space_types"] else "no_detail"
+                except httpx.HTTPStatusError as error:
+                    row = {"source_id": source_id, "status": f"http_{error.response.status_code}"}
+                output.write(json.dumps(row, ensure_ascii=False) + "\n")
+    print(f"저장: {path}")
 
 
 if __name__ == "__main__":

@@ -1,53 +1,34 @@
-# 크롤러 — 현재 스페이스클라우드 시제품
+# 크롤러 — F-61 두 수집원
 
-**11-05 수집 방향:** 1차 수집원은 스페이스클라우드·쉐어잇 2곳입니다. 상세 확인을 통과한 속성으로 시연용 공간을 만들고, 30개 목표에서 부족한 공간은 생성기로 채웁니다. 쉐어잇 파서는 아직 없고 현재 코드는 아래의 옛 스터디룸 필터를 사용합니다. 구현 기준은 [`docs/데이터_수집_명세.md`](../docs/데이터_수집_명세.md)와 이 폴더의 `AGENTS.md`입니다.
+담당: DB. spacecloud_crawler.py의 요청·상세 파서를 재사용하고 shareit_crawler.py, preprocess.py, crawl_venues.py로 F-61 파이프라인을 구성한다. 크롤러는 api1에서 실행한다. 두 사이트의 속성만 참고해 시연용 공간을 만들며, 실제 업체 예약 상품으로 표시하지 않는다.
 
-담당: DB. **11-03 확정 흐름**은 `사이트맵 diff → 상세 조회 → MongoDB crawl_raw → 전처리 → FastAPI B POST /internal/venues`이다(`AGENTS.md`). DB에 바로 넣는 길은 없앴다. 아직 API·MongoDB 연결 전이라 지금 코드는 `data/new_rooms.jsonl`에만 쓴다.
+## 실행 전
 
-> **코드가 문서보다 뒤처져 있다.** 서비스는 5개 유형·전국이고(유형 대응표 `db/seed/README.md`), 예약 단위는 `venues`(룸 없음)다. 그런데 `spacecloud_crawler.py`의 필터는 아직 스터디룸 + 최대 10명 + 서울만 고르고, 아래 '신규 룸 만들기 규칙'(룸 번호 101·102…, 가격 4단계)도 스터디룸 시절 방식이다. 고칠 때는 `docs/백엔드_B_공간_예약_결제_크롤링.md` 7절 JSON(`name`은 생성 이름, `images`는 `art:<종류>-<색>`)에 맞춘다.
+- 프로젝트 conda 환경 pro_1을 사용하고 docs/db/mongo_init.js, db/migrations/0001_init.sql, seed를 먼저 적용한다.
+- backend/.env의 DB_WRITE_URL, MONGO_URL, INTERNAL_API_KEY를 설정한다. 키와 주소의 실제 값은 저장소에 쓰지 않는다. API는 기본적으로 api1 로컬의 http://127.0.0.1:8000/internal/venues로 호출한다.
+- 쉐어잇 실제 수집 전 이용약관과 두 사이트 robots.txt를 다시 확인한다. 요청 클라이언트는 실행할 때 사이트별 robots.txt를 읽고 모든 HTTP 요청 간격을 3초 이상으로 둔다.
+- 실행당 상세 페이지 합계 20건 이하. 처음 채우기는 bootstrap, 주간 비교는 baseline 이후 weekly를 쓴다. 시연용 공간의 부족분은 생성기 이슈 #19 범위다.
 
-아래 실행 설명은 **현재 시제품의 동작**입니다. 이후 주 1회 사이트맵 비교·신규 공간 등록 흐름은 `docs/산출물_01_요구사항명세서.md` F-61을 따릅니다. 옛 스터디룸 수치는 구현 기준으로 사용하지 않습니다.
+    conda run -n pro_1 --no-capture-output python -m crawler.crawl_venues fetch --site spacecloud 53074
+    conda run -n pro_1 --no-capture-output python -m crawler.crawl_venues fetch --site shareit 1321
+    conda run -n pro_1 --no-capture-output python -m crawler.crawl_venues run --mode bootstrap --max-detail 20
+    conda run -n pro_1 --no-capture-output python -m crawler.crawl_venues baseline
+    conda run -n pro_1 --no-capture-output python -m crawler.crawl_venues run --mode weekly --max-detail 20
 
-## 실행
+- fetch: 파서 점검용 단건. 허용한 속성만 출력하며 저장하지 않는다. 파서 수정 후에는 스페이스클라우드 53074 한 건만 확인한다. 쉐어잇은 실제 실행 전 약관·robots 확인이 먼저다.
+- bootstrap: 현재 사이트맵에서 아직 처리하지 않은 ID를 살펴 초기 후보를 쌓는다. 여러 번 실행해도 출처와 ID로 중복을 피하며 매번 상세 상한 20건을 지킨다. 현재 두 경로 모두 예전 200건 표본 파일이 없어 자동 재사용은 불가능하다.
+- baseline: 두 사이트의 현재 사이트맵 ID를 data/sitemap_ids.json에 보관한다. 기존 목록 형식도 읽지만 저장할 때는 사이트별 형식으로 바꾼다. 등록은 하지 않는다.
+- weekly: baseline 당시의 전체 ID와 이후 처리 완료 ID를 새 사이트맵과 비교한다. weekly 실행 중 실패·미처리 ID는 다음 실행에 남는다. crawl_raw의 미등록 ok 후보도 재시도하고 유형별 최대 1개씩 등록한다. 적합한 후보가 없으면 0건도 정상이다.
+- run: MongoDB crawl.crawl_raw에 이름·사진·후기·연락처·상세 주소·HTML을 뺀 추출값과 제외 이유를 남긴다. 전처리한 공간은 B의 POST /internal/venues로만 등록하고 응답 venue_id를 기록한다. MariaDB crawl_jobs에는 출처별 조회·등록 건수와 실행 상태를 남긴다. API 등록 뒤 Mongo 기록이 실패해도 같은 출처로 재전송하면 기존 공간을 갱신한다.
+- 실행 결과의 `jobs.<site>.fetched`와 `registered`는 각각 상세 조회·공간 등록 건수다. 전체 시연 공간 수는 등록 뒤 공개 `GET /venues?page=1&size=1`의 `total`을 따로 확인한다. 읽기 복제 지연이 있으면 값이 반영될 때 다시 조회한다.
 
-conda 환경 `pro_1`(httpx, beautifulsoup4 포함)에서 실행한다.
+유형은 db/seed/category_map.csv 한 곳에서 대응시키고, 지역은 별칭 CSV와 db/loaders/load_seed.py의 resolve()를 사용한다. 쉐어잇의 ruleType 1·2 단위가 확정되지 않았으므로 명시적으로 timeUnitMinute=60인 요금만 시간당 가격 후보로 쓴다. API 요청의 이름·소개·안내는 생성 문구이고, 공간당 art: 이미지 코드 3개를 보낸다.
 
-```bash
-conda run -n pro_1 --no-capture-output python spacecloud_crawler.py baseline
-```
+sample_categories.py는 새 표본을 꼭 확인해야 할 때만 사용하며 상세 20건 상한을 강제한다. analyze_sample.py는 기존 표본의 분포를 읽는 도구다. data/의 기존 결과 파일은 삭제하지 않는다.
 
-```bash
-conda run -n pro_1 --no-capture-output python spacecloud_crawler.py diff
-```
+## 검증
 
-```bash
-conda run -n pro_1 --no-capture-output python spacecloud_crawler.py fetch 53074
-```
+    conda run -n pro_1 --no-capture-output python -m pytest db/tests/test_crawler.py -q
+    powershell -NoProfile -ExecutionPolicy Bypass -File verify.ps1
 
-- `baseline`: 사이트맵의 공간 id 목록을 `data/sitemap_ids.json`에 저장 (최초 1회)
-- `diff`: 새 id를 최신순으로 최대 20건 조회 → 스터디룸 + 최대 10명 이하 + 서울이면 1건 등록 → `data/new_rooms.jsonl`
-- `fetch`: 공간 하나를 파싱해 출력 (파서 점검용)
-
-## 지키는 것
-
-- robots.txt를 읽어 막힌 경로(`/search*`, `/reserve/` 등)는 요청하지 않는다.
-- 요청 간격 3초, 실행당 상세 조회 20건 이하.
-- 저장 항목: 공간유형, 수용인원, 최소 예약시간, 면적, 시설, 가격, 영업시간, 시·구, 평점·후기 수.
-- 사진, 후기 본문, 전화번호, 상세 주소는 저장하지 않는다.
-
-## 신규 룸 만들기 규칙
-
-| 최대 인원 | 룸 유형 | 시간당 가격 | 이미지 풀 (순환) |
-| --- | --- | --- | --- |
-| 1~2명 | 1인실 | 3,000원 | booth 기본 → booth 색 변형 |
-| 3~4명 | 소형 | 6,000원 | duo → lounge → 색 변형 2종 |
-| 5~8명 | 중형 | 10,000원 | group → seminar → 색 변형 2종 |
-| 9~10명 | 대형 | 20,000원 | meeting 기본 → 색 변형 |
-
-룸 번호는 101·102·201·202·301·302 다음부터 층마다 4개까지 이어 붙인다(303, 304, 401 …). 가상 룸은 10개가 되면 더 등록하지 않는다. 상태는 `data/virtual_rooms_state.json`에 남는다.
-
-## 2026-10-30 시험 실행 결과
-
-- 사이트맵 공간 14,137개, 최대 id 82391.
-- 기준선에서 최근 id 8개를 지우고 `diff`를 돌린 결과, 새 id 11개 중 8개를 조회했고 조건에 맞는 공간은 0개였다. 대부분 연습실·촬영스튜디오이거나 최대 인원이 10명을 넘었다.
-- 신규 스터디룸이 매주 나온다는 보장이 없으므로, 등록 0건인 주를 허용할지 아니면 조건(최대 인원, 지역)을 넓힐지 회의에서 정한다. → 11-01 검토 문서는 '실제 주 1회 후보 풀에 쌓고 가상 주마다 꺼내 등록, 없으면 가상 생성'을 제안(회의 대기).
+서버 연동은 로컬 테스트 MariaDB spacecube_test와 MongoDB 테스트 구성에서 확인한다. 실제 출처로 등록한 공간은 시연용이며 공간 이름·소개는 생성한다.

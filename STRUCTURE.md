@@ -97,7 +97,11 @@ Pro_1/
 │  ├─ loaders/                load_seed.py(CSV → seed.sql), load_synthetic (예정)
 │  └─ tests/                  제약 검증 SQL·동시 INSERT (예정)
 │
-├─ crawler/                   [DB] 스페이스클라우드 크롤러 (동작함, 필터는 옛 기준)
+├─ crawler/                   [DB] F-61 스페이스클라우드·쉐어잇 속성 수집
+│  ├─ spacecloud_crawler.py   요청 간격·사이트별 robots·사이트맵·스페이스클라우드 파서
+│  ├─ shareit_crawler.py      쉐어잇 속성 파서
+│  ├─ preprocess.py           seed 유형·지역·시설 매핑과 생성 문구·그림
+│  ├─ crawl_venues.py         crawl_raw·crawl_jobs·내부 API 등록 실행
 │  └─ data/                   기준선·표본 (지우지 않음)
 │
 ├─ simulator/
