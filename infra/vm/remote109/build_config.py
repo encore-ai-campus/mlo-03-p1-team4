@@ -2,10 +2,16 @@
 
 import gzip
 import io
+import json
+import runpy
 import tarfile
 from pathlib import Path
 
 source = Path(__file__).resolve().parent.parent / "lab"
+runpy.run_path(str(source / "polish_dashboards.py"), run_name="__main__")
+runpy.run_path(str(source / "dashboard_handoff.py"), run_name="__main__")
+for dashboard in source.glob("dashboard-*.json"):
+    json.loads(dashboard.read_text(encoding="utf-8-sig"))
 target = Path.home() / "spacecube109/config.tar.gz"
 allowed = {
     "haproxy.cfg",

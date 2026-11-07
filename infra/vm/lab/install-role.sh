@@ -137,6 +137,9 @@ providers:
   - name: Spacecube
     folder: Spacecube Lab
     type: file
+    allowUiUpdates: true
+    disableDeletion: true
+    updateIntervalSeconds: 30
     options:
       path: /var/lib/grafana/dashboards
 EOF

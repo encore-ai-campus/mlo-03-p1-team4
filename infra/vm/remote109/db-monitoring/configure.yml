@@ -1,0 +1,150 @@
+---
+- name: DB 전용 exporter와 앱 원본별 집계 준비
+  hosts: dbs
+  become: true
+  vars:
+    monitoring_ip: 192.168.219.217
+  tasks:
+    - name: 기존 UFW 기본 차단 상태 확인
+      ansible.builtin.command: ufw status verbose
+      register: ufw_before
+      changed_when: false
+    - name: 방화벽이 꺼져 있으면 SSH 정책 검토 없이 진행하지 않음
+      ansible.builtin.assert:
+        that:
+          - "'Status: active' in ufw_before.stdout"
+          - "'deny (incoming)' in ufw_before.stdout"
+        fail_msg: "UFW active·기본 incoming deny가 필요합니다. SSH 규칙을 확인한 뒤 별도로 설정하세요."
+    - name: Exporter 패키지 설치
+      ansible.builtin.apt:
+        name: [prometheus-node-exporter, prometheus-mysqld-exporter]
+        state: present
+    - name: 전용 시스템 계정
+      ansible.builtin.user:
+        name: spacecube-exporter
+        system: true
+        shell: /usr/sbin/nologin
+        create_home: false
+    - name: 설치 스크립트 폴더
+      ansible.builtin.file:
+        path: /opt/spacecube-monitoring
+        state: directory
+        mode: '0755'
+    - name: 집계 textfile 폴더
+      ansible.builtin.file:
+        path: /var/lib/spacecube-monitoring/textfile
+        state: directory
+        owner: spacecube-exporter
+        group: spacecube-exporter
+        mode: '0755'
+    - name: 계정 준비 스크립트 복사
+      ansible.builtin.copy:
+        src: monitor_account.py
+        dest: /opt/spacecube-monitoring/monitor_account.py
+        mode: '0700'
+    - name: 로컬 전용 DB 계정과 인증 파일 준비
+      ansible.builtin.command: /usr/bin/python3 /opt/spacecube-monitoring/monitor_account.py
+      args:
+        creates: /etc/spacecube-monitoring/my.cnf
+      no_log: true
+    - name: 집계 스크립트 복사
+      ansible.builtin.copy:
+        src: app_connections.py
+        dest: /opt/spacecube-monitoring/app_connections.py
+        mode: '0755'
+    - name: Systemd override 폴더
+      ansible.builtin.file:
+        path: '/etc/systemd/system/{{ item }}.service.d'
+        state: directory
+        mode: '0755'
+      loop: [prometheus-node-exporter, prometheus-mysqld-exporter]
+    - name: Node exporter listen·textfile 설정
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/prometheus-node-exporter.service.d/spacecube.conf
+        mode: '0644'
+        content: |
+          [Service]
+          ExecStart=
+          ExecStart=/usr/bin/prometheus-node-exporter --web.listen-address={{ ansible_host }}:9100 --collector.textfile.directory=/var/lib/spacecube-monitoring/textfile
+      notify: Exporter 재시작
+    - name: Mysqld exporter 최소 collector·전용 계정 설정
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/prometheus-mysqld-exporter.service.d/spacecube.conf
+        mode: '0644'
+        content: |
+          [Service]
+          User=spacecube-exporter
+          Group=spacecube-exporter
+          ExecStart=
+          ExecStart=/usr/bin/prometheus-mysqld-exporter --config.my-cnf=/etc/spacecube-monitoring/my.cnf --web.listen-address={{ ansible_host }}:9104 --collect.global_status --collect.global_variables --collect.slave_status --collect.info_schema.tables --collect.info_schema.tables.databases=spacecube --collect.info_schema.innodb_metrics --collect.info_schema.processlist --collect.info_schema.processlist.processes_by_host
+          NoNewPrivileges=true
+          ProtectHome=true
+      notify: Exporter 재시작
+    - name: 앱 연결 집계 서비스
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/spacecube-db-app-metrics.service
+        mode: '0644'
+        content: |
+          [Unit]
+          Description=Spacecube app connection aggregates only
+          After=mariadb.service
+          [Service]
+          Type=oneshot
+          User=spacecube-exporter
+          Group=spacecube-exporter
+          ExecStart=/usr/bin/python3 /opt/spacecube-monitoring/app_connections.py
+          NoNewPrivileges=true
+          ProtectSystem=strict
+          ProtectHome=true
+          ReadWritePaths=/var/lib/spacecube-monitoring/textfile
+    - name: 앱 연결 집계 타이머
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/spacecube-db-app-metrics.timer
+        mode: '0644'
+        content: |
+          [Unit]
+          Description=Collect DB app aggregates every 15 seconds
+          [Timer]
+          OnBootSec=15
+          OnUnitActiveSec=15
+          AccuracySec=1
+          [Install]
+          WantedBy=timers.target
+    - name: 기존 mon 허용 규칙 위치 정리를 위해 해당 규칙만 제거
+      ansible.builtin.command: 'ufw --force delete allow from {{ monitoring_ip }} to any port {{ item }} proto tcp'
+      loop: [9100, 9104]
+      register: delete_allow
+      changed_when: "'Rule deleted' in delete_allow.stdout"
+    - name: 기존 동일 포트 차단 규칙도 맨 앞으로 정렬할 수 있게 제거
+      ansible.builtin.command: 'ufw --force delete deny to any port {{ item }} proto tcp'
+      loop: [9100, 9104]
+      register: delete_deny
+      changed_when: "'Rule deleted' in delete_deny.stdout"
+    - name: 넓은 허용 규칙보다 앞에 exporter 포트 기본 차단
+      ansible.builtin.command: 'ufw insert 1 deny to any port {{ item }} proto tcp'
+      loop: [9100, 9104]
+      register: deny_result
+      changed_when: "'Rule inserted' in deny_result.stdout or 'Rule added' in deny_result.stdout"
+    - name: 포트 차단보다 앞에 모니터링 서버만 접근 허용
+      ansible.builtin.command: 'ufw insert 1 allow from {{ monitoring_ip }} to any port {{ item }} proto tcp'
+      loop: [9100, 9104]
+      register: allow_result
+      changed_when: "'Rule inserted' in allow_result.stdout or 'Rule added' in allow_result.stdout"
+    - name: 서비스 자동 시작
+      ansible.builtin.systemd_service:
+        name: '{{ item }}'
+        daemon_reload: true
+        enabled: true
+        state: started
+      loop: [prometheus-node-exporter, prometheus-mysqld-exporter, spacecube-db-app-metrics.timer]
+    - name: 집계 한 번 실행
+      ansible.builtin.systemd_service:
+        name: spacecube-db-app-metrics.service
+        state: started
+  handlers:
+    - name: Exporter 재시작
+      ansible.builtin.systemd_service:
+        name: '{{ item }}'
+        daemon_reload: true
+        state: restarted
+      loop: [prometheus-node-exporter, prometheus-mysqld-exporter]

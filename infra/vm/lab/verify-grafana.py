@@ -21,8 +21,8 @@ def get(path):
 
 
 dashboards = get("/api/search?type=dash-db")
-if len(dashboards) != 9:
-    raise RuntimeError("Grafana 대시보드가 9개가 아닙니다.")
+if len(dashboards) != 10:
+    raise RuntimeError("Grafana 대시보드가 10개가 아닙니다.")
 print(json.dumps({"dashboards": [row["title"] for row in dashboards]}, ensure_ascii=False))
 for uid in ("prometheus", "loki"):
     health = get(f"/api/datasources/uid/{uid}/health")

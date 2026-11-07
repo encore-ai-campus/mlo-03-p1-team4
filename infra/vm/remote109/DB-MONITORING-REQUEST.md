@@ -1,16 +1,13 @@
-# DB 모니터링 추가 요청
+# DB 모니터링 요청 — 11-07 적용 결과
 
-대상 primary 192.168.0.212 / replica 192.168.0.213, 수집 서버 mon 192.168.0.217.
+이전 192.168.0.x 요청은 현재 시험망 192.168.219.x에 적용했다. primary .212 / replica .213 / mon .217이다. [전체 운영 현황](../../../docs/DB_운영_모니터링_현황_2026-11-07.md)을 기준으로 한다.
 
-기존 node exporter(9100)·mysqld exporter(9104) 설치 요청에 아래 확인을 추가 부탁드립니다.
+- 두 DB의 node exporter 1.7.0(9100)·mysqld exporter 0.15.0(9104), systemd 자동 실행을 확인했다. mon만 접근하고 현재 PC의 접근은 차단된다.
+- MariaDB 10.11.14, max_connections 151, 전역 max_user_connections 0, team4 계정별 제한 0이다. 기존 값을 올리지 않았다.
+- exporter는 localhost 전용 계정·최대 연결 3, PROCESS/REPLICA MONITOR + SELECT ON spacecube.*만 사용한다. 인증 파일은 root:spacecube-exporter 0640, 상위 폴더 0750이다. 인증값은 공유하지 않는다.
+- 활성 collector 9종: global_status, global_variables, slave_status, info_schema.tables, info_schema.innodb_metrics, info_schema.processlist, info_schema.innodb_cmp, info_schema.innodb_cmpmem, info_schema.query_response_time. DB 플러그인·userstat를 새로 켜지 않았다.
+- CPU·메모리·디스크 여유, spacecube 데이터/인덱스/테이블 용량, 연결/최고 연결/실행 쿼리/접속 오류, InnoDB 잠금·데드락, 복제 지연·스레드를 수집한다. 19/19 Prometheus 대상 UP을 확인했다.
+- api1 .214 / api2 .215별 Sleep·Query 수·현재 상태의 최대 체류 시간·InnoDB 행 잠금 대기를 15초마다 집계한다. 상태 체류 시간은 HTTP 응답 지연이나 앱 DB 풀 획득 대기가 아니다.
+- SQL 원문·비밀번호·토큰은 수집하지 않는다. slow query/general log를 새로 켜지 않았다. DB 풀 획득 대기·프로세스별 Uvicorn 동시성은 앱 계측이 추가로 필요하다.
 
-- DB 설정은 현재값을 유지하고 MariaDB 버전, max_connections, max_user_connections, 앱 계정의 별도 연결 제한을 알려 주세요. 비밀번호·인증 파일은 보내지 않아도 됩니다.
-- exporter에서 현재/최고 연결 수, 실행 중 쿼리 수, 연결 한도 초과·접속 오류, InnoDB 잠금 대기·데드락, 복제 스레드·지연을 수집해 주세요. 버전·권한·collector에 따라 없는 항목은 미지원으로 알려 주세요.
-- 다음 부하 시험 시간에 앱 접속 원본 .214와 .215별 연결 수, Sleep/Query 상태와 대기 시간을 구분해 볼 수 있게 준비 부탁드립니다. exporter가 원본별 집계를 제공하지 않으면 민감한 SQL 본문 없이 집계 스냅샷만 남겨 주세요. 앱 계정·IP 기반으로 필터링합니다.
-- 부하 중 SHOW GLOBAL STATUS의 Threads_connected, Threads_running, Max_used_connections 및 연결 오류 증가를 함께 기록하면 앱 연결 편중과 DB 한도 문제를 구분하는 데 도움이 됩니다. 최고 연결 수는 서버 시작 이후 최고값이므로 시험 시작 전 값도 기록해 주세요.
-- slow query 원문·general log는 지금 켜지 않아도 됩니다. 필요하면 성능 영향·개인정보 수집 범위를 합의한 뒤 별도 적용합니다.
-- exporter 전용 최소 권한 계정, 보호된 인증 파일, systemd 자동 시작을 사용하고 9100/9104는 .217에서만 허용해 주세요.
-
-현재 확인된 현상: Uvicorn 제한 200 재시험에서 api1 특정 워커가 먼저 동시성 제한에 도달했으며, CPU 평균은 두 앱이 비슷했습니다. DB 병목이나 api1의 요청 과다로 확정한 결과는 아닙니다. DB 한도와 앱 DB 풀은 임의로 올리지 말고 관측 후 한 항목씩 변경하려고 합니다.
-
-앱 워커별 연결·DB 풀 대기는 앱 담당 쪽 계측 사항이며 DB 담당자 설치만으로 해결되는 지표는 아닙니다.
+11-06 Uvicorn 200 제한 재시험에서 특정 워커 제한과 HAProxy health 503이 관측됐지만 DB 병목 확정은 아니다. 현재 지표를 확보한 상태에서 워커·DB 한도·하드웨어를 고정하고 새 읽기/쓰기 시험을 진행한다.

@@ -1,5 +1,5 @@
-﻿param(
-    [ValidateSet('Plan', 'Create', 'Configure', 'Status', 'On', 'Off')]
+param(
+    [ValidateSet('Plan', 'Create', 'Configure', 'Dashboards', 'Status', 'On', 'Off')]
     [string]$Action = 'Plan',
     [string]$SourcePath = ''
 )
@@ -28,6 +28,9 @@ if ($Action -eq 'Configure') {
     if ($LASTEXITCODE -ne 0) { throw '배포 묶음 생성 실패' }
     & scp $payload playdata:spacecube109/payload.tar.gz
     & ssh -o BatchMode=yes playdata 'test -s ~/.config/spacecube109/app/.env && cd ~/spacecube109/overlay/infra/vm/remote109 && ANSIBLE_TIMEOUT=60 ansible-playbook -i inventory.yml site.yml'
+}
+elseif ($Action -eq 'Dashboards') {
+    & ssh -o BatchMode=yes playdata 'cd ~/spacecube109/overlay/infra/vm/remote109 && ANSIBLE_TIMEOUT=60 ansible-playbook -i inventory.yml refresh-dashboards.yml'
 }
 else {
     $operation = $Action.ToLowerInvariant()

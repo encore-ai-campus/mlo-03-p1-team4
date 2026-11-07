@@ -2,7 +2,7 @@
   "uid": "spacecube-nginx",
   "title": "Spacecube / Nginx",
   "schemaVersion": 39,
-  "version": 9,
+  "version": 102,
   "refresh": "15s",
   "panels": [
     {
@@ -386,76 +386,92 @@
     "spacecube",
     "lab"
   ],
-  "description": "109 최소 사양 시험. DB exporter 설치 대기·MongoDB 제외. FastAPI 지표는 현재 수집 워커 기준. 빈 구간은 0을 뜻하지 않습니다.",
+  "description": "109 최소 사양 시험. MariaDB primary·replica exporter가 수집 중이며 MongoDB는 제외했습니다. FastAPI 지표는 현재 수집 워커 기준. 빈 구간은 0을 뜻하지 않습니다.",
   "links": [
     {
-      "type": "link",
       "title": "전체 현황",
+      "type": "link",
       "url": "/d/spacecube-overview",
       "keepTime": true,
       "includeVars": true,
       "targetBlank": false
     },
     {
-      "type": "link",
       "title": "서버",
+      "type": "link",
       "url": "/d/spacecube-servers",
       "keepTime": true,
       "includeVars": true,
       "targetBlank": false
     },
     {
-      "type": "link",
-      "title": "Nginx",
-      "url": "/d/spacecube-nginx",
-      "keepTime": true,
-      "includeVars": true,
-      "targetBlank": false
-    },
-    {
-      "type": "link",
-      "title": "FastAPI",
-      "url": "/d/spacecube-api",
-      "keepTime": true,
-      "includeVars": true,
-      "targetBlank": false
-    },
-    {
-      "type": "link",
       "title": "HAProxy",
+      "type": "link",
       "url": "/d/spacecube-haproxy",
       "keepTime": true,
       "includeVars": true,
       "targetBlank": false
     },
     {
+      "title": "Nginx",
       "type": "link",
-      "title": "Alloy",
-      "url": "/d/spacecube-alloy",
+      "url": "/d/spacecube-nginx",
       "keepTime": true,
       "includeVars": true,
       "targetBlank": false
     },
     {
+      "title": "FastAPI",
       "type": "link",
-      "title": "Loki",
-      "url": "/d/spacecube-loki",
+      "url": "/d/spacecube-api",
       "keepTime": true,
       "includeVars": true,
       "targetBlank": false
     },
     {
+      "title": "MariaDB",
       "type": "link",
-      "title": "로그",
+      "url": "/d/spacecube-mariadb",
+      "keepTime": true,
+      "includeVars": true,
+      "targetBlank": false
+    },
+    {
+      "title": "DB 연결·대기",
+      "type": "link",
+      "url": "/d/spacecube-db-connections",
+      "keepTime": true,
+      "includeVars": true,
+      "targetBlank": false
+    },
+    {
+      "title": "이벤트·저장소",
+      "type": "link",
+      "url": "/d/spacecube-storage",
+      "keepTime": true,
+      "includeVars": true,
+      "targetBlank": false
+    },
+    {
+      "title": "로그 탐색",
+      "type": "link",
       "url": "/d/spacecube-logs",
       "keepTime": true,
       "includeVars": true,
       "targetBlank": false
     },
     {
+      "title": "Alloy",
       "type": "link",
-      "title": "저장소",
-      "url": "/d/spacecube-storage",
+      "url": "/d/spacecube-alloy",
+      "keepTime": true,
+      "includeVars": true,
+      "targetBlank": false
+    },
+    {
+      "title": "Loki",
+      "type": "link",
+      "url": "/d/spacecube-loki",
       "keepTime": true,
       "includeVars": true,
       "targetBlank": false
@@ -468,5 +484,6 @@
       "1m",
       "5m"
     ]
-  }
+  },
+  "timezone": "Asia/Seoul"
 }

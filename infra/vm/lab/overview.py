@@ -80,10 +80,10 @@ panels.append(
     {
         "id": 90,
         "type": "text",
-        "title": "DB 수집 준비 · 지표 해석",
+        "title": "DB 수집 현황 · 지표 해석",
         "options": {
             "mode": "markdown",
-            "content": "DB .212/.213: node exporter·mysqld exporter 설치 대기. MongoDB 제외. 요청은 두 Nginx 합계이며 정적 파일·헬스 요청을 포함합니다. FastAPI 2워커 카운터는 아직 전체 합산이 아니므로 업무 누계로 사용하지 않습니다.",
+            "content": "DB .212/.213: node exporter·mysqld exporter 정상 수집. MongoDB .216 온라인. 요청은 두 Nginx 합계이며 정적 파일·헬스 요청을 포함합니다. FastAPI 2워커 카운터는 아직 전체 합산이 아니므로 업무 누계로 사용하지 않습니다.",
         },
         "gridPos": {"x": 0, "y": 35, "w": 24, "h": 4},
     }
@@ -93,7 +93,7 @@ base.update(
     title="Spacecube / 전체 현황",
     panels=panels,
     tags=["spacecube"],
-    description="109 배포 전체 현황. DB exporter 설치 대기.",
+    description="109 배포 전체 현황. DB exporter 2대·19 targets 수집.",
     version=1,
 )
 (p / "dashboard-overview.json").write_text(

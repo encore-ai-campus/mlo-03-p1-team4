@@ -18,18 +18,6 @@ links = [
 for path in sorted(root.glob("dashboard-*.json")):
     board = json.loads(path.read_text(encoding="utf-8-sig"))
     panels = board["panels"]
-    if board["uid"] == "spacecube-storage" and not any(p["type"] == "text" for p in panels):
-        panels.append(
-            {
-                "id": 900,
-                "type": "text",
-                "title": "DB 수집 대기",
-                "options": {
-                    "mode": "markdown",
-                    "content": "MariaDB 앱 연결은 정상입니다. DB exporter 설치 대기라 용량·연결·복제 지표는 아직 없습니다. MongoDB는 이번 시험에서 제외했습니다. 아래 FastAPI 지표는 수집된 워커 기준입니다.",
-                },
-            }
-        )
     stats = [p for p in panels if p["type"] == "stat"]
     graphs = [p for p in panels if p["type"] not in ("stat", "logs", "text")]
     notes = [p for p in panels if p["type"] == "text"]
@@ -68,6 +56,8 @@ for path in sorted(root.glob("dashboard-*.json")):
     y = ((len(stats) + 3) // 4) * 3
     for i, panel in enumerate(graphs):
         panel["gridPos"] = {"x": i % 2 * 12, "y": y + i // 2 * 7, "w": 12, "h": 7}
+        if panel["type"] in ("piechart", "heatmap", "state-timeline", "barchart", "table"):
+            continue
         panel["options"] = {
             "legend": {"displayMode": "list", "placement": "bottom", "calcs": []},
             "tooltip": {"mode": "multi", "sort": "desc"},
@@ -147,9 +137,9 @@ for path in sorted(root.glob("dashboard-*.json")):
     ]
     board["tags"] = [t for t in board.get("tags", []) if t != "db-disconnected"]
     board["description"] = (
-        "109 최소 사양 시험. DB exporter 설치 대기·MongoDB 제외. FastAPI 지표는 현재 수집 워커 기준. 빈 구간은 0을 뜻하지 않습니다."
+        "109 최소 사양 시험. MariaDB primary·replica exporter가 수집 중이며 MongoDB는 온라인이며 exporter는 미설치입니다. FastAPI 지표는 현재 수집 워커 기준. 빈 구간은 0을 뜻하지 않습니다."
     )
-    board["version"] = board.get("version", 1) + 1
+    board["version"] = board.get("version", 1)
     board["refresh"] = "15s"
     board["timepicker"] = {"refresh_intervals": ["15s", "30s", "1m", "5m"]}
     path.write_text(json.dumps(board, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")

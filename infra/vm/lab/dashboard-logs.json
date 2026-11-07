@@ -2,7 +2,7 @@
   "uid": "spacecube-logs",
   "title": "Spacecube / 로그 탐색",
   "schemaVersion": 39,
-  "version": 8,
+  "version": 103,
   "refresh": "15s",
   "tags": [
     "spacecube",
@@ -11,7 +11,8 @@
   "panels": [
     {
       "id": 1,
-      "title": "Alloy → Loki (DB 연결과 무관)",
+      "title": "전체 로그",
+      "description": "",
       "type": "logs",
       "datasource": {
         "type": "loki",
@@ -23,11 +24,14 @@
           "expr": "{server=~\"gw|api1|api2|mon\"}"
         }
       ],
-      "gridPos": {
-        "x": 0,
-        "y": 0,
-        "w": 24,
-        "h": 16
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "decimals": 1,
+          "noValue": "수집 없음"
+        },
+        "overrides": []
       },
       "options": {
         "showTime": true,
@@ -36,11 +40,125 @@
         "sortOrder": "Descending",
         "enableLogDetails": true
       },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 9
+      }
+    },
+    {
+      "id": 2,
+      "title": "FastAPI 오류·503·동시성 제한",
+      "description": "",
+      "type": "logs",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "{job=\"api\",server=~\"api1|api2\"} |~ \"(?i)(ERROR|Exception|Traceback|503|Exceeded concurrency limit)\""
+        }
+      ],
       "fieldConfig": {
         "defaults": {
-          "noValue": "수집 없음",
-          "unit": "short"
+          "unit": "short",
+          "min": 0,
+          "decimals": 1,
+          "noValue": "수집 없음"
+        },
+        "overrides": []
+      },
+      "options": {
+        "showTime": true,
+        "showLabels": false,
+        "wrapLogMessage": false,
+        "sortOrder": "Descending",
+        "enableLogDetails": true
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 9,
+        "w": 24,
+        "h": 9
+      }
+    },
+    {
+      "id": 3,
+      "title": "Nginx API 5xx 접근 로그",
+      "description": "",
+      "type": "logs",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "{job=\"nginx\",server=~\"api1|api2\"} | json | __error__=\"\" | path=~\"/api/.*\" | path!~\"/api/(health|metrics).*\" | status=~\"5..\""
         }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "decimals": 1,
+          "noValue": "수집 없음"
+        },
+        "overrides": []
+      },
+      "options": {
+        "showTime": true,
+        "showLabels": false,
+        "wrapLogMessage": false,
+        "sortOrder": "Descending",
+        "enableLogDetails": true
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 18,
+        "w": 24,
+        "h": 9
+      }
+    },
+    {
+      "id": 4,
+      "title": "서버·수집기 오류 로그",
+      "description": "",
+      "type": "logs",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "{job=\"journal\",server=~\"gw|api1|api2|mon\"} |~ \"(?i)(error|failed|down|retry|drop)\""
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "decimals": 1,
+          "noValue": "수집 없음"
+        },
+        "overrides": []
+      },
+      "options": {
+        "showTime": true,
+        "showLabels": false,
+        "wrapLogMessage": false,
+        "sortOrder": "Descending",
+        "enableLogDetails": true
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 27,
+        "w": 24,
+        "h": 9
       }
     }
   ],
@@ -48,76 +166,92 @@
     "from": "now-30m",
     "to": "now"
   },
-  "description": "109 최소 사양 시험. DB exporter 설치 대기·MongoDB 제외. FastAPI 지표는 현재 수집 워커 기준. 빈 구간은 0을 뜻하지 않습니다.",
+  "description": "같은 시간 범위에서 API 오류, Nginx 5xx, 시스템·수집기 로그를 확인합니다.",
   "links": [
     {
-      "type": "link",
       "title": "전체 현황",
+      "type": "link",
       "url": "/d/spacecube-overview",
       "keepTime": true,
       "includeVars": true,
       "targetBlank": false
     },
     {
-      "type": "link",
       "title": "서버",
+      "type": "link",
       "url": "/d/spacecube-servers",
       "keepTime": true,
       "includeVars": true,
       "targetBlank": false
     },
     {
-      "type": "link",
-      "title": "Nginx",
-      "url": "/d/spacecube-nginx",
-      "keepTime": true,
-      "includeVars": true,
-      "targetBlank": false
-    },
-    {
-      "type": "link",
-      "title": "FastAPI",
-      "url": "/d/spacecube-api",
-      "keepTime": true,
-      "includeVars": true,
-      "targetBlank": false
-    },
-    {
-      "type": "link",
       "title": "HAProxy",
+      "type": "link",
       "url": "/d/spacecube-haproxy",
       "keepTime": true,
       "includeVars": true,
       "targetBlank": false
     },
     {
+      "title": "Nginx",
       "type": "link",
-      "title": "Alloy",
-      "url": "/d/spacecube-alloy",
+      "url": "/d/spacecube-nginx",
       "keepTime": true,
       "includeVars": true,
       "targetBlank": false
     },
     {
+      "title": "FastAPI",
       "type": "link",
-      "title": "Loki",
-      "url": "/d/spacecube-loki",
+      "url": "/d/spacecube-api",
       "keepTime": true,
       "includeVars": true,
       "targetBlank": false
     },
     {
+      "title": "MariaDB",
       "type": "link",
-      "title": "로그",
+      "url": "/d/spacecube-mariadb",
+      "keepTime": true,
+      "includeVars": true,
+      "targetBlank": false
+    },
+    {
+      "title": "DB 연결·대기",
+      "type": "link",
+      "url": "/d/spacecube-db-connections",
+      "keepTime": true,
+      "includeVars": true,
+      "targetBlank": false
+    },
+    {
+      "title": "이벤트·저장소",
+      "type": "link",
+      "url": "/d/spacecube-storage",
+      "keepTime": true,
+      "includeVars": true,
+      "targetBlank": false
+    },
+    {
+      "title": "로그 탐색",
+      "type": "link",
       "url": "/d/spacecube-logs",
       "keepTime": true,
       "includeVars": true,
       "targetBlank": false
     },
     {
+      "title": "Alloy",
       "type": "link",
-      "title": "저장소",
-      "url": "/d/spacecube-storage",
+      "url": "/d/spacecube-alloy",
+      "keepTime": true,
+      "includeVars": true,
+      "targetBlank": false
+    },
+    {
+      "title": "Loki",
+      "type": "link",
+      "url": "/d/spacecube-loki",
       "keepTime": true,
       "includeVars": true,
       "targetBlank": false
@@ -130,5 +264,6 @@
       "1m",
       "5m"
     ]
-  }
+  },
+  "timezone": "Asia/Seoul"
 }

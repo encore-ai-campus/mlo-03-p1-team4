@@ -1,8 +1,8 @@
 {
   "uid": "spacecube-storage",
-  "title": "Spacecube / 저장소·이벤트 (연결 대기)",
+  "title": "Spacecube / 이벤트·저장소 요약",
   "schemaVersion": 39,
-  "version": 8,
+  "version": 103,
   "refresh": "15s",
   "tags": [
     "spacecube",
@@ -10,30 +10,59 @@
   ],
   "panels": [
     {
-      "id": 900,
-      "type": "text",
-      "title": "DB 수집 대기",
+      "id": 10,
+      "title": "MariaDB exporter 정상 대수",
+      "description": "",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(mysql_up{job=\"mariadb\"})",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "decimals": 1,
+          "noValue": "수집 없음"
+        },
+        "overrides": []
+      },
       "options": {
-        "mode": "markdown",
-        "content": "MariaDB 앱 연결은 정상입니다. DB exporter 설치 대기라 용량·연결·복제 지표는 아직 없습니다. MongoDB는 이번 시험에서 제외했습니다. 아래 FastAPI 지표는 수집된 워커 기준입니다."
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "justifyMode": "auto",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "values": false
+        },
+        "text": {
+          "valueSize": 16,
+          "titleSize": 11
+        }
       },
       "gridPos": {
         "x": 0,
         "y": 0,
-        "w": 24,
-        "h": 4
-      },
-      "fieldConfig": {
-        "defaults": {
-          "noValue": "수집 없음",
-          "unit": "short"
-        }
+        "w": 6,
+        "h": 3
       }
     },
     {
-      "id": 1,
-      "title": "Replica 대체 횟수 · 수집된 워커",
-      "type": "timeseries",
+      "id": 11,
+      "title": "spacecube 데이터 + 인덱스",
+      "description": "테이블 데이터·인덱스 크기 합계입니다. DB 서버 루트 디스크 사용량과 다릅니다.",
+      "type": "stat",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -41,50 +70,49 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "db_read_fallback_total",
-          "interval": "15s",
-          "legendFormat": "{{server}} · {{instance}}"
+          "expr": "sum by(server,role)(mysql_info_schema_table_size{job=\"mariadb\",schema=\"spacecube\",component=~\"data_length|index_length\"})",
+          "legendFormat": "{{server}}",
+          "instant": true
         }
       ],
-      "gridPos": {
-        "x": 0,
-        "y": 4,
-        "w": 12,
-        "h": 7
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "min": 0,
+          "decimals": 1,
+          "noValue": "수집 없음"
+        },
+        "overrides": []
       },
       "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "calcs": []
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "justifyMode": "auto",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "values": false
         },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
+        "text": {
+          "valueSize": 16,
+          "titleSize": 11
         }
       },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "drawStyle": "line",
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "fillOpacity": 6,
-            "showPoints": "never",
-            "spanNulls": false,
-            "axisBorderShow": false
-          },
-          "noValue": "수집 없음",
-          "min": 0,
-          "decimals": 0,
-          "unit": "short"
-        }
+      "gridPos": {
+        "x": 6,
+        "y": 0,
+        "w": 6,
+        "h": 3
       }
     },
     {
-      "id": 2,
-      "title": "MongoDB 전달 실패 — 연결 대기",
-      "type": "timeseries",
+      "id": 12,
+      "title": "Replica 복제 지연",
+      "description": "",
+      "type": "stat",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -92,49 +120,146 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "mongo_event_write_failures_total",
-          "interval": "15s",
-          "legendFormat": "{{server}} · {{instance}}"
+          "expr": "mysql_slave_status_seconds_behind_master{job=\"mariadb\"}",
+          "legendFormat": "{{server}}",
+          "instant": true
         }
       ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "min": 0,
+          "decimals": 1,
+          "noValue": "수집 없음"
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "justifyMode": "auto",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "values": false
+        },
+        "text": {
+          "valueSize": 16,
+          "titleSize": 11
+        }
+      },
       "gridPos": {
         "x": 12,
-        "y": 4,
-        "w": 12,
-        "h": 7
-      },
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "calcs": []
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "drawStyle": "line",
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "fillOpacity": 6,
-            "showPoints": "never",
-            "spanNulls": false,
-            "axisBorderShow": false
-          },
-          "noValue": "수집 없음",
-          "min": 0,
-          "decimals": 0,
-          "unit": "short"
-        }
+        "y": 0,
+        "w": 6,
+        "h": 3
       }
     },
     {
-      "id": 3,
-      "title": "MariaDB 복제 지연 — exporter 대기",
+      "id": 14,
+      "title": "이벤트 API 수락 수 · 선택 기간",
+      "description": "HTTP 202 응답 수이며 MongoDB 저장 건수는 아닙니다.",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(increase(http_requests_total{job=\"api\",handler=\"/events\",status=\"202\"}[$__range]))",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "decimals": 1,
+          "noValue": "수집 없음"
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "justifyMode": "auto",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "values": false
+        },
+        "text": {
+          "valueSize": 16,
+          "titleSize": 11
+        }
+      },
+      "gridPos": {
+        "x": 18,
+        "y": 0,
+        "w": 6,
+        "h": 3
+      }
+    },
+    {
+      "id": 15,
+      "title": "읽기 대체 횟수 · 선택 기간",
+      "description": "",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(increase(db_read_fallback_total{job=\"api\"}[$__range]))",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "decimals": 1,
+          "noValue": "수집 없음"
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "justifyMode": "auto",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "values": false
+        },
+        "text": {
+          "valueSize": 16,
+          "titleSize": 11
+        }
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 3,
+        "w": 6,
+        "h": 3
+      }
+    },
+    {
+      "id": 20,
+      "title": "이벤트 API 수락률 · HTTP 202",
+      "description": "",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -143,16 +268,24 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "mysql_slave_status_seconds_behind_master",
-          "interval": "15s",
-          "legendFormat": "{{server}} · {{instance}}"
+          "expr": "sum by(server)(rate(http_requests_total{job=\"api\",handler=\"/events\",status=\"202\"}[$__rate_interval]))",
+          "legendFormat": "{{server}}"
         }
       ],
-      "gridPos": {
-        "x": 0,
-        "y": 11,
-        "w": 12,
-        "h": 7
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "min": 0,
+          "decimals": 1,
+          "noValue": "수집 없음",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 6,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
       },
       "options": {
         "legend": {
@@ -165,22 +298,236 @@
           "sort": "desc"
         }
       },
+      "gridPos": {
+        "x": 0,
+        "y": 6,
+        "w": 12,
+        "h": 7
+      }
+    },
+    {
+      "id": 21,
+      "title": "Replica 읽기 대체 증가율",
+      "description": "",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by(server)(rate(db_read_fallback_total{job=\"api\"}[$__rate_interval]))",
+          "legendFormat": "{{server}}"
+        }
+      ],
       "fieldConfig": {
         "defaults": {
+          "unit": "ops",
+          "min": 0,
+          "decimals": 1,
+          "noValue": "수집 없음",
           "custom": {
             "drawStyle": "line",
-            "lineInterpolation": "linear",
             "lineWidth": 1,
             "fillOpacity": 6,
-            "showPoints": "never",
-            "spanNulls": false,
-            "axisBorderShow": false
-          },
-          "noValue": "수집 없음",
-          "min": 0,
-          "decimals": 0,
-          "unit": "short"
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "calcs": []
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
         }
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 6,
+        "w": 12,
+        "h": 7
+      }
+    },
+    {
+      "id": 22,
+      "title": "MongoDB 전달 실패 누계",
+      "description": "MongoDB는 현재 온라인입니다. 응답 뒤 백그라운드 저장 실패 누계이며 현재 문서 수나 저장 완료 건수가 아닙니다.",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by(server)(mongo_event_write_failures_total{job=\"api\"})",
+          "legendFormat": "{{server}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "decimals": 1,
+          "noValue": "수집 없음",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 6,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "calcs": []
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 13,
+        "w": 12,
+        "h": 7
+      }
+    },
+    {
+      "id": 23,
+      "title": "Alloy → Loki 전송률",
+      "description": "",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by(server)(rate(loki_write_sent_entries_total{job=\"alloy\"}[$__rate_interval]))",
+          "legendFormat": "{{server}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "min": 0,
+          "decimals": 1,
+          "noValue": "수집 없음",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 6,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "calcs": []
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 13,
+        "w": 12,
+        "h": 7
+      }
+    },
+    {
+      "id": 24,
+      "title": "Loki 로그 수신률",
+      "description": "",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(loki_distributor_lines_received_total[$__rate_interval]))"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "min": 0,
+          "decimals": 1,
+          "noValue": "수집 없음",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 6,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "calcs": []
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 20,
+        "w": 12,
+        "h": 7
+      }
+    },
+    {
+      "id": 900,
+      "title": "저장·집계 범위",
+      "description": "",
+      "type": "text",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "decimals": 1,
+          "noValue": "수집 없음"
+        },
+        "overrides": []
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "**저장·집계 범위**\nMariaDB 10.11.14 primary·replica exporter는 정상 수집 중입니다. MongoDB 8.0.34는 온라인이며 전용 exporter는 미설치입니다.\n\n이벤트 API 202는 batch 접수 수로, 이벤트 수나 MongoDB 저장 완료 건수가 아닙니다. 예약·취소의 서버 이벤트는 /events 요청 없이도 생성됩니다.\n\n원천 space_rental_analytics.events는 api1이 매시 :20에 event_daily로 집계합니다. 생성기 파일럿(100명·30일, 10-08~11-06)의 10,368건과 이후 부하 시험 이벤트를 구분합니다. Mongo user.user_id는 문자열입니다. 업무별 정확한 건수는 실험 SQL/Mongo 집계 문서를 따릅니다."
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 27,
+        "w": 24,
+        "h": 8
       }
     }
   ],
@@ -188,76 +535,92 @@
     "from": "now-30m",
     "to": "now"
   },
-  "description": "109 최소 사양 시험. DB exporter 설치 대기·MongoDB 제외. FastAPI 지표는 현재 수집 워커 기준. 빈 구간은 0을 뜻하지 않습니다.",
+  "description": "이벤트 API 수락, replica 읽기 대체, 로그 전달과 DB 용량 요약을 봅니다. DB 세부 패널은 MariaDB 대시보드에서 확인합니다.",
   "links": [
     {
-      "type": "link",
       "title": "전체 현황",
+      "type": "link",
       "url": "/d/spacecube-overview",
       "keepTime": true,
       "includeVars": true,
       "targetBlank": false
     },
     {
-      "type": "link",
       "title": "서버",
+      "type": "link",
       "url": "/d/spacecube-servers",
       "keepTime": true,
       "includeVars": true,
       "targetBlank": false
     },
     {
-      "type": "link",
-      "title": "Nginx",
-      "url": "/d/spacecube-nginx",
-      "keepTime": true,
-      "includeVars": true,
-      "targetBlank": false
-    },
-    {
-      "type": "link",
-      "title": "FastAPI",
-      "url": "/d/spacecube-api",
-      "keepTime": true,
-      "includeVars": true,
-      "targetBlank": false
-    },
-    {
-      "type": "link",
       "title": "HAProxy",
+      "type": "link",
       "url": "/d/spacecube-haproxy",
       "keepTime": true,
       "includeVars": true,
       "targetBlank": false
     },
     {
+      "title": "Nginx",
       "type": "link",
-      "title": "Alloy",
-      "url": "/d/spacecube-alloy",
+      "url": "/d/spacecube-nginx",
       "keepTime": true,
       "includeVars": true,
       "targetBlank": false
     },
     {
+      "title": "FastAPI",
       "type": "link",
-      "title": "Loki",
-      "url": "/d/spacecube-loki",
+      "url": "/d/spacecube-api",
       "keepTime": true,
       "includeVars": true,
       "targetBlank": false
     },
     {
+      "title": "MariaDB",
       "type": "link",
-      "title": "로그",
+      "url": "/d/spacecube-mariadb",
+      "keepTime": true,
+      "includeVars": true,
+      "targetBlank": false
+    },
+    {
+      "title": "DB 연결·대기",
+      "type": "link",
+      "url": "/d/spacecube-db-connections",
+      "keepTime": true,
+      "includeVars": true,
+      "targetBlank": false
+    },
+    {
+      "title": "이벤트·저장소",
+      "type": "link",
+      "url": "/d/spacecube-storage",
+      "keepTime": true,
+      "includeVars": true,
+      "targetBlank": false
+    },
+    {
+      "title": "로그 탐색",
+      "type": "link",
       "url": "/d/spacecube-logs",
       "keepTime": true,
       "includeVars": true,
       "targetBlank": false
     },
     {
+      "title": "Alloy",
       "type": "link",
-      "title": "저장소",
-      "url": "/d/spacecube-storage",
+      "url": "/d/spacecube-alloy",
+      "keepTime": true,
+      "includeVars": true,
+      "targetBlank": false
+    },
+    {
+      "title": "Loki",
+      "type": "link",
+      "url": "/d/spacecube-loki",
       "keepTime": true,
       "includeVars": true,
       "targetBlank": false
@@ -270,5 +633,6 @@
       "1m",
       "5m"
     ]
-  }
+  },
+  "timezone": "Asia/Seoul"
 }
