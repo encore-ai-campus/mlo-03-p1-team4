@@ -110,6 +110,9 @@ Pro_1/
 │  ├─ generator/              [B 본체·A 연결 확인·DB 후속] #75 서비스 호출 기반 과거 백필 CLI
 │  │  └─ tests/              고정 방문량·시각·부분 실패·실제 MariaDB 서비스/재개 검증
 │  └─ locust/                 [B] 부하·동시성 (예정)
+│     ├─ daily_locustfile.py   [B] 네 페르소나 일일 조회·명시적 쓰기 시나리오
+│     ├─ run_daily.ps1         [B] pro_1·모드·날짜·실행 로그를 묶는 Windows 실행기
+│     └─ tests/                [B] 부하 시나리오의 오프라인 회귀 테스트
 │
 ├─ infra/
 │  ├─ local/                  [DB] docker compose: MariaDB 11.4(3308) + MongoDB 7, 첫 실행 때 0001·seed·mongo_init 자동 (11-04)
