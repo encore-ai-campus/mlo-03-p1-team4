@@ -215,13 +215,13 @@ infra/monitoring/  alloy.config                # [A] 로그 파일 → Loki, 로
 
 #### 생성기 백필에서 A 서비스 사용 (#75)
 
-- 새 합성 회원은 일반 가입 중복 정책을 그대로 지키며 `auth_service.signup()`으로 만든다. 회원 한 명의 과거 가입 시각을 `joined_at`이라고 하면 `with override_business_time(joined_at):` 블록 안에서 `SignupCreate` 입력 객체를 만들고 `auth_service.signup(db, body, is_synthetic=True)`를 호출한다. 스키마의 만 14세 검증과 서비스의 동의·가입 시각이 모두 같은 과거 업무 시각을 본다. 기존 비밀번호 검증·bcrypt 해시를 그대로 사용한다.
-- 후기는 이용 종료 후의 과거 작성 시각 `reviewed_at`을 `override_business_time(reviewed_at)`으로 감싼 상태에서 `review_service.create_review()`를 호출한다. 자격 판정·기한 확인·`reviews.created_at`이 과거 행동 시각을 따른다.
+- 현재 생성기는 별도 프로세스의 `HistoricalRuntime`에서 `Gateway.signup()` 호출 전 업무 시각을 과거 가입 시각으로 맞춘다. 그 안에서 `SignupCreate`를 만들고 `auth_service.signup(db, body, is_synthetic=True)`를 호출한다. A의 `override_business_time(joined_at)` 범위에서 같은 입력·서비스를 호출해도 가입 나이 검증, 동의·가입 시각이 같은 결과를 내는지 비교 테스트로 확인했다. 일반 가입 중복 정책과 기존 bcrypt 해시는 유지한다.
+- 후기는 `Gateway.review()`가 `HistoricalRuntime` 시각을 이용 종료 뒤의 작성 시각으로 맞춘 뒤 `review_service.create_review()`를 호출한다. A의 `override_business_time(reviewed_at)` 경로와 정상 작성 결과·`reviews.created_at`이 같은지 비교 테스트로 확인했다.
 - 이벤트는 A의 `build_document()`로 조립하고 `is_synthetic=True`, 각 행동 시각은 `occurred_at`으로 명시한다. `received_at`은 `get_event_time()`의 실제 적재 시각으로 둔다. 업무 시각 override를 이벤트 수신 시각에 적용하지 않는다.
 - `SERVER_NAME=generator`는 백필 실행 프로세스의 환경에만 지정하고 공용 `backend/.env`에는 넣지 않는다. 예: Linux `env SERVER_NAME=generator python -m <생성기_모듈>`. 앱 설정은 첫 `get_settings()` 때 읽으므로 프로세스를 시작하기 전에 지정한다. API 프로세스의 `api-1`·`api-2` 표시는 유지한다.
 - 재실행 때 기존 일반 가입 API의 중복 허용을 추가하지 않는다. 결정적 이메일이 이미 있으면 생성기에서 `is_synthetic` 표식과 manifest의 동일 seed·회원 데이터를 확인한다. 기대한 합성 회원과 일치하면 그 `user_id`를 재사용하고, 일반 회원 또는 다른 생성 결과와 충돌하면 덮어쓰지 말고 중단한다. 비밀번호는 bcrypt 해시 문자열이 매번 달라질 수 있으므로 해시 문자열끼리 비교하지 않는다.
 - 후기는 예약당 UNIQUE와 소프트 삭제 정책을 따른다. 같은 seed에서 해당 예약의 후기가 이미 있으면 `user_id`, 내용·평점·작성 시각 및 삭제 상태가 manifest의 기대 결과와 일치할 때만 재생성 없이 건너뛴다. 불일치하면 수정하거나 삭제 후 다시 쓰지 말고 충돌로 중단한다. 새 후기는 `review_service.create_review()`를 호출한다. 삭제된 후기도 예약당 1개 제한에 포함되므로 재작성하지 않는다.
-- 주의: 현재 B `reservation_service`는 예약 성공·충돌·취소 후 A `log_event()`와 `reservation_counter`를 자동 호출한다. 생성기가 서비스 호출 뒤 같은 행동 이벤트를 다시 만들면 MongoDB 원천 이벤트가 중복되고, B 지표를 실행 환경 메트릭에 올리면 실제 사용자 예약·취소율이 오염된다. `SERVER_NAME=generator`는 출처 표지만 바꾸며 이벤트·로그·계측을 끄지 않는다. 백필 전에 B가 기본값은 기존 동작을 유지하면서 내부 호출에만 이벤트 기록·Prometheus 계측을 각각 끌 수 있는 keyword-only 옵션을 제공해야 한다. 이 계약 전에는 B 예약·취소 서비스로 파일럿을 적재하지 않는다.
+- B 예약 서비스의 일반 요청은 `log_event()`와 `reservation_counter`를 호출한다. 현재 생성기의 `HistoricalRuntime`은 별도 생성기 프로세스 안에서만 이 두 호출을 억제하고 종료 시 원래 참조를 복원한다. 생성기가 확정 결과로 이벤트를 따로 만들어도 예약 이벤트와 운영 지표가 중복되지 않도록 한 방식이다. `SERVER_NAME=generator`는 출처 표식이며 억제 기능을 대신하지 않는다. api1 파일럿에서는 생성기 프로세스를 따로 실행하고 이벤트·카운터 중복 여부를 확인한다. PM은 `HistoricalRuntime`과 `override_business_time()`의 결과가 같다는 테스트가 있으면 현재 방식을 허용했다(#75).
 
 **#60 전환 상태(11-06):** A는 새 문서 조립·저장 대상·재적재 형식을 구현했다. 공식 `mongo_init.js`를 전용 `space_rental_analytics_test`에 적용한 뒤 실제 HTTP 검색 이벤트와 `log_event` 서버 이벤트 각 1건을 `events.log`와 MongoDB에서 확인했고, 같은 로그를 두 번 재적재해도 ID별 1건만 남음을 확인했다. 생성한 두 문서는 삭제했다. 이벤트 pytest 24건·전체 375건, Ruff·프론트 verify가 통과했다. FE PR #59는 develop에 병합됐지만 지역·시설 ID와 예약 문맥 전송은 남았고, B 서버 이벤트 이름·상품 전달도 미완료다. 비활성 공간 `review_create`가 유효한 항목과 섞이면 전체 400인 현행 정책은 PM 후속 논의 대상이다. 옛 로그는 별도로 보존하고 재적재에서 제외한다. HTTP 재전송은 서버가 새 ID를 발급한다.
 

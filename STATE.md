@@ -178,7 +178,7 @@ A1~A4는 11-03에 확정했고, **A5~A8은 추후 확정**으로 미뤘다(11-03
 
 ## 최근 변경 (최신이 위)
 
-- 11-07 · A · #75 생성기의 `HistoricalRuntime`과 A `override_business_time()`을 직접 비교하는 회귀 테스트 추가. 과거 날짜 가입 스키마 검증, `auth_service.signup()`의 가입·동의 시각, `review_service.create_review()` 저장 시각, 생성기 `documents()`와 A `build_document()`의 `occurred_at` 및 나머지 문서 필드 일치를 확인하고 실제 `received_at`은 현재 시각으로 유지되는지 검사. `backend/tests/test_backfill_clock.py`와 `simulator/generator/tests/test_generator.py` 24건 통과, Ruff 린트·포맷 통과. 기본 pytest 임시 폴더 권한 오류가 있어 사용자 Temp 아래 별도 `--basetemp`로 재실행함. DB 저장은 이 비교 테스트에서 mock 처리했고, MariaDB 10.11.14 전체 406건 결과는 이전 VM 실행; 11.4 검증은 남음.
+- 11-07 · A · #75 생성기의 `HistoricalRuntime`과 A `override_business_time()`을 직접 비교하는 회귀 테스트 추가. 과거 날짜 가입 스키마 검증, `auth_service.signup()`의 가입·동의 시각, `review_service.create_review()` 저장 시각, 생성기 `documents()`와 A `build_document()`의 `occurred_at` 및 나머지 문서 필드 일치를 확인하고 실제 `received_at`은 현재 시각으로 유지되는지 검사. A 기준 문서의 생성기 시각 적용·이벤트/지표 억제 설명을 현행 `HistoricalRuntime`에 맞춤. `backend/tests/test_backfill_clock.py`와 `simulator/generator/tests/test_generator.py` 24건 통과, Ruff 린트·포맷 통과. 기본 pytest 임시 폴더 권한 오류가 있어 사용자 Temp 아래 별도 `--basetemp`로 재실행함. DB 저장은 이 비교 테스트에서 mock 처리했고, MariaDB 10.11.14 전체 406건 결과는 이전 VM 실행; 11.4 검증은 남음.
 
 - 11-07 · A · 동일 MariaDB 10.11.14 VM에서 MongoDB 8.0.34 테스트 서버를 함께 연결해 생성기 서비스 pytest 3건 통과. 전용 space_rental_analytics_test.generator_validation_bd7d60618758442c84f05e74b4201966에 100명·1,260세션의 이벤트 10,111건 실제 저장, 재개 시 추가 0건/중복 10,111건, 공식 validator 적용 및 121 거절 확인. MariaDB 테스트 거래는 롤백해 기존 회원 3명 유지, 공간·예약·후기 0건. Mongo 테스트 컬렉션은 DB 담당 확인용 보존, 운영 events 변경 없음.
 
