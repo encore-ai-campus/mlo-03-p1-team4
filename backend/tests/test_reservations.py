@@ -18,9 +18,10 @@ from app.core import synthetic
 from app.core.db import get_db_write
 from app.core.deps import CurrentUser, get_current_user
 from app.core.errors import AppError
+from app.core.event_context import ClientEventContext, client_event_context
 from app.core.metrics import reservation_counter
 from app.main import create_app
-from app.schemas.reservations import ReservationRead
+from app.schemas.reservations import ReservationEventContext, ReservationRead
 from app.services import reservation_service, review_service
 
 TODAY = date(2026, 11, 5)
@@ -215,7 +216,223 @@ def test_create_reservation_writes_three_tables_and_returns_mock_payment(connect
         )
     ) == [13, 14]
     assert reservation_counter.labels(result="ok")._value.get() == before_ok + 1
-    assert [event[0] for event in api.app.state.booking_events] == ["reserve_ok"]
+    assert [event[0] for event in api.app.state.booking_events] == ["reservation_complete"]
+
+
+@pytest.fixture
+def collected_documents(api, monkeypatch):
+    """#72의 실제 조립 함수를 호출하고 외부 전송만 분리한다."""
+    from app.core import events
+
+    documents = []
+    monkeypatch.setattr(reservation_service, "log_event", events.log_event)
+    monkeypatch.setattr(events, "write_event", documents.append)
+    monkeypatch.setattr(events, "submit_events", lambda _: None)
+    return documents
+
+
+def browser_context():
+    url = "http://localhost/reserve"
+    return {
+        "user": {"anonymous_id": "anon-test", "session_sequence": 2, "user_id": "forged"},
+        "site": {"site_id": "main", "hostname": "localhost", "platform": "desktop_web"},
+        "acquisition": {"landing_url": url},
+        "page": {"page_view_id": "page-test", "page_type": "checkout", "url": url},
+        "navigation": {"from": None, "to": {"url": url}, "navigation_type": "direct"},
+        "products": [{"product_id": "forged"}],
+    }
+
+
+@pytest.mark.parametrize("with_context", [False, True])
+def test_new_event_documents_cover_booking_conflict_and_cancel(
+    connection, sample, api, collected_documents, with_context
+):
+    """#72 실제 조립·상품값·문맥 전달 및 재시도의 중복 기록 방지를 검사한다."""
+    headers = {"X-Session-Id": "cb98d91e-b62c-46e7-bbd4-ec158672e4ec"}
+    body = booking(sample["venue_id"])
+    if with_context:
+        body["event_context"] = browser_context()
+    created = api.post("/reservations", json=body, headers=headers)
+    assert created.status_code == 201
+    assert api.post("/reservations", json=body, headers=headers).status_code == 200
+    conflict = api.post(
+        "/reservations",
+        json=body,
+        headers={**headers, "X-Test-User-Id": str(sample["create_user"]())},
+    )
+    assert conflict.status_code == 409
+    reservation_id = created.json()["reservation_id"]
+    # 취소 상품 가격은 변경된 현재 가격이 아니라 확정된 예약 금액에서 복원한다.
+    connection.execute(
+        text("UPDATE venues SET price_per_hour=99000,is_active=FALSE WHERE venue_id=:id"),
+        {"id": sample["venue_id"]},
+    )
+    cancel_kwargs = {"json": {"event_context": browser_context()}} if with_context else {}
+    assert (
+        api.post(
+            f"/reservations/{reservation_id}/cancel", headers=headers, **cancel_kwargs
+        ).status_code
+        == 200
+    )
+    assert [d["event_name"] for d in collected_documents] == [
+        "reservation_complete",
+        "reservation_conflict",
+        "reservation_cancel_complete",
+    ]
+    for doc in collected_documents:
+        product = doc["products"][0]
+        assert product["product_id"] == str(sample["venue_id"])
+        assert product["product_name"] == "예약 검증 공간"
+        assert product["price"]["displayed_amount_minor"] == 11000
+        assert product["rental_conditions"]["guest_count"] == 2
+        assert product["rental_conditions"]["start_at"] == datetime.fromisoformat(
+            "2026-11-06T04:00:00+00:00"
+        )
+        assert product["rental_conditions"]["end_at"] == datetime.fromisoformat(
+            "2026-11-06T06:00:00+00:00"
+        )
+        assert doc["user"]["session_id"] == headers["X-Session-Id"]
+        assert doc["user"]["anonymous_id"] == ("anon-test" if with_context else None)
+        assert (doc["page"] is not None) == with_context
+    assert collected_documents[0]["user"]["user_id"] == str(sample["user_id"])
+    assert collected_documents[1]["properties"]["reason"] == "SLOT_TAKEN"
+    # 같은 워커에서 다음 요청에 이전 브라우저 문맥이 새지 않는다.
+    assert (
+        api.post(
+            "/reservations",
+            json=booking(sample["venue_id"], start=17),
+            headers=headers,
+        ).status_code
+        == 404
+    )  # 위에서 공간을 비활성화했다.
+    connection.execute(
+        text("UPDATE venues SET is_active=TRUE WHERE venue_id=:id"),
+        {"id": sample["venue_id"]},
+    )
+    assert (
+        api.post(
+            "/reservations",
+            json=booking(sample["venue_id"], start=17),
+            headers=headers,
+        ).status_code
+        == 201
+    )
+    assert collected_documents[-1]["page"] is None
+    assert collected_documents[-1]["user"]["anonymous_id"] is None
+
+
+def test_bad_event_context_does_not_change_booking_result(sample, api, collected_documents):
+    body = {**booking(sample["venue_id"]), "event_context": {"page": {"url": "bad"}}}
+    response = api.post(
+        "/reservations",
+        json=body,
+        headers={"X-Session-Id": "cb98d91e-b62c-46e7-bbd4-ec158672e4ec"},
+    )
+    assert response.status_code == 201
+    assert collected_documents == []
+
+
+@pytest.mark.parametrize("failure_point", ["model_dump", "log_event", "product"])
+def test_event_failure_after_commit_preserves_created_booking(
+    connection, sample, api, monkeypatch, failure_point
+):
+    """#5 F-30~32: 문맥 조립·기록 예외 뒤에도 201과 예약·칸·결제를 유지한다."""
+    calls = []
+
+    def fail_event(*args, **kwargs):
+        calls.append(failure_point)
+        raise RuntimeError("이벤트 실패 주입")
+
+    if failure_point == "model_dump":
+        monkeypatch.setattr(ReservationEventContext, "model_dump", fail_event)
+    elif failure_point == "product":
+        monkeypatch.setattr(reservation_service, "_event_product", fail_event)
+    else:
+        monkeypatch.setattr(reservation_service, "log_event", fail_event)
+
+    before_ok = reservation_counter.labels(result="ok")._value.get()
+    response = api.post(
+        "/reservations",
+        json={**booking(sample["venue_id"]), "event_context": browser_context()},
+    )
+
+    assert calls == [failure_point]
+    assert response.status_code == 201
+    body = response.json()
+    reservation_id = body["reservation_id"]
+    assert body["status"] == "confirmed"
+    assert body["total_price"] == 22000
+    assert body["payment"]["status"] == "paid"
+    assert connection.execute(
+        text("SELECT status,total_price FROM reservations WHERE reservation_id=:id"),
+        {"id": reservation_id},
+    ).one() == ("confirmed", 22000)
+    assert count_venue_reservations(connection, sample["venue_id"]) == 1
+    assert count_reservation_slots(connection, reservation_id) == 2
+    assert count_reservation_payments(connection, reservation_id) == 1
+    assert reservation_counter.labels(result="ok")._value.get() == before_ok + 1
+
+
+@pytest.mark.parametrize("operation", ["conflict", "cancel"])
+def test_event_product_failure_preserves_conflict_and_cancel_results(
+    connection, sample, api, monkeypatch, operation
+):
+    first = api.post("/reservations", json=booking(sample["venue_id"]))
+    assert first.status_code == 201
+    reservation_id = first.json()["reservation_id"]
+
+    def fail_product(**kwargs):
+        raise RuntimeError("상품 스냅샷 실패 주입")
+
+    monkeypatch.setattr(reservation_service, "_event_product", fail_product)
+    if operation == "cancel":
+        response = api.post(f"/reservations/{reservation_id}/cancel")
+        assert response.status_code == 200
+        assert response.json()["status"] == "cancelled"
+        assert (
+            connection.scalar(
+                text("SELECT status FROM payments WHERE reservation_id=:id"),
+                {"id": reservation_id},
+            )
+            == "refunded"
+        )
+        assert count_reservation_slots(connection, reservation_id) == 0
+    else:
+        other_user_id = sample["create_user"]()
+        response = api.post(
+            "/reservations",
+            json=booking(sample["venue_id"]),
+            headers={"X-Test-User-Id": str(other_user_id)},
+        )
+        assert response.status_code == 409
+        assert response.json()["code"] == "SLOT_TAKEN"
+        assert response.json()["detail"]["slots"] == [13, 14]
+        assert count_venue_reservations(connection, sample["venue_id"]) == 1
+
+
+def test_event_logging_failure_restores_previous_context(monkeypatch):
+    """기록이 실패해도 호출 전 문맥을 복원해 다음 작업과 섞이지 않게 한다."""
+    previous = ClientEventContext(occurred_at=None, anonymous_id="previous")
+    recorded_contexts = []
+
+    def fail_event(*args, **kwargs):
+        recorded_contexts.append(client_event_context.get())
+        raise RuntimeError("이벤트 실패 주입")
+
+    monkeypatch.setattr(reservation_service, "log_event", fail_event)
+    token = client_event_context.set(previous)
+    try:
+        reservation_service._log_reservation_event(
+            None,
+            1,
+            "reservation_complete",
+            event_context=ReservationEventContext.model_validate(browser_context()),
+        )
+        assert len(recorded_contexts) == 1
+        assert recorded_contexts[0].anonymous_id == "anon-test"
+        assert client_event_context.get() is previous
+    finally:
+        client_event_context.reset(token)
 
 
 def test_synthetic_booking_requires_its_own_key_and_sets_the_database_flag(
@@ -274,7 +491,7 @@ def test_retry_within_ten_minutes_returns_original_booking_without_extra_rows(
     assert count_reservation_payments(connection, reservation_id) == 1
     assert count_reservation_slots(connection, reservation_id) == 2
     assert reservation_counter.labels(result="ok")._value.get() == before_ok + 1
-    assert [event[0] for event in api.app.state.booking_events] == ["reserve_ok"]
+    assert [event[0] for event in api.app.state.booking_events] == ["reservation_complete"]
 
 
 def test_retry_after_cancellation_and_rebooking_returns_the_new_paid_reservation(
@@ -304,9 +521,9 @@ def test_retry_after_cancellation_and_rebooking_returns_the_new_paid_reservation
     assert count_reservation_payments(connection, new_id) == 1
     assert reservation_counter.labels(result="ok")._value.get() == before_ok
     assert [event[0] for event in api.app.state.booking_events] == [
-        "reserve_ok",
-        "reserve_cancel_ok",
-        "reserve_ok",
+        "reservation_complete",
+        "reservation_cancel_complete",
+        "reservation_complete",
     ]
 
 
@@ -332,10 +549,10 @@ def test_retry_after_cancellation_reports_conflict_when_another_user_books_the_s
     assert retried.json()["detail"] == {"slots": [13, 14]}
     assert count_venue_reservations(connection, sample["venue_id"]) == 2
     assert [event[0] for event in api.app.state.booking_events] == [
-        "reserve_ok",
-        "reserve_cancel_ok",
-        "reserve_ok",
-        "reserve_conflict",
+        "reservation_complete",
+        "reservation_cancel_complete",
+        "reservation_complete",
+        "reservation_conflict",
     ]
 
 
@@ -400,7 +617,10 @@ def test_multiple_own_reservations_return_the_smallest_id(connection, sample, ap
         "mine": True,
         "reservation_id": min(first_id, second_id),
     }
-    assert [event[0] for event in api.app.state.booking_events] == ["reserve_ok", "reserve_ok"]
+    assert [event[0] for event in api.app.state.booking_events] == [
+        "reservation_complete",
+        "reservation_complete",
+    ]
 
 
 def test_mixed_owner_conflict_does_not_reveal_another_reservation_id(connection, sample, api):
@@ -418,9 +638,9 @@ def test_mixed_owner_conflict_does_not_reveal_another_reservation_id(connection,
     assert conflict.status_code == 409
     assert conflict.json()["detail"] == {"slots": [13, 14]}
     assert [event[0] for event in api.app.state.booking_events] == [
-        "reserve_ok",
-        "reserve_ok",
-        "reserve_conflict",
+        "reservation_complete",
+        "reservation_complete",
+        "reservation_conflict",
     ]
 
 
@@ -757,9 +977,9 @@ def test_cancel_refunds_and_releases_only_owned_reservation_slots(connection, sa
     assert count_reservation_slots(connection, second_id) == 1
     assert reservation_counter.labels(result="cancel")._value.get() == before_cancel + 1
     assert [event[0] for event in api.app.state.booking_events] == [
-        "reserve_ok",
-        "reserve_ok",
-        "reserve_cancel_ok",
+        "reservation_complete",
+        "reservation_complete",
+        "reservation_cancel_complete",
     ]
 
     rebooked = api.post("/reservations", json=booking(sample["venue_id"], method="phone"))
@@ -792,14 +1012,35 @@ def test_cancel_event_includes_category_for_active_and_inactive_venues(
     response = api.post(f"/reservations/{reservation_id}/cancel")
 
     assert response.status_code == 200
-    assert [item for item in api.app.state.booking_events if item[0] == "reserve_cancel_ok"] == [
+    assert [
+        item for item in api.app.state.booking_events if item[0] == "reservation_cancel_complete"
+    ] == [
         (
-            "reserve_cancel_ok",
+            "reservation_cancel_complete",
             {
                 "venue_id": sample["venue_id"],
                 "category": category,
                 "payload": {"reservation_id": reservation_id},
                 "is_synthetic": False,
+                "products": [
+                    {
+                        "product_id": str(sample["venue_id"]),
+                        "product_name": "예약 검증 공간",
+                        "price": {
+                            "currency": "KRW",
+                            "displayed_amount_minor": 11000,
+                            "displayed_text": "11,000원 / 시간",
+                            "billing_unit": "hour",
+                        },
+                        "rental_conditions": {
+                            "start_at": datetime.fromisoformat("2026-11-06T13:00:00+09:00"),
+                            "end_at": datetime.fromisoformat("2026-11-06T15:00:00+09:00"),
+                            "timezone": "Asia/Seoul",
+                            "guest_count": 2,
+                            "option_ids": [],
+                        },
+                    }
+                ],
             },
         )
     ]

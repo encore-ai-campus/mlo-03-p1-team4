@@ -16,7 +16,7 @@ export function validateSignup(b) {
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(b.email ?? '') || b.email.length > 100)
     bad('email', '이메일 형식을 확인해 주세요.');
   if (typeof b.password !== 'string' || b.password.length < 8 || new TextEncoder().encode(b.password).length > 72)
-    bad('password', '8자 이상, 72바이트 이하로 입력해 주세요.');
+    bad('password', '8자 이상으로 입력해 주세요. 너무 길면(영문 72자·한글 24자 초과) 쓸 수 없어요.');
   if (!b.name?.trim())
     bad('name', '이름을 입력해 주세요.');
   if (!/^01\d-?\d{3,4}-?\d{4}$/.test(b.phone ?? ''))

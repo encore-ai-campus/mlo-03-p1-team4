@@ -73,12 +73,23 @@ const userMenu = [
 </template>
 
 <style scoped>
-/* 스티키 헤더: 반투명·흐림·그림자 없이 평평한 바탕 (높이는 움직이지 않음) */
+/* 스티키 헤더: 반투명·흐림·그림자 없이 평평한 바탕 (높이는 움직이지 않음)
+   스크롤하면 하단에 주 색 선을 그어 '고정된 상단바'임을 보여 준다(11-07 팀 피드백). 선은 높이를 바꾸지 않게 그림자로 그린다. */
 .header {
   position: sticky;
   top: 0;
   z-index: 40;
   background: var(--c-paper);
+  box-shadow: inset 0 -1px 0 var(--c-line);
+  transition: box-shadow var(--t-fast) var(--ease-out);
+}
+.header.is-compact {
+  box-shadow: inset 0 -2px 0 var(--c-brand);
+}
+@media (prefers-reduced-motion: reduce) {
+  .header {
+    transition: none;
+  }
 }
 .header__inner {
   display: flex;

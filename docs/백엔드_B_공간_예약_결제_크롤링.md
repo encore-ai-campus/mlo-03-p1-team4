@@ -59,7 +59,7 @@ infra/nginx/       spacecube.conf         # [B] upstream 2대, /health
 | `reservation_repo.count_cancellable(db, user_id)` → `int` | 그 회원의 `status='confirmed'`이면서 시작 시각(`reserve_date` + `start_hour`)이 `get_now()`보다 뒤인 예약 수. **호출하는 쪽이 primary 세션을 넘기며, 예약 ID를 `FOR UPDATE`로 읽어 최신 행 기준으로 집계함** (11-06) | A 탈퇴 전 확인 |
 | `reservation_repo.review_context_query(*, active_only: bool = True)` → `Select` | 예약·공간·유형을 조인해 예약당 한 행, `reservation_id`·`venue_id`·`venue_name`·`category`(`categories.code`) 열을 `.label()`로 고정해 반환. 기본값은 비활성 공간 제외, `False`는 포함. DB 실행·commit·rollback 없음 (#43 PM 승인) | A `review_repo`가 직접 import: 공개 후기는 기본값·replica, 내 후기는 `False`·primary |
 | `GET /reservations/me` | 5-3 응답 | 프론트 마이페이지 |
-| 서버 쪽 이벤트 | `reserve_ok`, `reserve_conflict`, `reserve_cancel_ok` (A의 `log_event()`) | 분석 |
+| 서버 쪽 이벤트 | `reservation_complete`, `reservation_conflict`, `reservation_cancel_complete` (A의 `log_event()`) | 분석. #60 기준: 기존 7개 인자를 유지하고 `products=None` 키워드 전용 선택 인자를 추가. B가 확정 예약·공간명·시간당 가격·이용 시작/종료·인원으로 상품 스냅샷을 채워 전달. 문맥 없는 직접 API 예약도 성공해야 함 |
 
 후기 목록의 필터·정렬·페이지 계산, 후기·회원 조인과 작성자 마스킹은 A가 담당합니다. `review_context_query()`는 후기·회원·결제·시설·그림을 조회하지 않으며 예약 상태나 후기 작성 자격으로 결과를 거르지 않습니다. A가 후기와 결합할 때 해당 조건을 판단합니다. 비활성 공간은 공개 후기 두 목록에서 숨기되 내 후기에서는 공간명을 포함해 유지합니다. 기존 `get_owned()`는 후기 작성 자격 확인용으로 그대로 사용합니다. 연결은 `main.py` 등록 대신 A 리포지토리의 직접 import로 하고, 후기 생성 이벤트 `review_create`는 프론트만 전송합니다.
 
@@ -214,6 +214,12 @@ F-21 구현 기준(기존 프론트 목업과 동일):
 
 ### 5-3. 예약·결제 (W)
 
+**F-60 선택적 예약 문맥(#60 승인):** 생성 JSON과 취소 JSON은 `event_context`를 선택적으로 받습니다. 취소는 본문 없이도 동일하게 동작합니다. 형태는 `{user: {anonymous_id, session_sequence}, site, acquisition, page, navigation}`이며 중첩 화면 필드는 A `/events` 문맥과 같습니다. 인증 회원·세션은 JWT와 `X-Session-Id`만 사용하고 문맥 안의 `user_id`·`session_id`·상품명·가격을 신뢰하지 않습니다. 서버 결과 시각도 서버가 결정합니다. URL·자유 문자열 검증과 개인정보 제거는 A의 공통 문서 조립을 통과합니다. 문맥 생략 시 임의 화면값을 만들지 않으며 예약·취소 업무 응답은 유지합니다.
+
+**B 상품 스냅샷:** 기존 `log_event` 7개 인자를 보존하고 키워드 전용 `products`에 한 상품을 전달합니다. `product_id=str(venue_id)`, `product_name=primary 공간명`, `price={currency:"KRW", displayed_amount_minor:시간당 원화 요금, displayed_text:"금액원 / 시간", billing_unit:"hour"}`, `rental_conditions={start_at,end_at,timezone:"Asia/Seoul",guest_count,option_ids:[]}`입니다. 시간은 한국 날짜·정수 시로 구성한 시간대 있는 datetime이며 A가 MongoDB UTC로 바꿉니다. 성공은 확정된 예약·총액, 취소는 기존 예약의 총액/이용시간으로 시간당 요금을 복원합니다(현재 요금 변경·비활성 공간도 처리). 공간명은 이벤트 시점 DB 값이며 과거 공간명 스냅샷을 새로 저장하지 않습니다. 충돌은 실패한 예약 시도의 검증된 조건·공간 요금을 사용하고 `payload.reason="SLOT_TAKEN"`을 포함합니다. 같은 요청 재시도 200과 기존 본인 겹침 분기의 이벤트 개수는 늘리지 않습니다.
+
+**통합 의존성:** A PR #72의 `products` 인자와 `ClientEventContext` 확장이 함께 필요합니다. 세션 헤더가 없는 서버 결과는 #60 PM 결정대로 A가 `server-<request_id>`로 보완합니다. B는 헤더 값을 그대로 전달하며 새 세션 ID를 임의 생성하지 않습니다. 11-06 A `d75deea`에는 이 보완이 아직 없고, 지정된 원격 MongoDB도 서버 문맥 null을 121로 거절하므로 A·DB 후속 반영 전 최종 완료로 보지 않습니다.
+
 | 메서드 | 경로 | 인증 | 기능 | 성공 | 주요 오류 |
 | --- | --- | --- | --- | --- | --- |
 | POST | /reservations | 회원 | F-30~F-32 | 201 (같은 요청을 다시 보내면 200) | 400 `OUT_OF_RANGE`·`TOO_MANY_PEOPLE`·`INVALID_METHOD`, 404 `VENUE_NOT_FOUND`, 409 `SLOT_TAKEN` |
@@ -267,14 +273,14 @@ POST /reservations  — 결제 화면에 들어올 때는 아무것도 잡지 �
                         status = 끝나는 시각(date, start_hour + hours) ≤ get_now() ? 'completed' : 'confirmed')
  4. INSERT reservation_slots (venue_id, slot_date, slot_hour, reservation_id) VALUES (…13…), (…14…)
  5. INSERT payments (reservation_id, method, status = 'paid', paid_at = NOW())
- 6. COMMIT → 201, log_event(session_id = get_session_id(request), user_id, "reserve_ok", venue_id, category = venue.category.code, payload = {date, start_hour, hours}), reservation_total{result="ok"} +1
+ 6. COMMIT → 201, log_event(session_id = get_session_id(request), user_id, "reservation_complete", venue_id, category = venue.category.code, payload = {date, start_hour, hours}), reservation_total{result="ok"} +1
     4에서 중복 키(1062) → ROLLBACK
       → 회원 행을 다시 잠그고 활성 상태 재확인(탈퇴됐으면 401)
       → primary에서 그날 겹친 칸과 그 예약의 주인을 다시 읽음
         ① 같은 사용자·공간·날짜·시작·시간인 예약이 10분 안에 만들어져 있고, 상태가 confirmed/completed이며 결제가 paid이면 → **200 + 그 예약**(두 번 누름·재시도, 새 이벤트·카운터 없음). cancelled 또는 refunded인 건은 재시도 후보에서 제외
         ② 겹친 칸이 모두 내 다른 예약이면 → 409 SLOT_TAKEN, detail = {slots, mine: true, reservation_id}
            겹친 예약이 여러 건이면 reservation_id가 가장 작은 예약을 대표로 반환
-        ③ 그 밖 → 409 SLOT_TAKEN, detail = {slots}, log_event(reserve_conflict), reservation_total{result="conflict"} +1
+        ③ 그 밖 → 409 SLOT_TAKEN, detail = {slots}, log_event(reservation_conflict), reservation_total{result="conflict"} +1
 ```
 
 - 중복 키는 `IntegrityError`의 `e.orig.args[0] == 1062`일 때만 409로 바꿉니다. 외래키 오류(1452)도 같은 `IntegrityError`로 오니, 1062가 아니면 409로 바꾸지 않고 500으로 둡니다(앞 단계 검증이 빠졌다는 신호).
@@ -296,12 +302,12 @@ POST /reservations/{id}/cancel
  4. UPDATE reservations SET status = 'cancelled'
  5. DELETE FROM reservation_slots WHERE reservation_id = ?
  6. UPDATE payments SET status = 'refunded', refunded_at = NOW()
- 7. COMMIT → 200, log_event(reserve_cancel_ok)
+ 7. COMMIT → 200, log_event(reservation_cancel_complete)
 ```
 
-전액 환불만 합니다. 성공 응답은 `reservation_id`·`status`·`total_price`·환불 시각을 포함한 `payment`·`can_cancel=false`를 반환합니다. `reserve_cancel_ok` 기록과 `reservation_total{result="cancel"}` 증가는 커밋 뒤에 한 번만 합니다. 예약과 무관한 다른 회원·예약 칸은 삭제하지 않습니다.
+전액 환불만 합니다. 성공 응답은 `reservation_id`·`status`·`total_price`·환불 시각을 포함한 `payment`·`can_cancel=false`를 반환합니다. `reservation_cancel_complete` 기록과 `reservation_total{result="cancel"}` 증가는 커밋 뒤에 한 번만 합니다. 예약과 무관한 다른 회원·예약 칸은 삭제하지 않습니다.
 
-`reserve_cancel_ok`에는 최상위 `venue_id`·`category`(공간 유형 코드)와 `payload.reservation_id`를 전달합니다. 유형은 커밋 전 같은 primary 세션에서 읽으며, 비활성 공간의 예약도 취소하고 유형을 기록합니다.
+`reservation_cancel_complete`에는 최상위 `venue_id`·`category`(공간 유형 코드)와 `payload.reservation_id`를 전달합니다. 유형은 커밋 전 같은 primary 세션에서 읽으며, 비활성 공간의 예약도 취소하고 유형을 기록합니다.
 
 ### 이용 완료 배치 (primary)
 
@@ -390,6 +396,16 @@ replica를 넣은 이유(읽기 분산)가 실제로 효과가 있었는지 이 
 | 3일 | Locust 두 시나리오, 발표 자료 숫자 | 보고서 2개 |
 
 ## 10. 확인 필요
+
+### #75 생성기 서비스 연결 (11-06 PM 결정)
+
+- B는 `simulator/generator/` 본체·세션·예약 흐름을 구현한다. api1의 별도 프로세스에서 A `auth_service.signup`·`review_service.create_review`, B 예약·취소 서비스를 직접 호출한다. 새 HTTP API·DDL·기존 함수 인자 변경은 없다.
+- 생성기 실행 중에만 서비스의 시간 참조를 과거로 치환하고 예약 운영 이벤트·카운터 호출을 억제한다. `get_event_time`은 실제 시각을 유지하고 `build_document`에 과거 `occurred_at`을 전달한다.
+- `reservation_repo.find_generator_booking`은 정확한 생성 시각·소유자·이용 조건·결제를 대조해 취소/완료 예약까지 복구한다. 슬롯 UNIQUE만으로 취소된 예약의 재실행을 판정하지 않는다.
+- 내부 전용 `reservation_service.complete_generator_reservation(db, *, user_id, reservation_id)`는 잠근 본인 가상 예약 한 건만 종료 시각 이후 완료 처리한다. 운영 완료 배치와 HTTP 계약은 유지한다.
+- 설정·재실행·담당별 후속 산출물은 [생성기 README](../simulator/generator/README.md)를 따른다. 집계·CSV·정리 스크립트는 DB 담당이며, 운영 DB 대량 삭제는 기존 규칙대로 사람이 실행한다.
+
+### 기존 확인 목록
 
 | # | 질문 | 이 문서의 가정 |
 | --- | --- | --- |

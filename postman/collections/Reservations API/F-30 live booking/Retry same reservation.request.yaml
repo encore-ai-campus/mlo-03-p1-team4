@@ -5,6 +5,8 @@ order: 2000
 url: '{{base_url}}/reservations'
 method: POST
 headers:
+  - key: X-Session-Id
+    value: '{{session_id}}'
   - key: Accept
     value: application/json
   - key: Content-Type

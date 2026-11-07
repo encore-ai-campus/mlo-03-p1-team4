@@ -10,6 +10,7 @@ from app.core.deps import CurrentUser, get_current_user, get_session_id
 from app.core.pagination import Page, Pagination, get_pagination
 from app.core.synthetic import is_synthetic_request
 from app.schemas.reservations import (
+    ReservationCancel,
     ReservationCancelRead,
     ReservationCreate,
     ReservationCreateRead,
@@ -93,6 +94,7 @@ def cancel_reservation(
     request: Request,
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
     db: Annotated[Session, Depends(get_db_write)],
+    body: ReservationCancel | None = None,
 ) -> ReservationCancelRead:
     """이용 시작 전 본인 예약을 취소하고 모의 결제를 전액 환불한다."""
     return reservation_service.cancel_reservation(
@@ -100,4 +102,5 @@ def cancel_reservation(
         user_id=current_user.user_id,
         reservation_id=reservation_id,
         session_id=get_session_id(request),
+        event_context=body.event_context if body else None,
     )

@@ -35,7 +35,7 @@ export async function changePassword(body, token) {
   if ((u.password !== null && body.current_password !== u.password) || (u.password === null && body.current_password?.length < 8))
     fail('WRONG_PASSWORD', 400, '현재 비밀번호가 맞지 않아요.');
   validation(typeof body.new_password !== 'string' || body.new_password.length < 8 || new TextEncoder().encode(body.new_password).length > 72 ? [{
-      field: 'new_password', reason: '8자 이상, 72바이트 이하로 입력해 주세요.'
+      field: 'new_password', reason: '8자 이상으로 입력해 주세요. 너무 길면(영문 72자·한글 24자 초과) 쓸 수 없어요.'
     }] : []);
   u.password = body.new_password;
   return mockDelay(null);
