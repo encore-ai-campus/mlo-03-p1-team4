@@ -14,10 +14,12 @@
 | B·일일 페르소나 | 이세훈·PM 보완 | #69 PM 피드백 반영: 새 이벤트 문맥·사용자별 `X-Session-Id`·실제 날짜/공간/시간 분산, 실행별 `logs/` CSV·HTML 경로 | 실제 Write·보고서 파일·Loki 적재 검증, 작업 스케줄러 등록 | `pro_1` Locust 2.43.1과 고정 2.47.0 불일치. A7 혼합 부하·DB exporter 계측은 별도 |
 | 프론트 | 노진산(FE·PM) | FE-1~9 확정안 반영, Claude 시안 대조·FE 오류/모바일 결제/가입 UX 재검토 및 목업·화면 검증. 11-06 C안 화풍(흰 바탕·검은 글자·주칠)과 유형별 일러스트 5장 유지. CCL 분위기 참고 사진 40장(유형별 8장)을 정적 경로로 연결하고 유형·venue ID 해시로 안정 선택, 사진 표시·크레딧 추가(API `art:` 계약 그대로) | A·B 구현 후 실제 API 연결·오류·예약 동시성 통합 검증 | 실제 API 미구현 |
 | FastAPI A | [이름] | 회원·후기 및 F-60 이벤트 구현. #75의 `override_business_time()`과 생성기 `HistoricalRuntime` 가입·후기·이벤트 시각 경계 비교 테스트 24건 통과. Windows 별도 MariaDB 11.4.13 `spacecube_test` 전체 backend/db pytest 407건 통과(경고 1건), PR #86의 CI DB·백엔드 테스트와 Ruff 통과. A 기능 PR #86은 2026-11-07 develop에 병합됨. 11-07 109 api1 파일럿 이벤트 10,368건의 과거 `occurred_at`·실제 `received_at` 분리와 중복 0을 확인. #5 후속으로 예약 이벤트 예외 경계 회귀 6건과 `test_reservations.py` 58건 통과 | #5 FE 예약·취소 `event_context`, 검색 ID·`page_view` 연결 후 최신 코드 배포·브라우저 통합 확인. #75 파일럿 결과 그래프 FE/PM 확인 | MariaDB 13.0.2 동시성 실패는 공식 기준 버전 결과가 아님 |
-| FastAPI B | 이세훈 | #67 `feat/B-nginx`에 최신 develop `e7db36f` 통합, 자체 구성한 api1(.232)·api2(.233) 테스트 VM에서 Nginx/FastAPI 동배치·캐시·WebP·loopback keepalive 검증. #66 HAProxy 정문 설정(gw:80 라운드로빈·/api/health 능동 확인·내부 경로 차단·retries 0·8404 지표) 머지, 장애 제외/복귀 시험은 별도. #74·#76 develop 병합: 예약 결과 이벤트 새 형식, 커밋 후 이벤트 문맥·상품 생성·기록 실패에도 업무 응답 유지. 후속 수정은 `fix/B-issue5-product-factory`에서 검증 대기. #77 `feat/B-F-62-generator`에서 #75 생성기 본체·서비스 연결·재개 구현, 실제 MongoDB 100명/30일 검증 완료 | #76 PM 상품 팩토리 후속 리뷰·병합. #75 A 연결 확인·DB 공간 보충/집계/CSV·api1 수동 파일럿. #79 공유 테스트 DB 경합 방지. #8 api1 cron | 원격 MongoDB 서버 문맥 null validator 동기화 필요. 실제 api1·replica·브라우저 E2E 미검증 |
+| FastAPI B | 이세훈 | #66 후속: 최신 develop eca5a0e 통합, health·주소 생성기 회귀 30건과 기본 pytest/CI 연결. 기준 설정의 시험 IP·특정 릴리스 경로 제거, VM별 배포 설정으로 분리. 최종 수정본에서 양 노드 중지/복구와 잔여 서버 GET 모두 성공. 전체 verify는 로컬 기존 공간 데이터가 섞이는 목록 4건 실패로 CI 확인 필요. 상세 infra/haproxy/README.md. #67 `feat/B-nginx`에 최신 develop `e7db36f` 통합, 자체 구성한 api1(.232)·api2(.233) 테스트 VM에서 Nginx/FastAPI 동배치·캐시·WebP·loopback keepalive 검증. #74·#76 develop 병합: 예약 결과 이벤트 새 형식, 커밋 후 이벤트 문맥·상품 생성·기록 실패에도 업무 응답 유지. 후속 수정은 `fix/B-issue5-product-factory`에서 검증 대기. #77 `feat/B-F-62-generator`에서 #75 생성기 본체·서비스 연결·재개 구현, 실제 MongoDB 100명/30일 검증 완료 | #76 PM 상품 팩토리 후속 리뷰·병합. #75 A 연결 확인·DB 공간 보충/집계/CSV·api1 수동 파일럿. #79 공유 테스트 DB 경합 방지. #8 api1 cron | 원격 MongoDB 서버 문맥 null validator 동기화 필요. 실제 api1·replica·브라우저 E2E 미검증 |
 | DB | [이름] | `0001_init.sql`·`mongo_init.js` 검증(설치형 11.8·compose 11.4 둘 다 29건 통과), seed(유형 5·시설 20·지역 230 → `seed.sql`), `infra/local` compose. F-61 두 수집원 파서·매핑·적재 코드와 오프라인 테스트 작성. API 제외 운영 저장 검증에서 MongoDB `crawl.crawl_raw`와 MariaDB `spacecube.crawl_jobs` 각 1건 삽입·재조회·해당 건 정리 성공. `environment.yml`로 `pro_1`(Python 3.12.16) 설치, 크롤러 오프라인 pytest 17건·Ruff 전체 린트·포맷 통과. FE verify(단위 67건·빌드) 통과. 별도 Compass DB의 events·event_daily 속성 정리 v1을 docs/db에 공유 | 실제 단건 파서 확인 → 시연용 공간 선별·API 등록(B와) → 부족분·과거 30일 행동 데이터 생성기 | 운영 저장소 쓰기 경로는 확인했으나 실제 외부 수집·`venues` 등록은 접속 URL·내부 키가 빈 `backend/.env`와 내부 API 미기동으로 미실행 |
 
 ## 기능 진행표
+
+- F-70·#66 후속: 독립 HTTP health·maxconn 50·queue 5초, 배포 환경값 분리 및 회귀 30건 CI 연결. 자체 구성 VM에서 과부하 격리·최종 중지/복구 확인. 전체 verify의 공간 조회 4건 실패(로컬 spacecube_test 기존 데이터)로 깨끗한 11.4 CI 확인 대기. worker hang VM 주입·Locust 사용자 부하·mon scrape는 미검증.
 
 상태: 설계 → 진행 → 완료 → 검증(테스트 통과). F-ID는 `docs/산출물_01_요구사항명세서.md`.
 
@@ -52,6 +54,8 @@
 | — | F-33 결제 대기 만료, F-52 자유게시판·댓글, F-53 공지 | — | 11-03 삭제 |
 
 ## 결정 기록
+
+- 11-07 · #66 후속: 독립 루프백 8001 health와 HAProxy 서버 maxconn 50·queue 5s를 적용하고 `retries 0` 유지. 자체 구성 bridged VM(gw .231, api1 .232, api2 .233)에서 양쪽 240-connection 부하와 장애/복귀를 검증. 8404는 제어 PC .20만 허용; mon IP 확인 전까지 scrape 미허용.
 
 | 날짜 | 결정 | 근거 |
 | --- | --- | --- |
@@ -180,7 +184,17 @@ A1~A4는 11-03에 확정했고, **A5~A8은 추후 확정**으로 미뤘다(11-03
 - 개인 기억(Claude 자동 메모리 등)은 팀에 공유되지 않는다. 팀이 알아야 할 것은 이 파일과 `docs/`에 쓴다.
 
 ## 최근 변경 (최신이 위)
+
+- 11-07 · B · #66 푸시 준비: 최신 origin/develop eca5a0e 통합(직전 기준 이후 STATE 기록만 변경), 최신 A 기록과 #66 변경을 모두 보존. 기존 공간 목록 테스트 fixture·Locust 실행기/README는 원복하여 이번 PR에서 제외하고 기존 실행 대상은 유지. 독립 health·배포 설정·CI 회귀 변경만 준비. 전체 pytest 4건은 기존 공유 데이터와 목록 테스트 전제 차이로 기록하며 제품 코드 결함으로 단정하지 않음. 실제 푸시·PR 등록 전 제목·본문을 사용자에게 제시.
 - 11-07 · A · 최신 `origin/develop` `97b533a`에서 `feat/A-F60-issue5-followup`을 분리해 #80 병합 뒤 예약 이벤트 예외 경계를 재확인. `test_reservations.py` 58건, 예외 경계 선택 6건, F-60 문서/개인정보/중복/장애 선택 11건 통과(임시 경로는 worktree 내 별도 지정). 통합 묶음 72건 통과했지만 Windows MariaDB 13.0.2에서 예약 동시성 4건 실패, pytest 기본 임시 경로 권한 오류 6건 발생; 프로젝트 기준 버전 완료 검증으로 표시하지 않음. FE event_context·검색 ID·page_view와 최신 배포/브라우저 흐름 대기라 #5를 열어 둠.
+
+- 11-07 · B · #66 PR 준비 보완: origin/develop 97b533a 통합·STATE 충돌 해결(양쪽 기록 보존). pytest.ini·CI 변경 감지·verify 수집 경로에 health 회귀 연결. 기준 설정에서 실제 VM 주소·특정 backend 릴리스 경로 제거, 주소 생성 CLI와 VM 환경 파일로 분리. health 13건+주소 생성 17건=30건 통과. API1·API2 최종 서비스 중지/복구 각 1회 DOWN→UP, health 자동 기동·잔여 서버 health/categories 총 12요청 모두 200. 전체 verify는 Ruff 122파일·FE 통과, pytest 487건 중 기존 데이터가 섞이는 공간 조회 4건 실패. 로컬 MariaDB 11.4.13 spacecube_test 기존 공간 21건 확인, 실패 4건 재실행도 동일; 데이터 삭제·검증 완화 없이 중단. 깨끗한 11.4 CI 확인 전 전체 통과 표시 금지. 실제 VM DB에는 읽기만, 커밋·푸시 미실행.
+
+- 11-07 · B · #66 PM 요구를 재확인해 과부하 503을 backend 제외 사유로 삼겠다는 앞선 해석을 정정. HAProxy 상한을 우회한 loopback 포화는 정문 maxconn 결함의 증거가 아님. 과부하 응답만으로 backend를 제외하지 않고, TCP accept만 하는 멈춘 프로세스를 오판하던 점에 HTTP 헤더 응답 검사를 추가. `pro_1` 회귀 13건·Ruff 린트·포맷 통과. 수정본을 양 API VM에 배포하고 해시 일치, 정상 health 200, 실제 Uvicorn HEAD 503 중 health 5/5회 200·categories 5/5회 503, 정상 복귀 후 HAProxy backend UP과 gateway 읽기 10/10회 200을 확인. 이전 앱 파일은 각 VM 백업에 보존. 실제 DB 쓰기 없이, API 서비스 재기동 없이 health sidecar만 재시작. VM worker hang 장애 주입·Locust 사용자 부하·mon scrape는 미실행.
+
+- 11-07 · B · #66 후속 재시험을 자체 구성 bridged VM에서 수행하고 기록을 정정. 30초 raw TCP 포화(각 API loopback 8000에 미완료 연결 240개)에서 categories는 api1 6/6회 503, api2 5/6회 503·1회 200; local health는 api1 15/15회 200, api2 14회 200·1회 503. 동시 gateway health는 각각 28회·26회 모두 200, backend 둘 다 UP이어서 포화 업무 API를 HAProxy가 제외하지 않는 한계를 남김. service stop/start 각 노드 3회씩 모두 복귀; 명령 제출부터 stats 관측까지 DOWN 상한 api1 3.25~3.78초·api2 3.03~3.89초, UP api1 6.23~6.47초·api2 5.36~6.19초. gw OUTPUT에서 api2:80만 차단해 DOWN 6.46초, 제거 후 UP 2.69초; DOWN 중 health/categories 각 5회 모두 200, api1 요청 증가 10·api2 0. 임시 규칙·타이머 정리, OUTPUT ACCEPT와 양 backend UP 확인. MariaDB는 SSH 없이 health/categories 읽기만, 쓰기·DDL·정리 없음. MongoDB degraded 예상, `mon` scrape 미검증. HAProxy·Nginx·API 설정은 다음 테스트용으로 유지; 전체 verify·PR·commit·push 미실행.
+
+- 11-07 · A · #75 생성기의 `HistoricalRuntime`과 A `override_business_time()`을 직접 비교하는 회귀 테스트 추가. 과거 날짜 가입 스키마 검증, `auth_service.signup()`의 가입·동의 시각, `review_service.create_review()` 저장 시각, 생성기 `documents()`와 A `build_document()`의 `occurred_at` 및 나머지 문서 필드 일치를 확인하고 실제 `received_at`은 현재 시각으로 유지되는지 검사. A 기준 문서의 생성기 시각 적용·이벤트/지표 억제 설명을 현행 `HistoricalRuntime`에 맞춤. `backend/tests/test_backfill_clock.py`와 `simulator/generator/tests/test_generator.py` 24건 통과, Ruff 린트·포맷 통과. 기본 pytest 임시 폴더 권한 오류가 있어 사용자 Temp 아래 별도 `--basetemp`로 재실행함. DB 저장은 이 비교 테스트에서 mock 처리했고, MariaDB 10.11.14 전체 406건 결과는 이전 VM 실행; 11.4 검증은 남음.
 
 - 11-07 · 공동 · PR #87 PM 코멘트 반영: 109 api1 파일럿의 생성 이벤트 10,368건에서 과거 `occurred_at`과 실제 `received_at` 분리 및 중복 0건을 확인. PM 보고: `event_daily` 32일 3,974행·재실행 신규 0, 크롤러 법정동 대응을 109에 적용했으며 별도 PR 예정. #75의 남은 작업은 FE/PM 그래프 확인.
 

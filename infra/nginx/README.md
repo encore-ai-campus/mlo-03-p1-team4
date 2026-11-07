@@ -50,7 +50,8 @@ sudo ln -s "$release" /var/www/frontend
 | `/`와 Vue 화면 경로 | `/var/www/frontend` 파일, 없으면 `index.html` |
 | `/assets/*` | 정적 파일, 없으면 404 |
 | `/photos/*` | 정적 파일만 제공, 없으면 404. `.webp`는 7일 캐시 |
-| `/api/*` | 같은 VM의 `127.0.0.1:8000`으로 전달. `/api/health`는 FastAPI `/health`가 됨 |
+| `/api/health` | 독립 헬스 프로세스 `127.0.0.1:8001/health`로 전달 |
+| 나머지 `/api/*` | 같은 VM의 업무 API `127.0.0.1:8000`으로 전달 |
 | `/api/internal`, `/api/internal/*` | 404 `NOT_FOUND` |
 | `/api/metrics`, `/api/metrics/*` | 404 `NOT_FOUND` |
 | 외부 `/stub_status` | 404 `NOT_FOUND` |
@@ -65,6 +66,8 @@ FastAPI의 `/metrics`는 공개 포트 80으로 전달하지 않는다. FastAPI�
 ## 접근 로그와 진단
 
 JSON 접근 로그에는 시각·요청 ID·메서드·상태·처리 시간·upstream 상태만 기록한다. URI, 쿼리 문자열, IP, 요청 헤더, 토큰, 본문은 기록하지 않는다. `error_log /dev/null`은 Nginx 오류 로그가 요청 원문을 포함할 수 있어 꺼 두었다. 따라서 upstream 실패의 상세 메시지는 남지 않고, 상태 코드·upstream 지표·FastAPI 로그로 확인한다. 로컬 `stub_status`는 Alloy가 보내는 nginx exporter 지표의 원본이다.
+
+PR #66 후속 헬스 분리는 [HAProxy README](../haproxy/README.md)의 독립 헬스 프로세스를 사용한다. 8001 프로세스 없이 이 설정을 적용하면 헬스 경로는 502가 된다. 2026-11-07 자체 구성 테스트 VM에서 재배포하고 #67 정적·캐시 확인과 함께 검사했다.
 
 ## 설정 검사
 
@@ -107,7 +110,7 @@ curl -sS http://127.0.0.1:8080/stub_status
 
 keepalive는 `sudo nginx -T`로 풀·HTTP 버전·Connection 헤더 설정을 확인하고, `/api/health`를 연속 호출한 뒤 `ss -ntp state established`에서 loopback 8000번 연결이 유휴 상태로 남는지 확인한다.
 
-HAProxy 정문·통계·서버 제외/복귀·노트북 종료 시험은 #66 별도 배포에서 확인한다.
+HAProxy 정문·통계·서버 제외/복귀는 2026-11-07 자체 구성 테스트 VM에서 확인했다. 결과와 한계는 [HAProxy 시험 기록](../haproxy/README.md)에 적었다.
 
 ## 이전 후보안 검증 기록 (d715a6a)
 
