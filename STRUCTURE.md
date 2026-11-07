@@ -26,6 +26,8 @@ Pro_1/
 ├─ environment.yml            [공동] conda 환경 pro_1 (Python 3.12)
 ├─ ruff.toml · verify.ps1     [공동] 파이썬 린트 규칙, 커밋 전 전체 검증
 ├─ pytest.ini                 [공동] pytest 공통 설정(테스트 폴더, backend import 경로)
+├─ conftest.py                [공동] #78 공유 테스트 DB의 pytest session 잠금·소유권 확인
+├─ tests/                     [공동] 테스트 DB 실행 잠금과 프로세스 간 회귀 검증
 ├─ .gitignore                 [공동] .env·node_modules·글꼴 원본 등 제외
 │
 ├─ docs/                      설계 문서 (docs/README.md)
@@ -105,12 +107,16 @@ Pro_1/
 │  └─ data/                   기준선·표본 (지우지 않음)
 │
 ├─ simulator/
-│  ├─ generator/              [DB] 과거 데이터 백필 (예정)
+│  ├─ generator/              [B 본체·A 연결 확인·DB 후속] #75 서비스 호출 기반 과거 백필 CLI
+│  │  └─ tests/              고정 방문량·시각·부분 실패·실제 MariaDB 서비스/재개 검증
 │  └─ locust/                 [B] 부하·동시성 (예정)
+│     ├─ daily_locustfile.py   [B] 네 페르소나 일일 조회·명시적 쓰기 시나리오
+│     ├─ run_daily.ps1         [B] pro_1·모드·날짜·실행 로그를 묶는 Windows 실행기
+│     └─ tests/                [B] 부하 시나리오의 오프라인 회귀 테스트
 │
 ├─ infra/
 │  ├─ local/                  [DB] docker compose: MariaDB 11.4(3308) + MongoDB 7, 첫 실행 때 0001·seed·mongo_init 자동 (11-04)
-│  ├─ haproxy/                [B] 정문 haproxy.cfg: api1·api2 분산, /health 확인 (11-06 B안, 예정)
+│  ├─ haproxy/                [B] 정문 haproxy.cfg·README: api1·api2 분산, /api/health 확인 (11-06 B안 초안)
 │  ├─ nginx/                  [B] 서버마다: 정적 파일 + /api → 127.0.0.1:8000 (11-06 B안, README에 초안)
 │  ├─ monitoring/             [A] docker-compose, alloy.config, grafana/dashboards (예정)
 │  ├─ vm/                     [공동] 로컬 VM 7대 설치 체크리스트 (11-05, 1차 배포)

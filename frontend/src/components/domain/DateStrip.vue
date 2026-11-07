@@ -9,6 +9,32 @@ defineProps({
 })
 defineEmits(['shift'])
 const model = defineModel({ type: String })
+
+// 11-07 팀 피드백: 마우스는 스크롤바 대신 누른 채 좌우로 끌어 날짜를 넘긴다. 터치는 기본 가로 스크롤 그대로.
+let pan = null
+let suppressClick = false
+function onPointerDown(event) {
+  if (event.pointerType !== 'mouse' || event.button !== 0) return
+  pan = { x: event.clientX, left: event.currentTarget.scrollLeft, el: event.currentTarget, moved: false }
+}
+function onPointerMove(event) {
+  if (!pan) return
+  const dx = event.clientX - pan.x
+  if (!pan.moved && Math.abs(dx) < 6) return
+  pan.moved = true
+  pan.el.scrollLeft = pan.left - dx
+}
+function onPointerUp() {
+  if (pan?.moved) {
+    suppressClick = true
+    setTimeout(() => (suppressClick = false), 0)
+  }
+  pan = null
+}
+function pick(d) {
+  if (suppressClick || d.available === false) return
+  model.value = d.iso
+}
 </script>
 
 <template>
@@ -18,7 +44,7 @@ const model = defineModel({ type: String })
     <span>{{ days[0]?.month }}월 {{ days[0]?.day }}일 – {{ days.at(-1)?.month }}월 {{ days.at(-1)?.day }}일</span>
     <button type="button" :disabled="offset + days.length > maxOffset" @click="$emit('shift', 14)">다음 14일</button>
   </div>
-  <div class="dates" role="radiogroup" :aria-label="label">
+  <div class="dates" role="radiogroup" :aria-label="label" @pointerdown="onPointerDown" @pointermove="onPointerMove" @pointerup="onPointerUp" @pointerleave="onPointerUp">
     <button
       v-for="d in days"
       :key="d.iso"
@@ -29,7 +55,7 @@ const model = defineModel({ type: String })
       :aria-checked="model === d.iso"
       :aria-disabled="d.available === false || undefined"
       :aria-label="`${d.month}월 ${d.day}일 ${d.weekday}요일${d.available === false ? ' 빈 칸 없음' : ''}`"
-      @click="d.available !== false && (model = d.iso)"
+      @click="pick(d)"
     >
       <span class="date__wd">{{ d.isToday ? '오늘' : d.weekday }}</span>
       <span class="date__d num">{{ d.day === 1 || d.isToday ? `${d.month}.${d.day}` : d.day }}</span>
@@ -51,7 +77,16 @@ const model = defineModel({ type: String })
   overflow-x: auto;
   scroll-snap-type: x proximity;
   padding-bottom: 4px;
-  scrollbar-width: thin;
+  scrollbar-width: none; /* 마우스는 끌어서, 터치는 밀어서, 키보드는 이전/다음 14일 버튼으로 넘긴다 */
+  user-select: none;
+}
+.dates::-webkit-scrollbar {
+  display: none;
+}
+@media (hover: hover) and (pointer: fine) {
+  .dates {
+    cursor: grab;
+  }
 }
 .date {
   display: flex;

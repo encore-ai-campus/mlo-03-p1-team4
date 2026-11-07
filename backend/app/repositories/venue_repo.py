@@ -29,6 +29,26 @@ _rating_view = table(
 )
 
 
+def list_generator_venues(db: Session) -> list[dict]:
+    """#75 실행 시작 시 고정할 활성 공간의 예약 속성만 primary에서 읽는다."""
+    rows = db.execute(
+        select(
+            Venue.venue_id,
+            Venue.name,
+            Venue.open_hour,
+            Venue.close_hour,
+            Venue.min_hours,
+            Venue.capacity_max,
+            Venue.price_per_hour,
+            Category.code.label("category_code"),
+        )
+        .join(Category, Category.category_id == Venue.category_id)
+        .where(Venue.is_active.is_(True))
+        .order_by(Venue.venue_id)
+    ).mappings()
+    return [dict(row) for row in rows]
+
+
 def get_booking_info(db: Session, venue_id: int) -> RowMapping | None:
     """예약 검증에 필요한 공간 상태·시간·요금과 유형 코드를 primary에서 읽는다."""
     query = (
