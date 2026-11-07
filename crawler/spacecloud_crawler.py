@@ -250,12 +250,21 @@ def sanitized_dict(space: SpaceInfo) -> dict:
         space.open_hours or "",
     )
     data["open_hours"] = hours.group(0) if hours else None
-    region = (space.address_region or "").split()[:2]
-    data["address_region"] = (
-        " ".join(region)
-        if len(region) == 2 and all(re.fullmatch(r"[가-힣]{2,20}", part) for part in region)
-        else None
+    # 파싱 중 필요한 동 이름도 파일·콘솔 출력 전에 시·구로 바꾼다.
+    # preprocess가 SpaceInfo를 사용하므로 실행 시점에만 가져온다.
+    from crawler.preprocess import SeedMaps
+    from db.loaders.load_seed import resolve
+
+    maps = SeedMaps.load()
+    region, _reason = resolve(
+        space.address_region or "",
+        maps.sido_alias,
+        maps.sigungu_alias,
+        maps.regions,
+        maps.legal_dong,
+        maps.legal_dong_city_aliases,
     )
+    data["address_region"] = " ".join(region) if region is not None else None
     return data
 
 

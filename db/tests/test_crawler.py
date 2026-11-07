@@ -544,3 +544,19 @@ def test_weekly_run_allows_zero_new_registrations(tmp_path, monkeypatch):
     )
     assert result["jobs"] == {"spacecloud": {"new_ids": 0, "fetched": 0, "registered": 0}}
     assert finished == [(1, result["jobs"]["spacecloud"], "done")]
+
+
+@pytest.mark.parametrize(
+    ("address", "expected"),
+    [
+        ("서울 봉천동", "서울 관악구"),
+        ("천안 두정동", "충남 천안시"),
+        ("서울 신사동", None),
+        ("서울 등록되지않은동", None),
+    ],
+)
+def test_sample_output_normalizes_or_omits_legal_dong(address, expected):
+    space = SpaceInfo("1", [], None, None, [], [], None, address)
+    data = sanitized_dict(space)
+    assert data["address_region"] == expected
+    assert address.split()[-1] not in json.dumps(data, ensure_ascii=False)
