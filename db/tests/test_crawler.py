@@ -532,3 +532,9 @@ def test_legal_dong_ambiguous_or_unknown_is_excluded():
     assert mapped is None and reason == "동 이름 겹침"
     mapped, reason = map_space("spacecloud", _space_at("서울 없는동"), maps)
     assert mapped is None and reason == "동 대응 없음"
+
+
+def test_legal_ri_resolves_with_city_name():
+    mapped, reason = map_space("spacecloud", _space_at("김포 석모리"), SeedMaps.load())
+    assert reason is None
+    assert (mapped["sido"], mapped["sigungu"]) == ("경기", "김포시")

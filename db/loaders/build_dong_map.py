@@ -7,7 +7,7 @@
 - 스페이스클라우드 상세는 시·군·구 없이 '시·도(또는 시 이름) + 법정동'만 준다(#10).
   그래서 (시·도, 동) → 시·군·구 대응표를 만든다. 크롤러는 시 이름(천안·파주)도 이 표로 푼다.
 - regions.csv 기준에 맞춘다: 일반구가 있는 시(천안시서북구)는 시(천안시)로 줄인다.
-- regions에 없는 시·군·구 행과 리(里) 행은 버린다. 같은 (시·도, 동)이 여러 시·군·구에 있어도
+- regions에 없는 시·군·구 행은 버린다. 리(里) 행은 리 이름으로 넣는다. 같은 (시·도, 동)이 여러 시·군·구에 있어도
   모두 남긴다. 고르는 일은 크롤러가 하고, 겹치면 제외한다.
 """
 
@@ -46,14 +46,15 @@ def build(source: Path) -> int:
     with source.open(encoding="utf-8-sig", newline="") as f:
         for row in csv.DictReader(f):
             dong, ri = (row.get("읍면동명") or "").strip(), (row.get("리명") or "").strip()
-            if not dong or ri:
+            if not dong:
                 continue
             sido = sido_alias.get((row.get("시도명") or "").strip())
             if not sido:
                 continue
             sigungu = normalize_sigungu(sido, (row.get("시군구명") or "").strip(), regions)
             if sigungu:
-                out.add((sido, sigungu, dong))
+                # 리(里) 행은 읍·면 대신 리 이름으로 넣는다(김포 석모리처럼 사이트가 리만 줄 때).
+                out.add((sido, sigungu, ri or dong))
     with OUT.open("w", encoding="utf-8", newline="") as f:
         writer = csv.writer(f, lineterminator="\n")
         writer.writerow(["sido", "sigungu", "dong"])

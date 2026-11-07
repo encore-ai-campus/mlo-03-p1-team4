@@ -97,7 +97,7 @@ def resolve_region(address: str, maps: SeedMaps) -> tuple[tuple[str, str] | None
     if region is not None or reason.startswith("나뉜 옛 구"):
         return region, reason
     parts = address.split()
-    if len(parts) != 2 or not re.search(r"(동|가|읍|면|로)$", parts[1]):
+    if len(parts) != 2 or not re.search(r"(동|가|읍|면|로|리)$", parts[1]):
         return region, reason
     head, dong = parts
     sido = maps.sido_alias.get(head)
