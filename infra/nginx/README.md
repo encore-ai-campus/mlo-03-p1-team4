@@ -1,28 +1,31 @@
-# nginx — api VM 공통 후보 설정 (담당: B)
+# nginx — api VM 공통 설정과 테스트 배포 (담당: B)
 
-이 문서는 #54와 [`docs/로컬_VM_구성.md`](../../docs/로컬_VM_구성.md)의 11-06 B안에 맞춘 **검토용 후보안**이다. 실제 `api1`·`api2`에는 적용하지 않았다.
+이 설정은 #54의 Nginx 정적 파일·API 전달을 담당한다. 프로젝트 기본 구성은 api1·api2 각 VM에 Nginx와 FastAPI를 함께 설치하고, Nginx가 같은 VM의 loopback으로 요청을 전달한다.
 
 ```text
-브라우저 → gw HAProxy:80 → api1 또는 api2 Nginx:80 → 해당 VM의 FastAPI 127.0.0.1:8000
+브라우저 → gw HAProxy → api1 Nginx → api1 FastAPI (127.0.0.1:8000)
+                    └→ api2 Nginx → api2 FastAPI (127.0.0.1:8000)
 ```
 
-HAProxy가 서버 선택과 `/api/health` 확인을 담당한다. 각 VM의 Nginx는 Vue 파일 제공과 로컬 FastAPI 전달만 맡으며, api1·api2를 upstream으로 두거나 다른 VM으로 재시도하지 않는다.
-
-로컬 `spacecube_local_api` upstream은 `127.0.0.1:8000` 하나만 사용한다. `keepalive 16`으로 워커당 유휴 연결을 최대 16개 재사용하고, HTTP/1.1과 빈 `Connection` 헤더를 함께 설정한다. `keepalive_timeout 4s`는 Uvicorn 기본 유휴 만료 5초보다 짧다. 실제 Uvicorn 설정이 더 짧으면 Nginx 쪽도 맞춰야 한다. 이 풀 크기는 활성 연결 수 제한이 아니다. 근거: [Nginx upstream keepalive](https://nginx.org/en/docs/http/ngx_http_upstream_module.html#keepalive).
+`spacecube_local_api` upstream은 `127.0.0.1:8000`을 사용한다. `keepalive 16`으로 워커당 유휴 연결을 최대 16개 재사용하고, HTTP/1.1과 빈 `Connection` 헤더를 함께 설정한다. `keepalive_timeout 4s`는 테스트 API의 Uvicorn 유휴 만료 5초보다 짧다. 이 풀 크기는 활성 연결 수 제한이 아니다. 근거: [Nginx upstream keepalive](https://nginx.org/en/docs/http/ngx_http_upstream_module.html#keepalive).
 
 ## 설치 위치와 기본 사이트
 
-로컬 VM 기준은 Ubuntu Server 24.04와 apt 설치다. Nginx 패키지 설정이 `/etc/nginx/conf.d/*.conf`를 `http` 블록 안에서 불러오므로, 이 파일을 두 서버에 같은 경로로 복사한다.
+VM 기준은 Ubuntu Server 24.04와 apt 설치다. Nginx 패키지 설정이 `/etc/nginx/conf.d/*.conf`를 `http` 블록 안에서 불러오므로, 이 파일을 api1·api2에 같은 경로로 복사한다.
 
 ```text
 infra/nginx/spacecube.conf → /etc/nginx/conf.d/spacecube.conf
 ```
 
-Ubuntu 패키지의 기본 사이트도 `listen 80 default_server`를 사용할 수 있다. `sites-enabled/default` 링크가 있으면 비활성화하고, 포트 80의 기본 서버가 하나만 남도록 확인한다. `spacecube.conf`의 `server_name _;`와 `default_server`가 호스트 이름이 없거나 일치하지 않는 요청을 받는다.
+Ubuntu 패키지의 기본 사이트도 `listen 80 default_server`를 사용할 수 있다. 기존 설정을 백업한 뒤 `sites-enabled/default` 링크를 옮기고, 포트 80의 기본 서버가 하나만 남도록 확인한다. `spacecube.conf`의 `server_name _;`와 `default_server`가 호스트 이름이 없거나 일치하지 않는 요청을 받는다.
 
 ```bash
+backup=/opt/spacecube/backups/nginx-$(date +%Y%m%d)
+sudo mkdir -p "$backup"
+sudo cp -a /etc/nginx "$backup/nginx"
 if [ -L /etc/nginx/sites-enabled/default ]; then
-    sudo unlink /etc/nginx/sites-enabled/default
+    sudo cp -a /etc/nginx/sites-enabled/default "$backup/sites-enabled-default"
+    sudo rm /etc/nginx/sites-enabled/default
 fi
 ```
 
@@ -32,11 +35,13 @@ fi
 
 ```bash
 npm --prefix frontend run build
-sudo install -d -o root -g root -m 0755 /var/www/frontend
-sudo cp -a /tmp/spacecube-dist/. /var/www/frontend/
+release=/opt/spacecube/releases/fda86e7/frontend
+sudo install -d -o root -g root -m 0755 "$release"
+sudo cp -a frontend/dist/. "$release/"
+sudo ln -s "$release" /var/www/frontend
 ```
 
-`/tmp/spacecube-dist/`는 각 VM으로 전송한 `frontend/dist/` 내용의 임시 위치다. 해시가 붙은 `/assets/` 파일은 1년 캐시하고, `/index.html`은 재검증하도록 `no-cache`를 보낸다. `/photos/`는 실제 파일만 응답하고 없는 파일을 Vue 화면으로 넘기지 않는다. `.webp`는 7일 캐시하며 해당 location에 `image/webp` MIME을 명시한다. 사진 안내 문서는 기본 캐시 정책을 따른다. `/assets/`의 `expires`와 `add_header`는 각각 Cache-Control 필드를 보낼 수 있으므로 두 필드를 합쳐 판정한다. 근거: [Nginx 응답 헤더](https://nginx.org/en/docs/http/ngx_http_headers_module.html#expires).
+해시가 붙은 `/assets/` 파일은 1년 캐시하고, `/index.html`은 재검증하도록 `no-cache`를 보낸다. `/photos/`는 실제 파일만 응답하고 없는 파일을 Vue 화면으로 넘기지 않는다. `.webp`는 7일 캐시하며 해당 location에 `image/webp` MIME을 명시한다. 사진 안내 문서는 기본 캐시 정책을 따른다. `/assets/`의 `expires`와 `add_header`는 각각 Cache-Control 필드를 보낼 수 있으므로 두 필드를 합쳐 판정한다. 근거: [Nginx 응답 헤더](https://nginx.org/en/docs/http/ngx_http_headers_module.html#expires).
 
 ## 경로와 접근 경계
 
@@ -53,7 +58,7 @@ sudo cp -a /tmp/spacecube-dist/. /var/www/frontend/
 
 HAProxy도 `/api/internal`과 `/api/metrics`를 차단한다. Nginx의 차단은 정문 설정을 우회했을 때의 추가 경계다. FastAPI 오류 본문은 Nginx가 가공하지 않으며, Nginx와 FastAPI 사이의 연결 실패는 FastAPI 라우트의 오류가 아니다.
 
-FastAPI의 `/metrics`는 공개 포트 80으로 전달하지 않는다. API 프로세스가 `127.0.0.1:8000`에만 바인딩된다는 구조와 모니터링 VM `mon`이 서버의 8000 포트를 직접 읽는 방화벽 표기가 함께 있다. 루프백 바인딩이면 원격 `mon`은 접속할 수 없으므로, 실제 배포 전에는 각 API VM의 로컬 Alloy가 scrape하는 방식인지 모니터링 경로를 확인해야 한다. 이 후보안은 Nginx에서 포트 8000을 외부에 열지 않는다.
+FastAPI의 `/metrics`는 공개 포트 80으로 전달하지 않는다. FastAPI는 loopback에 바인딩하고, 모니터링 경로는 이 테스트 배포 범위가 아니다.
 
 전달 헤더는 HAProxy를 유일한 외부 진입점으로 둔 현재 구조에 맞춘다. Nginx가 보는 `$remote_addr`와 `X-Real-IP`는 바로 앞의 `gw` 주소이며, `X-Forwarded-For`에는 기존 체인에 그 주소를 덧붙인다. 브라우저 원 IP가 필요한 소비자는 HAProxy가 클라이언트 제공 `X-Forwarded-For`를 정리한 뒤 체인을 설정하는지 확인해야 한다. 현재 VM 흐름은 HTTP라 `X-Forwarded-Proto`에는 Nginx가 받은 scheme을 전달한다. `Authorization`, `X-Session-Id`, `X-Synthetic`, `X-Synthetic-Key` 등 나머지 요청 헤더는 기본 동작으로 전달된다.
 
@@ -69,11 +74,11 @@ VM에 파일을 복사하고 기본 사이트 중복을 확인한 뒤 문법을 
 sudo nginx -t
 ```
 
-문법 검사 통과 후 실제 적용은 VM 소유자가 한다. 이번 작업에서는 서버 적용이나 reload를 하지 않았다.
+문법 검사 통과 후 `sudo systemctl reload nginx`로 적용한다. 이 저장소의 테스트 VM 배포는 이 절차를 거쳐 적용했다.
 
 ## PR #67 적용 후 확인
 
-각 VM 소유자가 설정·빌드를 배치하고 `sudo nginx -t` 통과 후 reload한다. 다음 검사는 **api1·api2 각각**에서 수행하고 응답 헤더와 검사 시각을 남긴다. 파일명은 배포된 빌드에 존재하는 경로를 골라 사용한다.
+각 api VM에서 수행한다. 파일명은 배포된 빌드에 존재하는 경로를 골라 사용한다.
 
 ```bash
 # 각 VM 안에서 실행한다. 접근 로그에 검색어나 인증정보를 넣지 않는다.
@@ -100,9 +105,9 @@ curl -sS http://127.0.0.1:8080/stub_status
 | 내부 API·metrics | 404 |
 | loopback `stub_status` | 200, Nginx 상태 본문 |
 
-keepalive는 `sudo nginx -T`로 풀·HTTP 버전·Connection 헤더 설정을 확인한 뒤, 다른 트래픽을 배제한 상태에서 `/api/health`를 연속 호출하고 `ss -ntp`의 로컬 8000 연결이 재사용되는지 확인한다. `nginx -t` 통과만으로 실제 연결 재사용을 검증했다고 기록하지 않는다.
+keepalive는 `sudo nginx -T`로 풀·HTTP 버전·Connection 헤더 설정을 확인하고, `/api/health`를 연속 호출한 뒤 `ss -ntp state established`에서 loopback 8000번 연결이 유휴 상태로 남는지 확인한다.
 
-정문 검증은 #66 담당자·각 VM 소유자와 함께 진행한다. `gw`에서 두 서버 정상 응답과 내부 API 차단을 확인한 뒤 api2 중단·복구 시 HAProxy 제외(4초 이내)·재편입을 확인한다. 노트북 종료·오류율·중복 예약 시험은 #54 완료 조건과 A7(#16)에 따른다. 두 서버 적용과 장애 시험이 끝나기 전에는 PR #67을 Draft로 유지한다.
+HAProxy 정문·통계·서버 제외/복귀·노트북 종료 시험은 #66 별도 배포에서 확인한다.
 
 ## 이전 후보안 검증 기록 (d715a6a)
 
@@ -115,10 +120,62 @@ keepalive는 `sudo nginx -T`로 풀·HTTP 버전·Connection 헤더 설정을 �
 
 - 커밋 전 전체 검증: Ruff 린트·90파일 포맷·pytest 362건 통과(경고 1). 프론트 verify는 이 워크트리의 의존성 미설치로 run-s를 찾지 못해 실패해 전체 verify.ps1은 exit 1. 프론트 코드 변경 없음.
 
-## PR #67 후속 수정 로컬 검증 (2026-11-07)
+## 로컬 코드 검증 기록 (fda86e7, 2026-11-07)
 
 - develop 1583778 통합 및 STATE 충돌 해결.
 - verify.ps1 전체 통과(exit 0): Ruff 린트·115파일 포맷, pytest 451건, FE 단위 67건·린트·색 검사·빌드. 기존 Starlette 사용 중단 경고와 FE 조건문 린트 경고 각 1건.
 - git diff --check 통과.
-- Windows에 Nginx 실행 환경이 없어 수정본 nginx -t·HTTP 캐시/MIME/keepalive 검증은 미실행. api1·api2 실적용·HAProxy 장애 시험·브라우저 E2E도 미실행.
-- 실제 SSH 접속 정보와 각 VM 소유자의 적용 가능 여부를 확인한 뒤 위 절차로 검증하고 Ready로 전환한다.
+- 이 커밋 시점에는 Windows에 Nginx 실행 환경이 없어 새 설정의 nginx -t·HTTP 검증을 하지 않았다. 아래 분리 VM 배포에서 수정본 검증을 완료했다.
+
+## 이전 분리 배치 기록 (2026-11-07)
+
+아래는 Nginx와 FastAPI를 다른 VM에 둔 초기 사전 시험 기록이다. 현재 시험 구성은 api1·api2 동배치이며, 아래 `동배치 재배포` 절의 상태가 최신이다.
+
+| 역할 | 주소 | 설치·설정 |
+| --- | --- | --- |
+| 이전 Nginx 호스트 | `192.168.0.232` | Nginx 1.24.0, `/etc/nginx/conf.d/spacecube.conf`, `api-backend → 192.168.0.234`, 프론트 릴리스 |
+| 이전 Nginx 호스트 | `192.168.0.233` | Nginx 1.24.0, 같은 설정, `api-backend → 192.168.0.235`, 프론트 릴리스 |
+| 이전 API 호스트 | `192.168.0.234` | Python 3.12 venv, FastAPI 0.162.0/Uvicorn 0.54.0 등 `environment.yml` 런타임 핀, `spacecube-api.service`, workers 2·동시성 100·유휴 연결 5초 |
+| 이전 API 호스트 | `192.168.0.235` | 같은 코드·패키지·서비스 설정, 별도 `SERVER_NAME`·bind IP |
+| MariaDB primary | `192.168.0.212` | SSH 접속·DDL·쓰기 없음. API에서 `spacecube` 연결과 읽기 조회만 확인 |
+
+FastAPI 설정 비밀값은 저장소나 평문 `.env`에 두지 않는다. systemd credential host key를 VM별로 만들고, API 설정은 `/etc/credstore.encrypted/spacecube-backend.cred`에 암호화해 둔다. 서비스는 `LoadCredentialEncrypted`로 `/run/credentials`에 읽기 전용으로 받아 `start-api.sh`가 환경변수로 적재한다. 이 API credential에는 primary DB 연결, JWT·내부 API·가상 데이터 키가 있다. 값은 로그·기록에 넣지 않는다. `MONGO_URL`은 제공되지 않아 비워 두었으며 이벤트 MongoDB 상태는 down/degraded로 표시된다.
+
+API 배포 파일은 `/opt/spacecube/releases/fda86e7/backend.tar.gz`, `/opt/spacecube/deploy/requirements-api.txt`, `/opt/spacecube/deploy/start-api.sh`에 남아 있다. 서비스는 부팅 때 자동 시작한다. Nginx 원 설정과 기존 `/var/www/html`·기본 사이트 링크는 각 VM의 `/opt/spacecube/backups/pr67-before-20261107/` 아래에 보존했다.
+
+### 당시 분리 배치 확인 결과
+
+- api1·api2 각각 `systemd-analyze verify` 통과, `spacecube-api` active, `/health`와 읽기 전용 `/categories`가 200. `/health`는 `{"status":"degraded","mongo":"down"}`이며 MariaDB primary 상태는 정상이다.
+- 당시 Nginx 호스트 `.232`·`.233` 각각 `nginx -t` 통과, reload 후 active. 홈페이지 200, `/assets/*.js` 200·1년 immutable, WebP 200·`image/webp`·7일, `/index.html` no-cache, 없는 asset·사진 404, 내부 API·공개 metrics 404.
+- 두 Nginx에서 API health 8회 연속 호출 후 `ss`로 짝 API의 유휴 TCP keepalive 연결을 확인했다.
+- 당시 별도 API 호스트 `.234`를 잠시 중지했을 때 Nginx 호스트 `.232`의 `/api/health`는 502, `.233`의 응답은 200이었다. `.234` 복구 뒤 양쪽 health가 다시 200이다. 이는 HAProxy 장애 제외·복귀 시험이 아니다.
+- MariaDB 연결을 검증하며 실행한 업무 쿼리는 health 확인과 `GET /categories`뿐이다. 스키마 변경·INSERT·SSH는 하지 않았다.
+- HAProxy VM은 이 브랜치에 설정이 없어 변경·적용하지 않았다. api1 직접 중지 확인은 HAProxy 시험이 아니며, #66 정문 분산·장애 제외/복귀 검증에 포함하지 않는다.
+
+## 동배치 재배포 (2026-11-07)
+
+| VM | 주소 | 설치·설정 |
+| --- | --- | --- |
+| api1 | `192.168.0.232` | Nginx 1.24.0 + FastAPI 0.162.0, Uvicorn 0.54.0, upstream `127.0.0.1:8000` |
+| api2 | `192.168.0.233` | api1과 같은 Nginx·FastAPI 구성, upstream `127.0.0.1:8000` |
+| gw | `192.168.0.231` | HAProxy는 이 배포에서 변경·시험하지 않음 |
+| MariaDB primary | `192.168.0.212` | 원격 서비스로만 사용. SSH·DDL·쓰기 없음 |
+
+기존 분리 시험의 `.234`·`.235` API 설치와 서비스는 변경하지 않았다. 현재 api1·api2 Nginx는 같은 VM의 loopback FastAPI로 연결한다. 각 VM의 백엔드 릴리스는 `/opt/spacecube/releases/fda86e7/backend`, 가상환경은 `/opt/spacecube/venv`, 배포 스크립트·요구사항은 `/opt/spacecube/deploy/`에 둔다. 서비스는 부팅 시 자동 시작한다.
+
+이 시험에서는 FastAPI를 loopback에만 바인딩했고 api1·api2의 UFW는 비활성 상태다. 따라서 Nginx 로컬 프록시는 확인했지만, 원격 `mon`의 8000번 `/metrics` 수집과 UFW 허용 규칙은 #15에서 별도로 맞춰야 한다.
+
+재배포 직전 Nginx 설정과 `/etc/hosts`는 `/opt/spacecube/backups/pr67-before-colocated-20261107/`에 백업했다. 기본 사이트·`/var/www/html`의 기존 백업은 이전 배포의 `/opt/spacecube/backups/pr67-before-20261107/` 아래에 보존했다.
+
+DB·JWT·내부 API·가상 데이터 키는 VM별 systemd host credential로 암호화해 `/etc/credstore.encrypted/spacecube-backend.cred`에 저장한다. 평문 임시 credential은 암호화 후 제거했다. 두 API는 검증을 위해 같은 JWT·내부 API·가상 데이터 키를 사용한다. `MONGO_URL`은 제공되지 않아 health 응답은 HTTP 200, 본문 `degraded`/`mongo: down`이다.
+
+### 동배치 확인 결과
+
+- api1·api2 각각 `systemd-analyze verify` 통과, `spacecube-api` active, Uvicorn은 `127.0.0.1:8000`에만 listen한다.
+- 각 VM에서 `/api/health` 200, 읽기 전용 `/api/categories` 200(198 bytes). MariaDB primary에는 health 확인과 `GET /categories`만 실행했다.
+- 작업 PC에서 api1·api2의 `/`, `/venues`, `/api/health`를 직접 요청해 모두 200을 확인했다.
+- 두 VM 모두 `nginx -t` 통과 후 reload·active. `/`·`/venues` 200, `/assets/*.js` 200·1년 immutable, WebP 200·`image/webp`·7일, `/index.html` no-cache.
+- 없는 asset·사진, 공개 `/stub_status`, `/api/internal/*`, `/api/metrics`는 404. loopback `127.0.0.1:8080/stub_status`는 200.
+- 각 VM에서 `/api/health` 8회 호출 후 `ss`로 loopback 8000번 유휴 keepalive 연결 1개를 확인했다.
+- 접근 로그는 `/var/log/nginx/spacecube_access.log`. 실제 JSON 필드는 시각·요청 ID·메서드·상태·처리 시간·upstream 주소·상태·응답 시간이며, URI·쿼리·IP·요청 헤더·토큰·본문은 기록하지 않는다.
+- HAProxy 장애 제외·복귀 시험은 #66에서 진행한다.
