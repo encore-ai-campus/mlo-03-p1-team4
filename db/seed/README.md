@@ -61,3 +61,10 @@ conda run -n pro_1 --no-capture-output python db/loaders/build_legal_dong_seed.p
 
 이 표는 `category_map.csv` 한 곳에 두고 크롤러 전처리가 읽습니다. 백엔드 `/internal/venues`는 이미 우리 유형 코드(`category_code`)로 받습니다.
 
+
+## dong_sigungu.csv (11-07, #10)
+
+- 스페이스클라우드 상세가 `시·도(또는 시 이름) + 법정동`만 주게 바뀌어, 크롤러가 시·군·구를 구할 때 쓰는 대응표다.
+- 원본: 공공데이터포털 `국토교통부_전국 법정동`(데이터 15063424, 2026-06-30판, 이용허락범위 제한 없음). 원본 파일은 저장소에 두지 않는다.
+- 생성: `python db/loaders/build_dong_map.py <원본.csv>`. `regions.csv` 기준으로 일반구는 시로 줄이고(천안시서북구 → 천안시), regions에 없는 행은 버리고, 리(里)는 리 이름으로 넣는다(김포 석모리).
+- 같은 시·도 안에 같은 동 이름이 여러 시·군·구에 있으면(서울 신사동 등) 크롤러가 고르지 않고 `동 이름 겹침`으로 제외한다.

@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { Star } from '@lucide/vue'
 import RoomArt from './RoomArt.vue'
 import { nowInSeoul } from '@/utils/date'
@@ -10,16 +10,31 @@ const props = defineProps({
   room: { type: Object, required: true },
   rank: { type: Number, default: 0 }, // 1~3이면 '인기 n위'를 글자로
   index: { type: Number, default: 0 }, // 스태거 순서
+  fresh: { type: Boolean, default: false }, // 메인 추천순 앞에 세운 최근 등록 공간
 })
 
 const available = computed(() => props.room.slots?.some((s) => !s.taken && s.hour > nowInSeoul().hour))
 const next = computed(() => props.room.slots?.find((s) => !s.taken && s.hour > nowInSeoul().hour)?.hour)
 const { log } = useEventLogger()
 const won = (n) => n.toLocaleString('ko-KR')
+
+// 목록 노출(product_impression): 카드가 화면에 절반 이상 보이면 카드마다 한 번만 보낸다.
+const el = ref(null)
+let observer
+onMounted(() => {
+  if (typeof IntersectionObserver === 'undefined' || !el.value) return
+  observer = new IntersectionObserver((entries) => {
+    if (!entries.some((e) => e.isIntersecting)) return
+    observer.disconnect()
+    log('product_impression', { venue_id: props.room.venue_id, category: props.room.category?.code })
+  }, { threshold: 0.5 })
+  observer.observe(el.value)
+})
+onBeforeUnmount(() => observer?.disconnect())
 </script>
 
 <template>
-  <article class="card" :style="{ '--i': Math.min(index, 7) }">
+  <article ref="el" class="card" :style="{ '--i': Math.min(index, 7) }">
     <div class="card__media">
       <RoomArt :image="room.image" :category="room.category" :seed="room.venue_id" />
     </div>
@@ -31,7 +46,7 @@ const won = (n) => n.toLocaleString('ko-KR')
         </h3>
         <span class="rating num"><Star :size="15" class="star" fill="currentColor" aria-hidden="true" />{{ Number(room.rating_avg ?? 0).toFixed(1) }} <span class="rating__count">({{ room.review_count }})</span></span>
       </div>
-      <p class="card__meta"><strong v-if="rank && rank <= 3" class="card__rank">인기 {{ rank }}위 · </strong>{{ room.category.name }} · {{ room.region.sido }} {{ room.region.sigungu }} · 최대 {{ room.capacity_max }}인</p>
+      <p class="card__meta"><strong v-if="rank && rank <= 3" class="card__rank">인기 {{ rank }}위 · </strong><strong v-else-if="fresh" class="card__rank">NEW · </strong>{{ room.category.name }} · {{ room.region.sido }} {{ room.region.sigungu }} · 최대 {{ room.capacity_max }}인</p>
       <p class="card__now" :class="{ 'is-now': available }">{{ available ? '지금 이용 가능' : next ? `다음 빈 시간 ${next}:00` : '오늘 예약 마감' }}</p>
       <p class="card__desc">{{ room.facilities?.map((f) => typeof f === 'string' ? f : f.name).join(' · ') }}</p>
       <p class="price num"><strong>{{ won(room.price_per_hour) }}원</strong> / 1시간</p>
