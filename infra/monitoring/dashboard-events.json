@@ -1,0 +1,113 @@
+{
+  "id": null,
+  "uid": "spacecube-events",
+  "title": "이벤트 · 수신/쓰기 실패/읽기 대체",
+  "tags": [
+    "spacecube",
+    "F-65"
+  ],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "이벤트 수신",
+      "type": "text",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "### 이벤트 수신\nevents.log 실제 구조 또는 이벤트 수신 counter 확인 대기\n실제 /metrics 샘플 확인 후 쿼리를 연결합니다."
+      }
+    },
+    {
+      "id": 2,
+      "title": "MongoDB 쓰기 실패",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "spacecube-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (vm) (increase(mongo_event_write_failures_total[5m]))",
+          "legendFormat": "{{vm}}"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "replica 읽기 대체",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "spacecube-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 8
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (vm) (increase(db_read_fallback_total[5m]))",
+          "legendFormat": "{{vm}}"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "이벤트 로그 유입 상태",
+      "type": "text",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 8
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "### 이벤트 로그 유입 상태\nLoki Explore에서 {source=\"events\"}를 VM별 확인\n실제 /metrics 샘플 확인 후 쿼리를 연결합니다."
+      }
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+groups:
+  - name: spacecube-operational
+    rules:
+      - alert: NodeExporterScrapeFailed
+        expr: up{job="node"} == 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.vm }} 호스트 exporter 수집 실패"
+      - alert: MongoEventWriteFailure
+        expr: sum(increase(mongo_event_write_failures_total[5m])) > 0
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "MongoDB 이벤트 쓰기 실패"
+      - alert: HttpServerErrorRateHigh
+        expr: (sum(rate(http_requests_total{status=~"5.."}[5m])) / clamp_min(sum(rate(http_requests_total[5m])) - (sum(rate(reservation_total{result="conflict"}[5m])) or vector(0)), 0.001)) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "FastAPI 5xx 오류율 5% 초과 (SLOT_TAKEN 분모 제외)"
+# 실제 exporter /metrics 확인 후 ReplicaLagOver5Seconds(for: 2m) 추가.
+# 4xx까지 포함한 오류율은 SLOT_TAKEN을 식별할 지표가 생긴 뒤 추가한다.

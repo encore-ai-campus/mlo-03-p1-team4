@@ -1,0 +1,4 @@
+# systemctl cat prometheus 로 실제 패키지 경로를 확인한 뒤 override
+[Service]
+ExecStart=
+ExecStart=/usr/bin/prometheus --config.file=/etc/prometheus/prometheus.yml --storage.tsdb.path=/var/lib/prometheus --storage.tsdb.retention.time=15d --web.listen-address=0.0.0.0:9090 --web.enable-remote-write-receiver
