@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { Star } from '@lucide/vue'
 import RoomArt from './RoomArt.vue'
 import { nowInSeoul } from '@/utils/date'
@@ -16,10 +16,24 @@ const available = computed(() => props.room.slots?.some((s) => !s.taken && s.hou
 const next = computed(() => props.room.slots?.find((s) => !s.taken && s.hour > nowInSeoul().hour)?.hour)
 const { log } = useEventLogger()
 const won = (n) => n.toLocaleString('ko-KR')
+
+// 목록 노출(product_impression): 카드가 화면에 절반 이상 보이면 카드마다 한 번만 보낸다.
+const el = ref(null)
+let observer
+onMounted(() => {
+  if (typeof IntersectionObserver === 'undefined' || !el.value) return
+  observer = new IntersectionObserver((entries) => {
+    if (!entries.some((e) => e.isIntersecting)) return
+    observer.disconnect()
+    log('product_impression', { venue_id: props.room.venue_id, category: props.room.category?.code })
+  }, { threshold: 0.5 })
+  observer.observe(el.value)
+})
+onBeforeUnmount(() => observer?.disconnect())
 </script>
 
 <template>
-  <article class="card" :style="{ '--i': Math.min(index, 7) }">
+  <article ref="el" class="card" :style="{ '--i': Math.min(index, 7) }">
     <div class="card__media">
       <RoomArt :image="room.image" :category="room.category" :seed="room.venue_id" />
     </div>
