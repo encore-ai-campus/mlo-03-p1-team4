@@ -1,0 +1,269 @@
+{
+  "uid": "spacecube-logs",
+  "title": "Spacecube / 로그 탐색",
+  "schemaVersion": 39,
+  "version": 103,
+  "refresh": "15s",
+  "tags": [
+    "spacecube",
+    "lab"
+  ],
+  "panels": [
+    {
+      "id": 1,
+      "title": "전체 로그",
+      "description": "",
+      "type": "logs",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "{server=~\"gw|api1|api2|mon\"}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "decimals": 1,
+          "noValue": "수집 없음"
+        },
+        "overrides": []
+      },
+      "options": {
+        "showTime": true,
+        "showLabels": false,
+        "wrapLogMessage": false,
+        "sortOrder": "Descending",
+        "enableLogDetails": true
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 9
+      }
+    },
+    {
+      "id": 2,
+      "title": "FastAPI 오류·503·동시성 제한",
+      "description": "",
+      "type": "logs",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "{job=\"api\",server=~\"api1|api2\"} |~ \"(?i)(ERROR|Exception|Traceback|503|Exceeded concurrency limit)\""
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "decimals": 1,
+          "noValue": "수집 없음"
+        },
+        "overrides": []
+      },
+      "options": {
+        "showTime": true,
+        "showLabels": false,
+        "wrapLogMessage": false,
+        "sortOrder": "Descending",
+        "enableLogDetails": true
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 9,
+        "w": 24,
+        "h": 9
+      }
+    },
+    {
+      "id": 3,
+      "title": "Nginx API 5xx 접근 로그",
+      "description": "",
+      "type": "logs",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "{job=\"nginx\",server=~\"api1|api2\"} | json | __error__=\"\" | path=~\"/api/.*\" | path!~\"/api/(health|metrics).*\" | status=~\"5..\""
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "decimals": 1,
+          "noValue": "수집 없음"
+        },
+        "overrides": []
+      },
+      "options": {
+        "showTime": true,
+        "showLabels": false,
+        "wrapLogMessage": false,
+        "sortOrder": "Descending",
+        "enableLogDetails": true
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 18,
+        "w": 24,
+        "h": 9
+      }
+    },
+    {
+      "id": 4,
+      "title": "서버·수집기 오류 로그",
+      "description": "",
+      "type": "logs",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "{job=\"journal\",server=~\"gw|api1|api2|mon\"} |~ \"(?i)(error|failed|down|retry|drop)\""
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "decimals": 1,
+          "noValue": "수집 없음"
+        },
+        "overrides": []
+      },
+      "options": {
+        "showTime": true,
+        "showLabels": false,
+        "wrapLogMessage": false,
+        "sortOrder": "Descending",
+        "enableLogDetails": true
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 27,
+        "w": 24,
+        "h": 9
+      }
+    }
+  ],
+  "time": {
+    "from": "now-30m",
+    "to": "now"
+  },
+  "description": "같은 시간 범위에서 API 오류, Nginx 5xx, 시스템·수집기 로그를 확인합니다.",
+  "links": [
+    {
+      "title": "전체 현황",
+      "type": "link",
+      "url": "/d/spacecube-overview",
+      "keepTime": true,
+      "includeVars": true,
+      "targetBlank": false
+    },
+    {
+      "title": "서버",
+      "type": "link",
+      "url": "/d/spacecube-servers",
+      "keepTime": true,
+      "includeVars": true,
+      "targetBlank": false
+    },
+    {
+      "title": "HAProxy",
+      "type": "link",
+      "url": "/d/spacecube-haproxy",
+      "keepTime": true,
+      "includeVars": true,
+      "targetBlank": false
+    },
+    {
+      "title": "Nginx",
+      "type": "link",
+      "url": "/d/spacecube-nginx",
+      "keepTime": true,
+      "includeVars": true,
+      "targetBlank": false
+    },
+    {
+      "title": "FastAPI",
+      "type": "link",
+      "url": "/d/spacecube-api",
+      "keepTime": true,
+      "includeVars": true,
+      "targetBlank": false
+    },
+    {
+      "title": "MariaDB",
+      "type": "link",
+      "url": "/d/spacecube-mariadb",
+      "keepTime": true,
+      "includeVars": true,
+      "targetBlank": false
+    },
+    {
+      "title": "DB 연결·대기",
+      "type": "link",
+      "url": "/d/spacecube-db-connections",
+      "keepTime": true,
+      "includeVars": true,
+      "targetBlank": false
+    },
+    {
+      "title": "이벤트·저장소",
+      "type": "link",
+      "url": "/d/spacecube-storage",
+      "keepTime": true,
+      "includeVars": true,
+      "targetBlank": false
+    },
+    {
+      "title": "로그 탐색",
+      "type": "link",
+      "url": "/d/spacecube-logs",
+      "keepTime": true,
+      "includeVars": true,
+      "targetBlank": false
+    },
+    {
+      "title": "Alloy",
+      "type": "link",
+      "url": "/d/spacecube-alloy",
+      "keepTime": true,
+      "includeVars": true,
+      "targetBlank": false
+    },
+    {
+      "title": "Loki",
+      "type": "link",
+      "url": "/d/spacecube-loki",
+      "keepTime": true,
+      "includeVars": true,
+      "targetBlank": false
+    }
+  ],
+  "timepicker": {
+    "refresh_intervals": [
+      "15s",
+      "30s",
+      "1m",
+      "5m"
+    ]
+  },
+  "timezone": "Asia/Seoul"
+}
