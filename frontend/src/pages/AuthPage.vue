@@ -89,9 +89,11 @@ watch(
 )
 watch(terms, () => delete se.terms)
 
+// 길이 상한(72바이트, bcrypt 한계)은 일반 사용자에게 낯선 기준이라 넘었을 때만 쉬운 말로 보여 준다.
+const pwTooLong = computed(() => new TextEncoder().encode(sf.password).length > 72)
 const pwChecks = computed(() => [
   { ok: sf.password.length >= 8, label: '8자 이상' },
-  { ok: new TextEncoder().encode(sf.password).length <= 72, label: '72바이트 이하' },
+  ...(pwTooLong.value ? [{ ok: false, label: '너무 길어요. 영문·숫자는 72자, 한글은 24자까지 쓸 수 있어요' }] : []),
 ])
 const allTerms = computed({
   get: () => terms.service && terms.privacy,
@@ -133,7 +135,8 @@ async function submitSignup() {
   if (signing.value) return
   if (!sf.name.trim()) se.name = '이름을 적어 주세요.'
   if (emailState.value !== 'ok' && !se.email) await verifyEmail()
-  if (!pwChecks.value.every((c) => c.ok)) se.password = '비밀번호는 8자 이상, 72바이트 이하로 적어 주세요.'
+  if (sf.password.length < 8) se.password = '비밀번호는 8자 이상으로 적어 주세요.'
+  else if (pwTooLong.value) se.password = '비밀번호가 너무 길어요. 영문·숫자는 72자, 한글은 24자까지 쓸 수 있어요.'
   if (sf.password2 !== sf.password) se.password2 = '비밀번호가 서로 달라요.'
   if (!/^01[016789]-?\d{3,4}-?\d{4}$/.test(sf.phone.trim())) se.phone = '휴대폰 번호를 010-1234-5678 형식으로 적어 주세요.'
   if (!/^\d{6}$/.test(sf.birth)) se.birth = '생년월일을 숫자 6자리로 적어 주세요.'

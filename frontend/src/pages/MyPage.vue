@@ -207,7 +207,7 @@ const savingPw = ref(false)
 async function savePassword() {
   if (savingPw.value) return
   if (!pw.current) pwErr.current = '현재 비밀번호를 입력해 주세요.'
-  if (pw.next.length < 8 || new TextEncoder().encode(pw.next).length > 72) pwErr.next = '8자 이상, 72바이트 이하로 입력해 주세요.'
+  if (pw.next.length < 8 || new TextEncoder().encode(pw.next).length > 72) pwErr.next = pw.next.length < 8 ? '8자 이상으로 입력해 주세요.' : '너무 길어요. 영문·숫자는 72자, 한글은 24자까지 쓸 수 있어요.'
   else if (pw.next === pw.current) pwErr.next = '지금 비밀번호와 다르게 정해 주세요.'
   if (pw.next2 !== pw.next) pwErr.next2 = '새 비밀번호가 서로 달라요.'
   if (pwErr.current || pwErr.next || pwErr.next2) return
