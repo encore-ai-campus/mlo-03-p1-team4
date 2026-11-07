@@ -4,6 +4,22 @@
 
 ![다락큐브 시스템 아키텍처 1차 구성(로컬 VM)](figures/architecture.png)
 
+## 현재 109 시험 배치 (11-07 실제 확인)
+
+현재는 노트북 한 대의 VMware Workstation에 **7대가 모두 실행 중**이다. 제어 노드는 `ssh playdata` → `192.168.219.102`다. 아래 2절의 노트북 4대 분산·계획 사양은 11-09 이전 계획이며 현재 실측 사양과 구분한다.
+
+| VM | 현재 IP | 실제 vCPU / RAM | 소프트웨어 |
+| --- | --- | --- | --- |
+| gw | 192.168.219.218 | 1 / 768MB | HAProxy 정문 |
+| db1 | 192.168.219.212 | 1 / 2048MB | MariaDB 10.11.14 primary |
+| mongo | 192.168.219.216 | 1 / 2048MB | MongoDB 8.0.34, 팀 OVA |
+| api1 | 192.168.219.214 | 1 / 1536MB | Nginx + FastAPI, Uvicorn 2 workers / concurrency 200 |
+| mon | 192.168.219.217 | 2 / 3072MB | Grafana·Prometheus·Loki·Alloy |
+| api2 | 192.168.219.215 | 1 / 1536MB | Nginx + FastAPI, Uvicorn 2 workers / concurrency 200 |
+| db2 | 192.168.219.213 | 1 / 2048MB | MariaDB 10.11.14 replica, read_only=1 |
+
+DB node/mysqld exporter는 설치·자동 실행됐고 9100/9104는 mon .217만 허용한다. Prometheus는 **19/19 UP**이다. DB 한도는 양쪽 max_connections=151·max_user_connections=0·앱 개별 한도 0을 유지했다. [운영·모니터링 현황](DB_운영_모니터링_현황_2026-11-07.md)에 버전·권한·집계·검증·현재 대시보드를 모았다.
+
 ## 1. 왜 바꾸나
 
 | | AWS C안 (11-04) | 로컬 VM (11-05) |
@@ -15,15 +31,15 @@
 | 장애 시연 | 가용 영역(2a·2c) 분리 | **노트북 분리**(노트북 한 대 전원을 꺼도 서비스 유지) |
 | 배우는 것 | 관리형 서비스 | 리눅스 설치·systemd·방화벽·복제를 직접 |
 
-## 2. 노트북별 배치
+## 2. 노트북별 배치 (11-09 분산 계획)
 
 | 노트북 (주인) | VM | vCPU / 메모리 / 디스크 | 올리는 것 | 열 포트 ← 받는 곳 |
 | --- | --- | --- | --- | --- |
 | **1** (DB 전희정) | `gw` 정문 | 1c / 1GB / 10GB | **HAProxy**(80 → api1·api2 라운드로빈, `/health` 2초 능동 확인, `/api/internal`·`/api/metrics` 차단, 통계·지표 8404), Alloy | 80 ← 공유기 전체, 8404 ← mon |
-| | `db1` MariaDB primary | 2c / 4GB / 20GB | MariaDB 11.4(STRICT `sql_mode`, `+09:00`, utf8mb4), 백업 cron, mysqld exporter, Alloy | 3306 ← api1·api2·db2 |
-| | `mongo` | 2c / 3GB / 20GB | MongoDB 7(인증 켬, `docs/db/mongo_init.js`), 백업 cron, mongodb exporter, Alloy | 27017 ← api1·api2 |
+| | `db1` MariaDB primary | 2c / 4GB / 20GB | MariaDB 10.11.14(STRICT `sql_mode`, `+09:00`, utf8mb4), 백업 cron, mysqld exporter, Alloy | 3306 ← api1·api2·db2 |
+| | `mongo` | 2c / 3GB / 20GB | MongoDB 8.0.34(팀 OVA, 인증 켬, `docs/db/mongo_init.js`), 백업 cron, mongodb exporter, Alloy | 27017 ← api1·api2 |
 | **2** (A 이자연) | `api1` FastAPI #1 | 2c / 2GB / 15GB | **Nginx**(80: Vue 정적 파일 + `/api` → `127.0.0.1:8000`) + FastAPI(uvicorn 워커 2), cron: 이용 완료 배치(1시간)·크롤러(주 1회)·`replay_events.py`·`event_daily` 집계(매일 새벽), 데이터 생성기(과거 30일 백필, 수동 실행), `app.log`·`events.log`, `/metrics`, nginx exporter, Alloy | 80 ← gw, 8000 ← mon(지표) |
-| | `mon` 모니터링 | 2c / 4GB / 30GB | Prometheus(15일), Loki(14일), Grafana(대시보드 4장 + 경보) | 3000·9090 ← 공유기, 3100·지표 받기 ← 모든 VM |
+| | `mon` 모니터링 | 2c / 4GB / 30GB | Prometheus(15일), Loki(14일), Grafana(현재 시험 서버 대시보드 11개, 경보 별도 확인) | 3000·9090 ← 공유기, 3100·지표 받기 ← 모든 VM |
 | **3** (B 이세훈) | `api2` FastAPI #2 | 2c / 2GB / 15GB | api1과 같은 Nginx·코드(cron 없음), `/metrics`, nginx exporter, Alloy | 80 ← gw, 8000 ← mon(지표) |
 | | `db2` MariaDB replica | 2c / 4GB / 20GB | MariaDB replica(`read_only`, GTID 복제), mysqld exporter, Alloy | 3306 ← api1·api2 |
 | **4** (FE·PM 노진산) | VM 없음 | — | Locust(부하·`SameSlotRush`·서버 끄기 시험), Playwright E2E(실제 API), 발표 브라우저·녹화 | Locust 웹 8089 ← 노트북 4 안에서만 |
@@ -41,17 +57,19 @@
 - **Locust는 서버와 다른 노트북에**: 같은 노트북이면 CPU를 나눠 써서 측정이 틀어짐.
 - **알려진 한계**: 노트북 1이 꺼지면 정문과 primary가 같이 멈춤(정문 1대는 AWS C안과 같은 약점). 공유기도 한 대.
 
-## 3. 주소 (예시 — 공유기 대역에 맞춰 바꿈)
+## 3. 학원망 복귀 때 사용할 주소 예약안
 
 | 이름 | IP | 노트북 |
 | --- | --- | --- |
-| `gw` | 192.168.0.11 | 1 |
-| `db1` | 192.168.0.12 | 1 |
-| `mongo` | 192.168.0.13 | 1 |
-| `api1` | 192.168.0.21 | 2 |
-| `mon` | 192.168.0.22 | 2 |
-| `api2` | 192.168.0.31 | 3 |
-| `db2` | 192.168.0.32 | 3 |
+| `gw` | 192.168.0.218 | 1 |
+| `db1` | 192.168.0.212 | 1 |
+| `mongo` | 192.168.0.216 | 1 |
+| `api1` | 192.168.0.214 | 2 |
+| `mon` | 192.168.0.217 | 2 |
+| `api2` | 192.168.0.215 | 3 |
+| `db2` | 192.168.0.213 | 3 |
+
+현재 109는 위 끝자리에 `192.168.219.x`를 사용한다. 아래 .0.x는 학원망 복귀 때의 예약안이며 당일 실제 대역·중복 IP를 확인한다. 할당 범위 192.168.0.211~230 안에서 정했다.
 
 - 공유기 관리 화면에서 VM의 MAC 주소마다 IP를 **DHCP 예약**한다(고정 IP를 VM 안에서 직접 줘도 됨).
 - 모든 VM의 `/etc/hosts`에 위 이름을 넣어, 설정 파일에는 IP 대신 이름(`db1`, `api1`)을 쓴다.
@@ -64,8 +82,8 @@
 | 전부 | 22 ← 팀 노트북 4대의 IP만, 나머지 들어오는 것 거부 |
 | `gw` | 80 ← 공유기 대역, 8404 ← `mon` |
 | `api1`·`api2` | 80 ← `gw`, 8000 ← `mon`(지표만) |
-| `db1` | 3306 ← `api1`, `api2`, `db2` |
-| `db2` | 3306 ← `api1`, `api2` |
+| `db1` | 3306 ← `api1`, `api2`, `db2`; 9100·9104 ← `mon`만 |
+| `db2` | 3306 ← `api1`, `api2`; 9100·9104 ← `mon`만 |
 | `mongo` | 27017 ← `api1`, `api2` |
 | `mon` | 3000·9090 ← 공유기 대역, 3100·9090 ← 모든 VM(Alloy) |
 
@@ -85,7 +103,7 @@
 | 결정 | AWS에서 | 로컬 VM에서 |
 | --- | --- | --- |
 | A6 RDS 백업 7일 | RDS 자동 백업 | `db1` cron: 하루 1회 `mariadb-dump` → `/var/backups/mariadb`, 7개 보관. `mongo`도 `mongodump` 7개 |
-| A6 삭제 보호 | RDS 설정 | 해당 없음. 대신 **VM 스냅샷**(설치를 마친 뒤, 측정 전에 VirtualBox 스냅샷) |
+| A6 삭제 보호 | RDS 설정 | 해당 없음. 대신 **VM 스냅샷**(설치를 마친 뒤, 측정 전에 VMware Workstation 스냅샷) |
 | A6 파라미터 그룹 | RDS 파라미터 그룹 | `/etc/mysql/mariadb.conf.d/90-spacecube.cnf`에 `sql_mode`·`default-time-zone`·문자셋 |
 | A6 `X-Synthetic-Key`, Nginx `max_fails=2`, `limit_req` 안 넣음 | 그대로 | 그대로 |
 | A7 측정 기준 | 그대로 | 그대로. 단 **유선 랜 기준**. 와이파이로 잰 값은 '참고'로 표시(응답 시간이 2~10ms씩 흔들림) |
@@ -95,9 +113,9 @@
 ## 6. 먼저 확인할 것
 
 1. **공유기의 'AP 격리'(접속 기기끼리 통신 차단)가 꺼져 있는지.** 학원·공용 와이파이는 보통 켜져 있어 노트북끼리 VM이 안 보인다 → **팀 전용 공유기**를 쓴다.
-2. **유선 연결.** USB 랜 어댑터 + 공유기 랜 포트를 권장. 와이파이 브리지는 VirtualBox에서 되지만 측정이 흔들린다.
-3. **가상화 프로그램.** PC가 Windows 11 Home이라 **Hyper-V가 없다** → 모두 **VirtualBox 7**(브리지 어댑터)로 맞춘다. BIOS에서 가상화(VT-x/AMD-V)가 켜져 있어야 한다.
-4. **OS 이미지.** Ubuntu Server 24.04 LTS 하나를 만들어 복제한다. MongoDB 7.0이 24.04를 지원하는지 설치 전에 확인하고, 안 되면 `mongo` VM만 22.04로 한다.
+2. **유선 연결.** USB 랜 어댑터 + 공유기 랜 포트를 권장. 와이파이 브리지는 어댑터·드라이버별 확인이 필요하며 측정이 흔들린다.
+3. **가상화 프로그램.** 현재 109는 VMware Workstation + WSL2 Terraform/Ansible를 사용한다. 실제 LAN 어댑터에 브리지해야 하며 이 서버는 VMnet2를 쓴다. 다른 노트북은 브리지 이름·연결 어댑터를 따로 확인한다. WSL2를 위해 Hyper-V/VBS를 임의로 끄지 않는다.
+4. **OS 이미지.** 일반 6대는 Ubuntu 24.04 cloud image, Mongo는 팀에서 받은 MongoDB 8.0.34 OVA를 사용한다. 일반 VM은 ubuntu, OVA는 test 계정과 전용 SSH 키로 점검한다.
 5. **노트북 운영.** 측정·시연 동안 절전 끄기, 덮개를 닫아도 계속 켜짐, 전원 연결.
 6. **발표 장소.** 시연은 같은 공유기 안에서만 된다. 발표 날은 노트북 4대와 공유기를 함께 가져가고, 안 되면 일요일에 찍어 둔 녹화로 대신한다.
 

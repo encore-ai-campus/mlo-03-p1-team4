@@ -216,6 +216,13 @@ def parse_space(source_id: str | int, html: str) -> SpaceInfo:
     street = address.get("streetAddress") or ""
     if not isinstance(street, str):
         street = ""
+    if not street.strip():
+        # 11-07(#10): streetAddress가 빠지고 addressRegion(시·도 또는 시 이름)+addressLocality(법정동)만 온다.
+        # 업체명·번지는 받지 않는다. 시·군·구는 전처리에서 법정동 대응표로 구한다.
+        region = address.get("addressRegion")
+        locality = address.get("addressLocality")
+        if isinstance(region, str) and isinstance(locality, str):
+            street = f"{region.strip()} {locality.strip()}"
     rating = business.get("aggregateRating") or {}
     if not isinstance(rating, dict):
         rating = {}
@@ -249,7 +256,7 @@ def sanitized_dict(space: SpaceInfo) -> dict:
     region = (space.address_region or "").split()[:2]
     data["address_region"] = (
         " ".join(region)
-        if len(region) == 2 and all(re.fullmatch(r"[가-힣]{2,20}", part) for part in region)
+        if len(region) == 2 and all(re.fullmatch(r"[가-힣0-9]{2,20}", part) for part in region)
         else None
     )
     return data

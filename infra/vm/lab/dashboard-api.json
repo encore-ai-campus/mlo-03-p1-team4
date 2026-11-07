@@ -1,0 +1,619 @@
+{
+  "uid": "spacecube-api",
+  "title": "Spacecube / FastAPI",
+  "schemaVersion": 39,
+  "version": 103,
+  "refresh": "15s",
+  "panels": [
+    {
+      "id": 1,
+      "title": "FastAPI 프로세스 수집 상태 (DB 상태와 별개)",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "up{job=\"api\"}",
+          "legendFormat": "{{server}}",
+          "instant": true,
+          "interval": "15s"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "DOWN",
+                  "color": "red"
+                },
+                "1": {
+                  "text": "UP",
+                  "color": "green"
+                }
+              }
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          },
+          "noValue": "수집 없음",
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "justifyMode": "auto",
+        "orientation": "horizontal",
+        "text": {
+          "valueSize": 16,
+          "titleSize": 11
+        },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "values": false
+        }
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 3
+      }
+    },
+    {
+      "id": 2,
+      "title": "초당 API 요청",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by(server)(rate(http_requests_total{job=\"api\"}[$__rate_interval]))"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "min": 0,
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "fillOpacity": 6,
+            "showPoints": "never",
+            "spanNulls": false,
+            "axisBorderShow": false
+          },
+          "noValue": "수집 없음",
+          "decimals": 1
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "calcs": []
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 3,
+        "w": 12,
+        "h": 7
+      },
+      "description": ""
+    },
+    {
+      "id": 3,
+      "title": "HTTP 상태코드별 API 요청률",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by(server,status)(rate(http_requests_total{job=\"api\"}[$__rate_interval]))"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "min": 0,
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "fillOpacity": 6,
+            "showPoints": "never",
+            "spanNulls": false,
+            "axisBorderShow": false
+          },
+          "noValue": "수집 없음",
+          "decimals": 1
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "calcs": []
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 3,
+        "w": 12,
+        "h": 7
+      },
+      "description": ""
+    },
+    {
+      "id": 4,
+      "title": "API 응답 지연 p50 / p95 / p99",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "1000 * histogram_quantile(0.50, sum by(le,server)(rate(http_request_duration_seconds_bucket{job=\"api\"}[$__rate_interval])))",
+          "legendFormat": "{{server}} · p50"
+        },
+        {
+          "refId": "B",
+          "expr": "1000 * histogram_quantile(0.95, sum by(le,server)(rate(http_request_duration_seconds_bucket{job=\"api\"}[$__rate_interval])))",
+          "legendFormat": "{{server}} · p95"
+        },
+        {
+          "refId": "C",
+          "expr": "1000 * histogram_quantile(0.99, sum by(le,server)(rate(http_request_duration_seconds_bucket{job=\"api\"}[$__rate_interval])))",
+          "legendFormat": "{{server}} · p99"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "min": 0,
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "fillOpacity": 6,
+            "showPoints": "never",
+            "spanNulls": false,
+            "axisBorderShow": false
+          },
+          "noValue": "수집 없음",
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "calcs": []
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 10,
+        "w": 12,
+        "h": 7
+      },
+      "description": "FastAPI 히스토그램 버킷에서 계산한 서버별 백분위입니다. 단위는 ms."
+    },
+    {
+      "id": 5,
+      "title": "워커 프로세스 메모리 (수집된 워커)",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "process_resident_memory_bytes{job=\"api\"}",
+          "legendFormat": "{{server}}",
+          "interval": "15s"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "min": 0,
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "fillOpacity": 6,
+            "showPoints": "never",
+            "spanNulls": false,
+            "axisBorderShow": false
+          },
+          "noValue": "수집 없음",
+          "decimals": 1
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "calcs": []
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 10,
+        "w": 12,
+        "h": 7
+      }
+    },
+    {
+      "id": 6,
+      "title": "MongoDB 이벤트 전달 실패",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "mongo_event_write_failures_total",
+          "legendFormat": "{{server}}",
+          "interval": "15s"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "fillOpacity": 6,
+            "showPoints": "never",
+            "spanNulls": false,
+            "axisBorderShow": false
+          },
+          "noValue": "수집 없음",
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "calcs": []
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 17,
+        "w": 12,
+        "h": 7
+      },
+      "description": "MongoDB는 현재 온라인입니다. 응답 뒤 저장 실패 누계이며 문서 수나 저장 완료 건수가 아닙니다."
+    },
+    {
+      "id": 7,
+      "title": "API 5xx 요청률 · 상태코드별",
+      "description": "503 등 서버 오류를 발생 서버와 상태코드별로 비교합니다.",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by(server,status)(rate(http_requests_total{job=\"api\",status=~\"5..\"}[$__rate_interval]))",
+          "legendFormat": "{{server}} · {{status}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "min": 0,
+          "decimals": 1,
+          "noValue": "수집 없음",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 6,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "calcs": []
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 17,
+        "w": 12,
+        "h": 7
+      }
+    },
+    {
+      "id": 8,
+      "title": "API 응답 지연 분포 · 시간별",
+      "description": "각 시점의 요청 지연시간 분포입니다. 밝은 구간은 요청이 몰린 지연 버킷입니다.",
+      "type": "heatmap",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by(le)(rate(http_request_duration_seconds_bucket{job=\"api\"}[$__rate_interval]))",
+          "legendFormat": "{{le}}",
+          "format": "heatmap"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "min": 0,
+          "decimals": 1,
+          "noValue": "수집 없음"
+        },
+        "overrides": []
+      },
+      "options": {},
+      "gridPos": {
+        "x": 0,
+        "y": 24,
+        "w": 24,
+        "h": 8
+      }
+    },
+    {
+      "id": 9,
+      "title": "5xx 발생 경로 · 선택 기간 상위 10개",
+      "description": "선택 기간에 5xx가 많이 발생한 API 경로와 코드입니다.",
+      "type": "table",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "topk(10,sum by(handler,status)(increase(http_requests_total{job=\"api\",status=~\"5..\"}[$__range])))",
+          "instant": true,
+          "format": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "decimals": 1,
+          "noValue": "수집 없음"
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "sortBy": []
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 32,
+        "w": 12,
+        "h": 7
+      }
+    },
+    {
+      "id": 100,
+      "title": "관련 로그 · Loki",
+      "type": "logs",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "{job=\"api\"}"
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "showLabels": false,
+        "wrapLogMessage": false,
+        "sortOrder": "Descending",
+        "enableLogDetails": true
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 39,
+        "w": 24,
+        "h": 9
+      },
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "수집 없음",
+          "unit": "short"
+        }
+      }
+    }
+  ],
+  "time": {
+    "from": "now-30m",
+    "to": "now"
+  },
+  "tags": [
+    "spacecube",
+    "lab"
+  ],
+  "description": "API RED 상세: 요청률·상태코드·지연 백분위와 히스토그램, 5xx 경로를 살펴봅니다.",
+  "links": [
+    {
+      "title": "전체 현황",
+      "type": "link",
+      "url": "/d/spacecube-overview",
+      "keepTime": true,
+      "includeVars": true,
+      "targetBlank": false
+    },
+    {
+      "title": "서버",
+      "type": "link",
+      "url": "/d/spacecube-servers",
+      "keepTime": true,
+      "includeVars": true,
+      "targetBlank": false
+    },
+    {
+      "title": "HAProxy",
+      "type": "link",
+      "url": "/d/spacecube-haproxy",
+      "keepTime": true,
+      "includeVars": true,
+      "targetBlank": false
+    },
+    {
+      "title": "Nginx",
+      "type": "link",
+      "url": "/d/spacecube-nginx",
+      "keepTime": true,
+      "includeVars": true,
+      "targetBlank": false
+    },
+    {
+      "title": "FastAPI",
+      "type": "link",
+      "url": "/d/spacecube-api",
+      "keepTime": true,
+      "includeVars": true,
+      "targetBlank": false
+    },
+    {
+      "title": "MariaDB",
+      "type": "link",
+      "url": "/d/spacecube-mariadb",
+      "keepTime": true,
+      "includeVars": true,
+      "targetBlank": false
+    },
+    {
+      "title": "DB 연결·대기",
+      "type": "link",
+      "url": "/d/spacecube-db-connections",
+      "keepTime": true,
+      "includeVars": true,
+      "targetBlank": false
+    },
+    {
+      "title": "이벤트·저장소",
+      "type": "link",
+      "url": "/d/spacecube-storage",
+      "keepTime": true,
+      "includeVars": true,
+      "targetBlank": false
+    },
+    {
+      "title": "로그 탐색",
+      "type": "link",
+      "url": "/d/spacecube-logs",
+      "keepTime": true,
+      "includeVars": true,
+      "targetBlank": false
+    },
+    {
+      "title": "Alloy",
+      "type": "link",
+      "url": "/d/spacecube-alloy",
+      "keepTime": true,
+      "includeVars": true,
+      "targetBlank": false
+    },
+    {
+      "title": "Loki",
+      "type": "link",
+      "url": "/d/spacecube-loki",
+      "keepTime": true,
+      "includeVars": true,
+      "targetBlank": false
+    }
+  ],
+  "timepicker": {
+    "refresh_intervals": [
+      "15s",
+      "30s",
+      "1m",
+      "5m"
+    ]
+  },
+  "timezone": "Asia/Seoul"
+}
