@@ -26,6 +26,8 @@ Pro_1/
 ├─ environment.yml            [공동] conda 환경 pro_1 (Python 3.12)
 ├─ ruff.toml · verify.ps1     [공동] 파이썬 린트 규칙, 커밋 전 전체 검증
 ├─ pytest.ini                 [공동] pytest 공통 설정(테스트 폴더, backend import 경로)
+├─ conftest.py                [공동] #78 공유 테스트 DB의 pytest session 잠금·소유권 확인
+├─ tests/                     [공동] 테스트 DB 실행 잠금과 프로세스 간 회귀 검증
 ├─ .gitignore                 [공동] .env·node_modules·글꼴 원본 등 제외
 │
 ├─ docs/                      설계 문서 (docs/README.md)
@@ -97,11 +99,16 @@ Pro_1/
 │  ├─ loaders/                load_seed.py(CSV → seed.sql), load_synthetic (예정)
 │  └─ tests/                  제약 검증 SQL·동시 INSERT (예정)
 │
-├─ crawler/                   [DB] 스페이스클라우드 크롤러 (동작함, 필터는 옛 기준)
+├─ crawler/                   [DB] F-61 스페이스클라우드·쉐어잇 속성 수집
+│  ├─ spacecloud_crawler.py   요청 간격·사이트별 robots·사이트맵·스페이스클라우드 파서
+│  ├─ shareit_crawler.py      쉐어잇 속성 파서
+│  ├─ preprocess.py           seed 유형·지역·시설 매핑과 생성 문구·그림
+│  ├─ crawl_venues.py         crawl_raw·crawl_jobs·내부 API 등록 실행
 │  └─ data/                   기준선·표본 (지우지 않음)
 │
 ├─ simulator/
-│  ├─ generator/              [DB] 과거 데이터 백필 (예정)
+│  ├─ generator/              [B 본체·A 연결 확인·DB 후속] #75 서비스 호출 기반 과거 백필 CLI
+│  │  └─ tests/              고정 방문량·시각·부분 실패·실제 MariaDB 서비스/재개 검증
 │  └─ locust/                 [B] 부하·동시성 (예정)
 │
 ├─ infra/
