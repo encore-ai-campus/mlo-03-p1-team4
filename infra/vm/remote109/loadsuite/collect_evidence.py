@@ -64,7 +64,13 @@ def main():
     args = parser.parse_args()
     suite = json.loads((args.report / "suite.json").read_text())
     rows = suite["results"]
-    start, end = min(r["start"] for r in rows), max(r["end"] for r in rows)
+    # 예열에서 중단한 단계도 보존한다. 측정 구간별 집계는 보고서에서 따로 자른다.
+    observations = [
+        json.loads(line)
+        for line in (args.report / "resources.jsonl").read_text(encoding="utf-8").splitlines()
+    ]
+    start = min([r["start"] for r in rows] + [r["time"] for r in observations])
+    end = max([r["end"] for r in rows] + [r["time"] for r in observations])
     raw, summary = {}, {}
     for name, query in QUERIES.items():
         response = requests.get(
