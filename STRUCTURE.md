@@ -99,17 +99,24 @@ Pro_1/
 │  ├─ loaders/                load_seed.py(CSV → seed.sql), load_synthetic (예정)
 │  └─ tests/                  제약 검증 SQL·동시 INSERT (예정)
 │
-├─ crawler/                   [DB] 스페이스클라우드 크롤러 (동작함, 필터는 옛 기준)
+├─ crawler/                   [DB] F-61 스페이스클라우드·쉐어잇 속성 수집
+│  ├─ spacecloud_crawler.py   요청 간격·사이트별 robots·사이트맵·스페이스클라우드 파서
+│  ├─ shareit_crawler.py      쉐어잇 속성 파서
+│  ├─ preprocess.py           seed 유형·지역·시설 매핑과 생성 문구·그림
+│  ├─ crawl_venues.py         crawl_raw·crawl_jobs·내부 API 등록 실행
 │  └─ data/                   기준선·표본 (지우지 않음)
 │
 ├─ simulator/
 │  ├─ generator/              [B 본체·A 연결 확인·DB 후속] #75 서비스 호출 기반 과거 백필 CLI
 │  │  └─ tests/              고정 방문량·시각·부분 실패·실제 MariaDB 서비스/재개 검증
 │  └─ locust/                 [B] 부하·동시성 (예정)
+│     ├─ daily_locustfile.py   [B] 네 페르소나 일일 조회·명시적 쓰기 시나리오
+│     ├─ run_daily.ps1         [B] pro_1·모드·날짜·실행 로그를 묶는 Windows 실행기
+│     └─ tests/                [B] 부하 시나리오의 오프라인 회귀 테스트
 │
 ├─ infra/
 │  ├─ local/                  [DB] docker compose: MariaDB 11.4(3308) + MongoDB 7, 첫 실행 때 0001·seed·mongo_init 자동 (11-04)
-│  ├─ haproxy/                [B] 정문 haproxy.cfg: api1·api2 분산, /health 확인 (11-06 B안, 예정)
+│  ├─ haproxy/                [B] 정문 haproxy.cfg·README: api1·api2 분산, /api/health 확인 (11-06 B안 초안)
 │  ├─ nginx/                  [B] 서버마다: 정적 파일 + /api → 127.0.0.1:8000 (11-06 B안, README에 초안)
 │  ├─ monitoring/             [A] docker-compose, alloy.config, grafana/dashboards (예정)
 │  ├─ vm/                     [공동] 로컬 VM 7대 설치 체크리스트 (11-05, 1차 배포)

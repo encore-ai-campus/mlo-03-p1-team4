@@ -2,10 +2,16 @@
 import { TooltipProvider } from 'reka-ui'
 import { onBeforeUnmount, ref } from 'vue'
 import { toast } from 'vue-sonner'
+import { useRouter } from 'vue-router'
 import AppHeader from '@/components/layout/AppHeader.vue'
 import AppFooter from '@/components/layout/AppFooter.vue'
 import AppToaster from '@/components/ui/AppToaster.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
+
+// 화면 전환은 첫 화면이 그려진 뒤의 이동에만 쓴다(처음 연 화면은 바로 보이게).
+const pageTransition = ref('none')
+const router = useRouter()
+router?.isReady?.().then(() => setTimeout(() => (pageTransition.value = 'page'), 0))
 
 const serviceError = ref('')
 const remaining = ref(0)
@@ -52,7 +58,15 @@ onBeforeUnmount(() => { window.removeEventListener('spacecube:api-error', handle
         <p>{{ remaining }}초 뒤 화면을 다시 불러옵니다. 결제는 자동으로 재시도하지 않아요.</p>
         <BaseButton :disabled="remaining > 0" @click="retry">다시 시도</BaseButton>
       </section>
-      <RouterView v-else :key="retryKey" />
+      <!-- 화면 전환: 경로가 바뀔 때만 짧게 페이드(같은 화면의 검색 조건 변경은 전환하지 않음) -->
+      <RouterView v-else v-slot="{ Component, route }">
+        <!-- 화면 컴포넌트는 최상위 요소가 여럿일 수 있어 감싸는 div 하나에만 전환을 준다 -->
+        <Transition :name="pageTransition" mode="out-in">
+          <div :key="`${route.path}#${retryKey}`" class="page-view">
+            <component :is="Component" />
+          </div>
+        </Transition>
+      </RouterView>
     </main>
     <AppFooter />
     <AppToaster />
@@ -81,5 +95,26 @@ main {
 }
 main:focus {
   outline: none;
+}
+</style>
+
+<style>
+/* 화면 전환(11-07 팀 피드백): 나갈 때 빠르게 흐려지고 새 화면이 부드럽게 나타난다.
+   위치는 움직이지 않는다(버튼이 움직이는 동안 누르기 어렵지 않게). 움직임 줄이기 설정이면 끈다. */
+.page-enter-active {
+  transition: opacity var(--t-base) var(--ease-out);
+}
+.page-leave-active {
+  transition: opacity var(--t-fast) var(--ease-out);
+}
+.page-enter-from,
+.page-leave-to {
+  opacity: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .page-enter-active,
+  .page-leave-active {
+    transition: none;
+  }
 }
 </style>

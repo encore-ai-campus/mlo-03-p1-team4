@@ -18,9 +18,10 @@ const slots = [
   { hour: 17, taken: false, past: false },
 ]
 
-function setup(modelValue = [], max = 4) {
+function setup(modelValue = [], max = 4, min = 1) {
   const wrapper = mount(SlotGrid, {
-    props: { slots, label: '시간 칸', max, modelValue, 'onUpdate:modelValue': (v) => wrapper.setProps({ modelValue: v }) },
+    attachTo: document.body,
+    props: { slots, label: '시간 칸', max, min, modelValue, 'onUpdate:modelValue': (v) => wrapper.setProps({ modelValue: v }) },
     global: { stubs: { UiTooltip: { template: '<slot />' } } },
   })
   // 화면 글자(9, 10…)가 아니라 접근성 이름(09:00부터 1시간)으로 칸을 찾는다
@@ -69,5 +70,65 @@ describe('SlotGrid (F-22 시간 칸 선택 규칙)', () => {
     const { btn, value } = setup([13, 14, 15])
     await btn(14).trigger('click')
     expect(value()).toEqual([14])
+  })
+})
+
+describe('SlotGrid 최소 이용시간 (11-07 팀 피드백)', () => {
+  const minMsg = '이 공간은 최소 이용시간이 2시간이라 2시간 미만은 예약할 수 없어요'
+
+  it('처음 누르면 최소 시간만큼 한 번에 잡고, 그다음부터 1칸씩 늘린다', async () => {
+    const { btn, value } = setup([], 4, 2)
+    await btn(13).trigger('click')
+    expect(value()).toEqual([13, 14])
+    await btn(15).trigger('click')
+    expect(value()).toEqual([13, 14, 15])
+  })
+
+  it('뒤가 마감이면 앞쪽으로 최소 묶음을 잡고, 둘 다 안 되면 안내만 한다', async () => {
+    const { btn, value } = setup([], 4, 2)
+    await btn(11).trigger('click') // 12시 마감 → 10~11시
+    expect(value()).toEqual([10, 11])
+    toast.mockClear()
+    const only = setup([], 4, 3)
+    await only.btn(13).trigger('click')
+    expect(only.value()).toEqual([13, 14, 15])
+    await only.btn(10).trigger('click') // 10~12는 12시 마감 → 한 칸 당겨 9~11(지난 칸도 예약 가능)
+    expect(only.value()).toEqual([9, 10, 11])
+  })
+
+  it('줄여서 최소 시간보다 짧아지면 빼지 않고 안내한다', async () => {
+    const { btn, value } = setup([13, 14], 4, 2)
+    toast.mockClear()
+    await btn(14).trigger('click')
+    expect(value()).toEqual([13, 14])
+    expect(toast).toHaveBeenCalledWith(minMsg)
+    const longer = setup([13, 14, 15], 4, 2)
+    await longer.btn(15).trigger('click')
+    expect(longer.value()).toEqual([13, 14])
+  })
+
+  it('마우스로 끌면 지나간 칸까지 이어서 고르고, 마감 칸 앞에서 멈춘다', async () => {
+    const { wrapper, btn, value } = setup([], 4, 2)
+    const li = (h) => wrapper.find(`li[data-hour="${h}"]`).element
+    const original = document.elementFromPoint
+    let over = 13
+    document.elementFromPoint = () => li(over)
+    try {
+      await btn(13).trigger('pointerdown', { pointerType: 'mouse' })
+      over = 15
+      await wrapper.find('ul').trigger('pointermove', { pointerType: 'mouse' })
+      expect(value()).toEqual([13, 14, 15])
+      over = 17
+      await wrapper.find('ul').trigger('pointermove', { pointerType: 'mouse' })
+      expect(value()).toEqual([13, 14, 15, 16]) // 최대 4칸
+      await wrapper.find('ul').trigger('pointerup')
+      // 왼쪽으로 끌면 12시 마감 앞에서 멈춰 최소 2칸을 채우지 못하므로 바꾸지 않는다
+      await btn(11).trigger('pointerdown', { pointerType: 'mouse' })
+      over = 10
+      await wrapper.find('ul').trigger('pointermove', { pointerType: 'mouse' })
+      expect(value()).toEqual([10, 11])
+    } finally {
+      document.elementFromPoint = original
+    }
   })
 })

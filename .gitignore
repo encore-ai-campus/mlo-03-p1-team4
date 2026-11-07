@@ -9,6 +9,7 @@ __pycache__/
 .ruff_cache/
 .pytest_cache/
 .venv/
+.f61-testdeps/
 
 # 프론트 (frontend/.gitignore에도 있음)
 node_modules/
