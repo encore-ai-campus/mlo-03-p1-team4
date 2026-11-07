@@ -12,7 +12,7 @@
 | 파트 | 담당자 | 지금 | 다음 할 일 | 막힌 것 |
 | --- | --- | --- | --- | --- |
 | 프론트 | 노진산(FE·PM) | FE-1~9 확정안 반영, Claude 시안 대조·FE 오류/모바일 결제/가입 UX 재검토 및 목업·화면 검증. 11-06 C안 화풍(흰 바탕·검은 글자·주칠)과 유형별 일러스트 5장 유지. CCL 분위기 참고 사진 40장(유형별 8장)을 정적 경로로 연결하고 유형·venue ID 해시로 안정 선택, 사진 표시·크레딧 추가(API `art:` 계약 그대로) | A·B 구현 후 실제 API 연결·오류·예약 동시성 통합 검증 | 실제 API 미구현 |
-| FastAPI A | [이름] | 회원·후기 A 기능 구현. F-60 공식 `mongo_init.js`와 이벤트 파일·Mongo 저장을 검증. #75에서 `override_business_time()`으로 가입 스키마/서비스·후기 서비스의 과거 업무 시각만 고정하고 `build_document(occurred_at=...)`와 실제 `received_at`을 분리하는 지원 및 사용 지침 반영 | A·F-63 과거 업무 시각 지원 및 생성기 연계 지침 반영. 회원·후기·이벤트 경계 테스트 수행| 생성기의 HistoricalRuntime과 A override_business_time() 결과가 같은지 비교 테스트 추가 후 11.4 CI 결과 확인. DB/FE 후속 통합은 담당자 진행| Windows MariaDB 13.0.2 전체 테스트 동시성 4건 실패, VM MariaDB 10.11.14 전체 406건 통과. 시각 방식 직접 비교 테스트 및 MariaDB 11.4 확인은 남음
+| FastAPI A | [이름] | 회원·후기 A 기능 구현. F-60 공식 `mongo_init.js`와 이벤트 파일·Mongo 저장을 검증. #75에서 `override_business_time()`으로 가입 스키마/서비스·후기 서비스의 과거 업무 시각만 고정하고 `build_document(occurred_at=...)`와 실제 `received_at`을 분리하는 지원 및 사용 지침 반영 | A·F-63 과거 업무 시각 지원 및 생성기 연계 지침 반영. 가입·후기·이벤트 시간 비교 테스트 추가·통과. DB/FE 후속 통합은 담당자 진행 | MariaDB 11.4 기준 CI/실환경 확인. DB/FE 후속 통합은 담당자 진행 | Windows MariaDB 13.0.2 전체 테스트 동시성 4건 실패, VM MariaDB 10.11.14 전체 406건 통과. 생성기 HistoricalRuntime과 A override 결과 비교는 테스트 통과; 문서/CI 기준 MariaDB 11.4 검증은 남음
 | FastAPI B | 이세훈 | #74·#76 develop 병합: 예약 결과 이벤트 새 형식, 커밋 후 이벤트 문맥 조립·기록 실패에도 예약 응답 유지(회귀 테스트 포함). #77 `feat/B-F-62-generator`에서 #75 생성기 본체·서비스 연결·재개 구현, 실제 MongoDB 100명/30일 검증 완료 | #75 A 연결 확인·DB 공간 보충/집계/CSV·api1 수동 파일럿. #79 공유 테스트 DB 경합 방지. #8 api1 cron | 원격 MongoDB 서버 문맥 null validator 동기화 필요. 실제 api1·replica·브라우저 E2E 미검증 |
 | DB | [이름] | `0001_init.sql`·`mongo_init.js` 검증(설치형 11.8·compose 11.4 둘 다 29건 통과), seed(유형 5·시설 20·지역 230 → `seed.sql`), `infra/local` compose, 크롤러 시제품(옛 필터). 1차 수집원 2곳+부족분 생성 방향 확정. 별도 Compass DB의 events·event_daily 속성 정리 v1을 docs/db에 공유 | 스페이스클라우드 새 필터·쉐어잇 파서/사이트별 robots 확인 → 속성 기반 시연용 공간 선별·`/internal/venues` 등록(B와) → 부족한 공간·과거 30일 행동 데이터 생성기 | 없음(A2 결정을 팀원에게 공유) |
 
@@ -177,6 +177,8 @@ A1~A4는 11-03에 확정했고, **A5~A8은 추후 확정**으로 미뤘다(11-03
 - 개인 기억(Claude 자동 메모리 등)은 팀에 공유되지 않는다. 팀이 알아야 할 것은 이 파일과 `docs/`에 쓴다.
 
 ## 최근 변경 (최신이 위)
+
+- 11-07 · A · #75 생성기의 `HistoricalRuntime`과 A `override_business_time()`을 직접 비교하는 회귀 테스트 추가. 과거 날짜 가입 스키마 검증, `auth_service.signup()`의 가입·동의 시각, `review_service.create_review()` 저장 시각, 생성기 `documents()`와 A `build_document()`의 `occurred_at` 및 나머지 문서 필드 일치를 확인하고 실제 `received_at`은 현재 시각으로 유지되는지 검사. `backend/tests/test_backfill_clock.py`와 `simulator/generator/tests/test_generator.py` 24건 통과, Ruff 린트·포맷 통과. 기본 pytest 임시 폴더 권한 오류가 있어 사용자 Temp 아래 별도 `--basetemp`로 재실행함. DB 저장은 이 비교 테스트에서 mock 처리했고, MariaDB 10.11.14 전체 406건 결과는 이전 VM 실행; 11.4 검증은 남음.
 
 - 11-07 · A · 동일 MariaDB 10.11.14 VM에서 MongoDB 8.0.34 테스트 서버를 함께 연결해 생성기 서비스 pytest 3건 통과. 전용 space_rental_analytics_test.generator_validation_bd7d60618758442c84f05e74b4201966에 100명·1,260세션의 이벤트 10,111건 실제 저장, 재개 시 추가 0건/중복 10,111건, 공식 validator 적용 및 121 거절 확인. MariaDB 테스트 거래는 롤백해 기존 회원 3명 유지, 공간·예약·후기 0건. Mongo 테스트 컬렉션은 DB 담당 확인용 보존, 운영 events 변경 없음.
 
