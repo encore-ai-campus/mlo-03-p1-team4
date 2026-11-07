@@ -53,6 +53,7 @@
         src: /tmp/spacecube-config.tar.gz
         dest: /tmp/lab
         remote_src: true
+        extra_opts: ["--overwrite"]
     - name: 이전 역할 설치 완료 여부
       ansible.builtin.stat:
         path: /var/lib/spacecube/role-ready

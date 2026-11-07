@@ -17,3 +17,5 @@
 11-07 저장 원본은 logs/read-high-20261107-183052/grafana-source.json에 보존했다. Grafana 파일 원본 변경을 먼저 적용하고 공급 폴링 후 API를 재조회해 유지 여부를 확인한다. UI 저장 직후 구 원본이 재공급되면 이전 화면으로 돌아갈 수 있다.
 
 DASH-003: polish 다음 dashboard_handoff.py를 적용한다. 11개 탭과 8개 요약 카드의 반복 적용·패널 보존은 loadsuite/tests에서 검증한다.
+
+11-08부터 build_config는 대시보드를 재생성하지 않고 검증된 JSON을 포장한다. health_app.py·spacecube-health.service와 nginx 두 health8001 경로 및 HAProxy큐를 함께 배포한다. 생성기를 직접 실행할 때만 polish→dashboard_handoff 순서로 명시 실행한다.
