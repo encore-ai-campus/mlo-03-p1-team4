@@ -8,6 +8,8 @@
 | --- | --- | --- |
 | `check_ddl.py` | `migrations/0001_init.sql`로 `spacecube_test`를 새로 만들고, 아래 표의 01~06과 같은 칸 동시 결제까지 29건을 시험 | `conda run -n pro_1 --no-capture-output python db/tests/check_ddl.py` |
 | `check_mongo_init.js` | `mongo_init.js` 뒤에 붙여 새 `events` 검증기(FE 이벤트 문맥 필수·서버 결과 3종 null 허용·빈 products·product 필수 칸)·고유 인덱스·TTL·`event_daily`·`crawl_raw` 24건(11-06, 아래 07) | `mongosh "mongodb://127.0.0.1:27017" docs/db/mongo_init.js db/tests/check_mongo_init.js` (Docker면 두 파일을 컨테이너로 복사해 `docker exec … mongosh`) |
+| `test_crawler.py` | F-61 두 파서의 허용 속성·사이트별 robots·유형/지역 매핑·재시도·미처리 ID 보존을 외부 요청 없이 확인 | `conda run -n pro_1 --no-capture-output python -m pytest db/tests/test_crawler.py -q` |
+| `check_crawler_storage.py` | F-61 API 없이 MongoDB `crawl.crawl_raw`와 MariaDB `spacecube_test.crawl_jobs`에 검증용 각 1건을 저장·재조회하고 특정 행만 정리 | `conda run -n pro_1 --no-capture-output python -m db.tests.check_crawler_storage` |
 
 - `check_ddl.py`는 `backend/.env`의 `DB_WRITE_URL`(DB 이름이 `spacecube_test`여야 함)로 접속하고, 비밀번호는 환경 변수로만 클라이언트에 넘깁니다. MariaDB 클라이언트 경로가 다르면 `MARIADB_BIN`을 줍니다.
 - 이름이 `test_`로 시작하지 않아 `verify.ps1`의 pytest가 자동으로 돌리지 않습니다(로컬 DB가 있어야 하므로). 결과 기록: `docs/기록/검증_2026-11-04_DDL실행.md`.

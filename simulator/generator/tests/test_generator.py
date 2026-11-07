@@ -93,6 +93,7 @@ def test_historical_runtime_restores_aliases_and_keeps_receive_clock(monkeypatch
     receive_clock = event_document.get_event_time
     log = Mock(side_effect=AssertionError("운영 이벤트 호출"))
     counter = Mock()
+    product_factory = Mock(side_effect=AssertionError("운영 상품 생성"))
     monkeypatch.setattr(reservation_service, "_log_reservation_event", log)
     monkeypatch.setattr(reservation_service, "reservation_counter", counter)
     historical = datetime.fromisoformat("2026-10-08T12:00:00")
@@ -101,7 +102,7 @@ def test_historical_runtime_restores_aliases_and_keeps_receive_clock(monkeypatch
         assert auth_service.get_now() == historical
         assert review_service.get_today() == historical.date()
         assert reservation_service.get_now() == historical
-        reservation_service._log_reservation_event("unused")
+        reservation_service._log_reservation_event("unused", product_factory=product_factory)
         reservation_service.reservation_counter.labels(result="ok").inc()
         runtime.now += timedelta(days=1)
         assert auth_service.get_now() == historical + timedelta(days=1)
@@ -110,6 +111,7 @@ def test_historical_runtime_restores_aliases_and_keeps_receive_clock(monkeypatch
     assert reservation_service._log_reservation_event is log
     log.assert_not_called()
     counter.assert_not_called()
+    product_factory.assert_not_called()
 
 
 def test_runtime_restores_on_error():

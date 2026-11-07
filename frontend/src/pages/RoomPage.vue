@@ -246,7 +246,7 @@ function scrollToBooking() {
           <div class="booking__group">
             <span class="booking__label">{{ dateLabel(date) }} 시간 <span class="muted">· 최소 {{ room.min_hours }}시간, 최대 4시간</span></span>
             <UiSkeleton v-if="slotsLoading" height="156px" />
-            <SlotGrid v-else v-model="hours" :slots="slots" :columns="5" label="시간 칸" @select="(h) => log('rental_slot_select', { venue_id: room.venue_id, hour: h })" />
+            <SlotGrid v-else v-model="hours" :slots="slots" :columns="5" :min="room.min_hours" label="시간 칸" @select="(h) => log('rental_slot_select', { venue_id: room.venue_id, hour: h })" />
           </div>
           <p v-if="slotError" role="alert">{{ slotError }} <BaseButton variant="secondary" @click="loadRoom(route.params.venueId)">다시 시도</BaseButton></p>
           <UiSelect v-model="people" label="인원" :options="peopleOptions" />

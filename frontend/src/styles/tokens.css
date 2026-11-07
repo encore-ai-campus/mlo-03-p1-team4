@@ -94,4 +94,5 @@
   --container: 1200px;
   --header-h: 64px;
   --tap: 44px;
+  --check: 20px;  /* 체크박스·라디오 크기. 줄 높이는 --tap */
 }

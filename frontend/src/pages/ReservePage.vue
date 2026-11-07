@@ -117,7 +117,7 @@ async function pay() {
               <p class="num">{{ dateLabel(date) }} · 최소 {{ venue.min_hours }}시간, 최대 4시간</p>
               <p v-if="conflict" role="alert">{{ conflict }}</p>
               <RouterLink v-if="mine" to="/me">내 예약 확인하기</RouterLink>
-              <SlotGrid :model-value="selected" :slots="slots" :columns="5" label="결제할 시간 칸" @update:model-value="updateSelection" />
+              <SlotGrid :model-value="selected" :slots="slots" :columns="5" :min="venue.min_hours" label="결제할 시간 칸" @update:model-value="updateSelection" />
               <p v-if="!validSelection" class="err">최소 {{ venue.min_hours }}시간의 빈 칸을 이어서 골라 주세요.</p>
               <UiSelect v-model="people" label="인원" :options="peopleOptions" />
               <p v-if="isPast" class="note">지난 시간이에요. 결제하면 이용 완료로 저장되어 바로 후기를 쓸 수 있어요.</p>
