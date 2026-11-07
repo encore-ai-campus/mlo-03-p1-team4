@@ -156,12 +156,12 @@ API 배포 파일은 `/opt/spacecube/releases/fda86e7/backend.tar.gz`, `/opt/spa
 
 | VM | 주소 | 설치·설정 |
 | --- | --- | --- |
-| api1 | `192.168.0.232` | Nginx 1.24.0 + FastAPI 0.162.0, Uvicorn 0.54.0, upstream `127.0.0.1:8000` |
-| api2 | `192.168.0.233` | api1과 같은 Nginx·FastAPI 구성, upstream `127.0.0.1:8000` |
+| api1 | `192.168.0.232` | Nginx 1.24.0 + FastAPI 0.162.0, Uvicorn 0.54.0, 프론트 `e7db36f`, upstream `127.0.0.1:8000` |
+| api2 | `192.168.0.233` | api1과 같은 Nginx·FastAPI·프론트 구성, upstream `127.0.0.1:8000` |
 | gw | `192.168.0.231` | HAProxy는 이 배포에서 변경·시험하지 않음 |
 | MariaDB primary | `192.168.0.212` | 원격 서비스로만 사용. SSH·DDL·쓰기 없음 |
 
-기존 분리 시험의 `.234`·`.235` API 설치와 서비스는 변경하지 않았다. 현재 api1·api2 Nginx는 같은 VM의 loopback FastAPI로 연결한다. 각 VM의 백엔드 릴리스는 `/opt/spacecube/releases/fda86e7/backend`, 가상환경은 `/opt/spacecube/venv`, 배포 스크립트·요구사항은 `/opt/spacecube/deploy/`에 둔다. 서비스는 부팅 시 자동 시작한다.
+develop `e7db36f` 병합 뒤 최신 프론트 빌드를 `/opt/spacecube/releases/e7db36f/frontend`에 배포해 `/var/www/frontend` symlink를 갱신했다. 이전 `fda86e7` 프론트 릴리스는 보존하고, 교체 전 symlink는 백업 디렉터리에 남겼다. 기존 분리 시험의 `.234`·`.235` API 설치와 서비스는 변경하지 않았다. 현재 api1·api2 Nginx는 같은 VM의 loopback FastAPI로 연결한다. 각 VM의 백엔드 릴리스는 `/opt/spacecube/releases/fda86e7/backend`, 가상환경은 `/opt/spacecube/venv`, 배포 스크립트·요구사항은 `/opt/spacecube/deploy/`에 둔다. 서비스는 부팅 시 자동 시작한다.
 
 이 시험에서는 FastAPI를 loopback에만 바인딩했고 api1·api2의 UFW는 비활성 상태다. 따라서 Nginx 로컬 프록시는 확인했지만, 원격 `mon`의 8000번 `/metrics` 수집과 UFW 허용 규칙은 #15에서 별도로 맞춰야 한다.
 
@@ -174,8 +174,10 @@ DB·JWT·내부 API·가상 데이터 키는 VM별 systemd host credential로 �
 - api1·api2 각각 `systemd-analyze verify` 통과, `spacecube-api` active, Uvicorn은 `127.0.0.1:8000`에만 listen한다.
 - 각 VM에서 `/api/health` 200, 읽기 전용 `/api/categories` 200(198 bytes). MariaDB primary에는 health 확인과 `GET /categories`만 실행했다.
 - 작업 PC에서 api1·api2의 `/`, `/venues`, `/api/health`를 직접 요청해 모두 200을 확인했다.
+- 최신 프론트 빌드의 `AuthPage-ChvXJtYP.js`도 두 VM에서 200·1년 immutable로 응답한다.
 - 두 VM 모두 `nginx -t` 통과 후 reload·active. `/`·`/venues` 200, `/assets/*.js` 200·1년 immutable, WebP 200·`image/webp`·7일, `/index.html` no-cache.
 - 없는 asset·사진, 공개 `/stub_status`, `/api/internal/*`, `/api/metrics`는 404. loopback `127.0.0.1:8080/stub_status`는 200.
 - 각 VM에서 `/api/health` 8회 호출 후 `ss`로 loopback 8000번 유휴 keepalive 연결 1개를 확인했다.
 - 접근 로그는 `/var/log/nginx/spacecube_access.log`. 실제 JSON 필드는 시각·요청 ID·메서드·상태·처리 시간·upstream 주소·상태·응답 시간이며, URI·쿼리·IP·요청 헤더·토큰·본문은 기록하지 않는다.
+- 최신 develop `e7db36f` 병합 후 `verify.ps1` 통과: Ruff, pytest 451건, 프론트 린트·색상 검사·단위 67건·빌드. 기존 Starlette deprecation 및 Playwright conditional-test 린트 경고 각 1건. E2E는 미실행.
 - HAProxy 장애 제외·복귀 시험은 #66에서 진행한다.
