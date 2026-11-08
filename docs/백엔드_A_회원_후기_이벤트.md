@@ -244,9 +244,14 @@ user_id·venue_id·session_id는 라벨이 아니라 본문에 둡니다. MongoD
 | `http_request_duration_seconds` | 히스토그램 | p50·p95 (replica 있음·없음 비교) |
 | `reservation_total{result}` | 카운터 | 예약 성공·충돌·취소 (B가 올림) |
 | `mongo_event_write_failures_total` | 카운터 | 이벤트 유실 감시 |
+| `event_file_write_failures_total{stage,reason}` | 카운터 | 기록 실패 단계(`serialize`, `directory_prepare`, `thread_lock`, `lock_file_open`, `process_lock`, `event_file_open`, `append` 등)와 원인(`lock_timeout`, `permission`, `disk_full`, `io_error`, `serialization_error`) |
+| `event_file_lock_wait_seconds{scope}` | 히스토그램 | `thread`·`process` 파일 잠금 대기시간. scope별 p95 계산 |
+| `event_file_write_duration_seconds` | 히스토그램 | 이벤트 직렬화부터 파일 append 시도까지 전체 시간(파일 시스템 write 구간만의 시간은 아님) |
 | `db_read_fallback_total` | 카운터 | replica → primary 대체 횟수 |
 
-그 밖의 exporter(mysqld·mongodb·node·nginx)는 Alloy가 각 서버에서 긁어 Prometheus로 보냅니다(`infra/monitoring/alloy.config`).
+예약·취소 서버 이벤트는 `events.log` 기록 실패 시 실패 원인을 안전한 고정 코드로 집계하고, 요청 응답 후 MongoDB writer 전달을 계속 시도합니다. 프론트 이벤트 접수 API는 기존처럼 파일 기록 실패 시 503을 반환하고 해당 문서를 큐에 넣지 않습니다. 잠금 대기 제한 0.1초는 실측 원인이 확정될 때까지 유지합니다.
+
+현재 109의 7 VM 실험 구성에서는 Prometheus가 mysqld·node·HAProxy·Nginx·FastAPI·Alloy 자체 `/metrics`를 직접 pull 합니다. Alloy는 journal·로그 파일을 읽어 Loki로 보내며 exporter 지표를 Prometheus에 remote_write하지 않습니다. `infra/monitoring/README.md`의 AWS 예시 및 초기 설계 흐름은 이 배포 구성을 설명하지 않는 참고안입니다.
 
 ### 5-6. 헬스체크
 

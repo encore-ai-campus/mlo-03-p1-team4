@@ -25,6 +25,8 @@
 
 Grafana 11개 대시보드·Prometheus 19/19 UP을 확인했다. 파일 원본은 mon /var/lib/grafana/dashboards, 최근 30분·Asia/Seoul·15초 갱신을 저장했다. UI 저장 허용·파일 삭제 시 대시보드 보존 설정을 적용했다. UI 저장은 DB에 반영되지만 이후 같은 원본 파일을 덮으면 파일 값이 우선하므로 재배포 전에 persist_dashboards.py로 현재 화면을 백업·동기화한다. 비밀번호는 보호된 설정에만 둔다.
 
+메트릭은 Prometheus가 exporter와 API `/metrics`를 직접 pull 하고, Alloy는 각 VM 로그를 Loki로 전송한다. Prometheus도 Alloy `:12345/metrics`를 scrape 해 에이전트 상태를 본다. Alloy remote_write를 Prometheus 자체로 보내는 구조는 아직 적용하지 않았다. 원격 쓰기 수신 기능·9090 접근 제어·중복 scrape 전환이 필요하고, 공식 Prometheus 문서도 이를 scrape 대체용으로 권장하지 않는다.
+
 두 DB에는 node exporter 1.7.0·mysqld exporter 0.15.0과 앱별 연결 집계 타이머를 적용했다. [db-monitoring](db-monitoring/README.md) 참고. max_connections=151, 전역/앱 사용자 제한=0을 유지했다. replica IO/SQL Yes·지연 0초, API /health ok를 확인했다. Mongo exporter는 설치하지 않았으며 Mongo 자원은 이번 실행기 SSH 표본으로 수집한다.
 
 ## 현재 실행기·파일 위치
