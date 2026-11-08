@@ -35,7 +35,14 @@
 
 ## 3. 기술 스택
 
-![Vue](https://img.shields.io/badge/Vue-3.5-4FC08D?logo=vuedotjs&logoColor=white) ![Vite](https://img.shields.io/badge/Vite-8-646CFF?logo=vite&logoColor=white) ![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white) ![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white) ![MariaDB](https://img.shields.io/badge/MariaDB-11.4-003545?logo=mariadb&logoColor=white) ![MongoDB](https://img.shields.io/badge/MongoDB-7-47A248?logo=mongodb&logoColor=white) ![HAProxy](https://img.shields.io/badge/HAProxy-106DA9?logoColor=white) ![Nginx](https://img.shields.io/badge/Nginx-009639?logo=nginx&logoColor=white) ![Grafana](https://img.shields.io/badge/Grafana-F46800?logo=grafana&logoColor=white) ![Playwright](https://img.shields.io/badge/Playwright-2EAD33?logo=playwright&logoColor=white) ![Locust](https://img.shields.io/badge/Locust-1C7C54?logoColor=white)
+| 영역 | 기술 |
+| --- | --- |
+| 프론트엔드 | ![Vue](https://img.shields.io/badge/Vue-3.5-4FC08D?logo=vuedotjs&logoColor=white) ![Vite](https://img.shields.io/badge/Vite-8-646CFF?logo=vite&logoColor=white) |
+| 백엔드 | ![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white) ![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white) |
+| 데이터 | ![MariaDB](https://img.shields.io/badge/MariaDB-11.4-003545?logo=mariadb&logoColor=white) ![MongoDB](https://img.shields.io/badge/MongoDB-7-47A248?logo=mongodb&logoColor=white) |
+| 인프라·테스트 | ![HAProxy](https://img.shields.io/badge/HAProxy-106DA9?logoColor=white) ![Nginx](https://img.shields.io/badge/Nginx-009639?logo=nginx&logoColor=white) ![Grafana](https://img.shields.io/badge/Grafana-F46800?logo=grafana&logoColor=white) ![Playwright](https://img.shields.io/badge/Playwright-2EAD33?logo=playwright&logoColor=white) ![Locust](https://img.shields.io/badge/Locust-1C7C54?logoColor=white) |
+
+기술별 쓰임과 VM 7대 구성: [위키 · 기술 스택과 시스템 구성](https://github.com/encore-ai-campus/mlo-03-p1-team4/wiki/기술-스택과-시스템-구성)
 
 ## 4. WBS
 
@@ -69,12 +76,13 @@
 
 | 대상 | 결과 |
 | --- | --- |
-| 백엔드 API (실제 MariaDB 11.4) | pytest 303건 통과 (#44 기준) |
+| 테스트 | 백엔드·DB pytest 407건, 프론트 단위 71건·E2E 67건 통과 |
 | 같은 칸 동시 결제 50명 | 201 1건 · 409 49건 (중복 예약 0) |
-| DB 스키마·MongoDB 초기화 | 제약 시험 29건 · 13건 통과 |
-| 프론트엔드 | 단위 55건, 화면 흐름 E2E 67건(데스크톱·폰) 통과, 접근성 심각 0건 |
+| 쓰기 부하 400명 | 오류 0, 예약 p95 81ms (DB 풀 조정 전에는 실패) |
+| 읽기 부하 1,000명 | 오류 0, p95 954ms (800명까지 p95 314ms) |
+| 이벤트 수집 | 파일 21,374건 = MongoDB 21,374건, 중복 0 |
 
-배포 뒤 추가: Locust 부하(p95·오류율), replica 비교, 이벤트 유실률·중복률.
+시험 조건·단계별 수치·한계: [위키 · 수행결과](https://github.com/encore-ai-campus/mlo-03-p1-team4/wiki/수행결과)
 
 <details>
 <summary>시연 화면 (목업 데이터)</summary>

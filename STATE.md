@@ -59,6 +59,7 @@
 
 | 날짜 | 결정 | 근거 |
 | --- | --- | --- |
+| 11-08 | 현재 7 VM·19 target 관측은 Prometheus 직접 pull을 유지하고 Alloy는 로그를 Loki로 전달한다. Alloy의 Prometheus scrape/remote_write 전환은 Prometheus receiver·방화벽·중복 수집을 별도 검증할 때 검토하고, Mimir 같은 Remote Write 저장소 도입 시 우선 고려한다 | Grafana Alloy 공식 문서 · Prometheus Remote Write Receiver 문서 · 현재 `infra/vm/lab/README.md` |
 | 11-07 | 현재 109 운영 설명은 219망 VM 7대·MariaDB 10.11.14·MongoDB 8.0.34 기준. 이전 .0망/11.4 compose/4대 Mongo 제외는 이력으로 구분. DB 연결 한도와 앱 사양은 고정하고 읽기/쓰기 50명까지 이번 단계 시험 | 사용자 요청 · 실제 SSH/VMX/exporter 검증 · DB_운영_모니터링_현황_2026-11-07.md |
 | 11-07 | 검토 보류 28장을 제외한 사용자 제공 사진 82장을 로컬 프론트에 유형별 참고 이미지로 연결한다. 출처·이용허락은 미확인으로 표시하고 기존 CCL 40장은 보관한다. 실제 공간 사진·DB ID 매핑으로 취급하지 않는다 | 사용자 요청 · `docs/데이터_수집_명세.md` |
 | 11-07 | 이 저장소에는 우리 팀 Spacecube의 문서·자동화·실험 결과만 기록한다. 다른 팀 서비스의 참고 자료·관측 결과는 포함하지 않는다 | 사용자 지시 |
@@ -189,6 +190,7 @@ A1~A4는 11-03에 확정했고, **A5~A8은 추후 확정**으로 미뤘다(11-03
 
 ## 최근 변경
 
+- 2026-11-08: 이벤트 파일 실패 단계·reason 지표, thread/process 잠금 대기·전체 기록 시간, 예약/취소 MongoDB fallback 보강. 관련 pytest 22건·Ruff·JSON 검증 및 첫 PR #97 DB/백엔드 CI 통과. PR #97 `develop` 대상, 문서 갱신 후 CI 재실행 중, CODEOWNERS 리뷰 2명 요청·미병합. 팀 보고서에 2-vCPU 공개 GET 500/600/800(오류0, 800 평균 CPU 67%), 3-vCPU 부팅 실패 후 2-vCPU 복구, 별도 쓰기 600의 append 실패 17건(api1 10·api2 7)을 추가. SSH host key는 저장된 `192.168.0.109` fingerprint와 일치해 서버 작업판을 읽음. 기존 작업판대로 저부하 쓰기 대사/PR 병합/배포 전 추가 부하 금지. 현재 VM 미배포. Prometheus pull, Alloy→Loki 로그 경로.
 - 2026-11-08: PR93·94 리뷰/병합,20f0418 API순차반영. 독립헬스·큐·풀5+5 영속 원본/반복묶음 검증. capacity-book-20261108-004340 실패탐색 시작(첫 오류 중단).
 
 - 2026-11-08: PR #94 리뷰에서 표본 JSONL의 동 단위 주소 잔존을 수정. 운영 경로와 같이 시·구로 정규화하고 모호/누락은 비움. 오프라인 회귀4개 추가.

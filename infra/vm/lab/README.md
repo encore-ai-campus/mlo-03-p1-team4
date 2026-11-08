@@ -8,6 +8,13 @@
 - prometheus.yml: 초기 .211 템플릿이며 remote109/build_config.py가 실제 gw .218로 렌더링한다. 직접 적용하지 않는다.
 - dashboard-*.json: 현재 Grafana provisioning 산출물 11개.
 
+## 메트릭과 로그 수집 경로
+
+- 메트릭은 모니터링 VM의 Prometheus가 node exporter·FastAPI·HAProxy·Nginx·MariaDB exporter·Alloy `/metrics`를 직접 pull 합니다. `prometheus.yml`은 실험 VM용 초기 템플릿이며 109의 실제 주소와 DB exporter 대상은 원격 운영 설정에서 관리합니다.
+- Alloy는 각 VM의 journal·로그 파일을 읽어 Loki로 전송합니다. Alloy 자체 상태 지표는 Prometheus가 Alloy `:12345/metrics`에서 pull 합니다.
+- 현재 7 VM·19 target 구성에서는 이 pull 구조를 유지합니다. Alloy `prometheus.remote_write`를 Prometheus 자체로 밀어 넣으려면 Prometheus receiver를 켜고 포트 접근을 추가해야 하며, Prometheus는 receiver를 scraping의 대체 수집 경로로 쓰는 것을 권장하지 않습니다. 나중에 Mimir 등 Remote Write 저장소를 도입할 때 Alloy scrape + remote_write를 검토합니다.
+- 마이그레이션을 할 경우 같은 target을 Prometheus와 Alloy가 동시에 수집하지 않도록 target 소유권·중복 시계열·`up` 상태·저장량을 단계별로 검증한 뒤 한쪽 scrape를 제거합니다.
+
 기본 대시보드 JSON을 새로 만들 때는 conda pro_1에서 dashboards.py → overview.py → compare_apps.py → http_status_panels.py → style_dashboards.py → polish_dashboards.py 순서로 실행한다. 기존 servers/storage/logs JSON도 입력으로 사용하므로 삭제하지 않는다. 마지막 단계가 실제 109 수집 지표에 맞춰 패널을 정리한다. 109 배포용 build_config.py는 현재 JSON에 polish_dashboards.py를 적용한 뒤 설정 묶음을 만든다.
 
 대시보드는 전체 현황, 서버, FastAPI, HAProxy, MariaDB, 이벤트·저장소, Nginx, Alloy, Loki, 로그 및 DB 앱별 연결·대기의 11개다. `verify-dashboard-queries.py`가 Grafana에 설치된 JSON을 읽어 각 PromQL·LogQL을 실제 Prometheus·Loki에 실행하며, 빈 결과와 쿼리 오류를 구분해 요약한다. exporter·데이터소스·대시보드 검증은 `deploy-109.ps1 -Action Dashboards`에 포함한다.

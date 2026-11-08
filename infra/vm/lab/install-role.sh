@@ -24,6 +24,8 @@ cat >> /etc/hosts <<'EOF'
 192.168.0.217 mon
 EOF
 cat > /etc/alloy/config.alloy <<EOF
+# 로그는 Alloy -> Loki, 메트릭은 Prometheus pull 경로로 수집한다.
+# Alloy remote_write로 바꾸려면 Prometheus receiver·방화벽·중복 scrape 전환을 별도로 검증한다.
 logging { level = "info" }
 loki.source.journal "system" {
   max_age = "1h"
