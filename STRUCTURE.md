@@ -201,3 +201,5 @@ Pro_1/
 6. 글꼴 원본이 필요하면 `design/fonts/README.md`의 배포처에서 받습니다(서비스에는 필요 없음).
 
 - `infra/vm/lab/dashboard_handoff.py`: 쓰기 시험 뒤 DASH-003 11탭·8KPI를 기존 패널에 반복 적용하는 원본 변환. `infra/vm/remote109/loadsuite/tests`에서 보존·중복을 검증.
+
+- `infra/vm/remote109/loadsuite/capacity.py`: 실패 탐색·안전 중단·단계별 정합성. guest_observer.py/observe_vms.py는 임시1초 관측/회수.

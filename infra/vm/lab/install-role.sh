@@ -84,13 +84,19 @@ PrivateTmp=true
 [Install]
 WantedBy=multi-user.target
 EOF
+  # 사용자 승인 운영 기본값. 재배포가 독립 헬스를 해제하지 않게 함께 설치한다.
+  grep -q '"pool_size": 5' /opt/spacecube/backend/app/core/db.py
+  grep -q '"max_overflow": 5' /opt/spacecube/backend/app/core/db.py
+  install -d -o root -g adm -m 0750 /opt/spacecube/deploy/health
+  install -o root -g adm -m 0640 /tmp/lab/health_app.py /opt/spacecube/deploy/health/health_app.py
+  install -m 0644 /tmp/lab/spacecube-health.service /etc/systemd/system/spacecube-health.service
   install -m 644 /tmp/lab/nginx.conf /etc/nginx/conf.d/spacecube.conf
   test ! -f /etc/nginx/sites-enabled/default || unlink /etc/nginx/sites-enabled/default
   nginx -t
   printf 'ARGS="-nginx.scrape-uri=http://127.0.0.1:8080/nginx_status"\n' > /etc/default/prometheus-nginx-exporter
   systemctl daemon-reload
-  systemctl enable --now spacecube nginx prometheus-nginx-exporter
-  systemctl restart spacecube nginx prometheus-nginx-exporter
+  systemctl enable --now spacecube spacecube-health nginx prometheus-nginx-exporter
+  systemctl restart spacecube spacecube-health nginx prometheus-nginx-exporter
   cat > /etc/logrotate.d/spacecube <<'EOF'
 /opt/spacecube/backend/logs/*.log {
     daily

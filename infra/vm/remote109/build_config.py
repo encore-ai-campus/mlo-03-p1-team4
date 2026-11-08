@@ -3,17 +3,17 @@
 import gzip
 import io
 import json
-import runpy
+import re
 import tarfile
 from pathlib import Path
 
 source = Path(__file__).resolve().parent.parent / "lab"
-runpy.run_path(str(source / "polish_dashboards.py"), run_name="__main__")
-runpy.run_path(str(source / "dashboard_handoff.py"), run_name="__main__")
 for dashboard in source.glob("dashboard-*.json"):
     json.loads(dashboard.read_text(encoding="utf-8-sig"))
 target = Path.home() / "spacecube109/config.tar.gz"
 allowed = {
+    "health_app.py",
+    "spacecube-health.service",
     "haproxy.cfg",
     "haproxy-final.cfg",
     "nginx.conf",
@@ -34,11 +34,17 @@ with (
             path.name in allowed or (path.name.startswith("dashboard-") and path.suffix == ".json")
         ):
             continue
-        content = (
-            path.read_text(encoding="utf-8").replace("192.168.0.211", "192.168.0.218").encode()
-        )
+        content = path.read_text(encoding="utf-8")
+        # 109 운영망으로 일관되게 렌더링한다. 원본은 0망 템플릿을 유지한다.
+        for before, after in [
+            ("192.168.0.211", "192.168.219.218"),
+            ("192.168.0.109", "192.168.219.102"),
+            ("192.168.0.19", "192.168.219.107"),
+        ]:
+            content = re.sub(re.escape(before) + r"\b", after, content)
+        content = content.replace("192.168.0.", "192.168.219.").encode()
         info = tarfile.TarInfo(path.name)
         info.size = len(content)
         info.mode = 0o644
         archive.addfile(info, io.BytesIO(content))
-print("109 공개 설정 묶음 생성: gw 192.168.0.218")
+print("109 공개 설정 묶음 생성: gw 192.168.219.218")
