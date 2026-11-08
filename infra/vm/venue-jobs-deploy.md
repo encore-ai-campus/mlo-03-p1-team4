@@ -24,7 +24,7 @@
 3. 회원 100명·30일 생성기 → 집계·CSV → 브라우저 점검으로 진행한다.
 4. PM 계획의 11:10 이후 정기 실행을 켜고 첫 로그를 확인한다. 분산 환경 준비가 늦으면 PM 판단으로 109 예비 환경을 사용한다.
 
-발표일 정기 크롤링은 **bootstrap, 실행당 상세 합계 20건 이하, KST 매시 :10·:40** 기준이다. `weekly`는 신규 사이트맵 ID·유형별 등록 상한 때문에 이 계획에 대신 사용하지 않는다. 요청 간격·robots·출처별 사전 확인은 [crawler 지침](../../crawler/AGENTS.md)을 따른다. 30분 주기를 시연 이후 상시 운영 주기로 확정한 것은 아니다.
+PM 검토안은 발표일 정기 크롤링을 **bootstrap, 실행당 상세 합계 20건 이하, KST 매시 :10·:40**으로 두는 것이다. 주기는 PM이 확정하기 전까지 활성화하지 않는다. `weekly`는 신규 사이트맵 ID·유형별 등록 상한 때문에 이 발표 계획에 대신 사용하지 않는다. 요청 간격·robots·출처별 사전 확인은 [crawler 지침](../../crawler/AGENTS.md)을 따른다. 30분 주기를 시연 이후 상시 운영 주기로 확정한 것은 아니다.
 
 **초기 시연 준비의 「DB 활성 공간 유형별 6곳 이상」과 변경된 #99의 「이번 실행 신규 등록을 유형별 6곳까지 보충」은 서로 다른 수치다.** 변경된 #99의 계획량은 `max(0, 6 - 이번 크롤러의 유형별 유효 신규 등록 수)`이며 HTTP 201만 센다. HTTP 200 갱신은 제외한다. 매회 크롤러 신규 등록이 모두 0이면 보충 공간이 30곳씩 추가될 수 있으므로, PM은 정기 실행을 켜기 전에 변경된 #99 정책과 발표일 주기를 함께 확인한다. DB 보유량 기준으로 정책을 임의 전환하지 않는다.
 
@@ -45,7 +45,7 @@
 | 필수 값 | `DB_WRITE_URL`, `MONGO_URL`, `INTERNAL_API_KEY`; host는 `db1`, `mongo` |
 | 쓰기 경로 | `logs/`, `crawler/data/`와 기존 사이트맵 상태 파일 — 실행 계정 쓰기 권한 확인 |
 
-#100은 통합 실행기의 소스 위치를 `simulator/generator/run_pipeline.py`로 지정한다. 통합 기록은 저장소 루트의 `logs/venue-pipeline-<통합 실행 ID>/`, 보충 기록은 #99의 `logs/venue-supplement-<보충 실행 ID>/`에 보존하며 두 실행 ID를 연결한다. 통합 실행기는 #103 보충기와 #108 크롤러를 연결한 구현이다. #100 본문·댓글에는 실제 Python·실행 계정·작업 폴더·설정 경로가 아직 고정돼 있지 않고 이 문서에서 관리하도록 돼 있다. Ubuntu api1 `192.168.0.214`와 발표 배포의 cron 사용은 11-08 사용자가 추가 확인한 사항이다. 매시 :10/:40 주기는 11-08 사용자 확정이며 cron은 `10,40 * * * *`이다.
+#100은 통합 실행기의 소스 위치를 `simulator/generator/run_pipeline.py`로 지정한다. 통합 기록은 저장소 루트의 `logs/venue-pipeline-<통합 실행 ID>/`, 보충 기록은 #99의 `logs/venue-supplement-<보충 실행 ID>/`에 보존하며 두 실행 ID를 연결한다. 통합 실행기는 #103 보충기와 #108 크롤러를 연결한 구현이다. Ubuntu api1 `192.168.0.214`와 발표 배포의 cron 사용은 사용자가 확인했다. 매시 :10/:40은 PM 검토안이며, PM 확정 전에는 cron에 활성 등록하지 않는다.
 
 대상 서버에서 확정할 실행 환경 항목은 다음 세 가지다. 통합 CLI 연결 후 실제 서버의 정기 실행 검증이 남아 있다.
 
@@ -93,6 +93,8 @@ sudo chmod 0755 /opt/spacecube/ops/run-venue-job.sh
 
 ## 4. 방식 A — systemd timer
 
+아래 `OnCalendar`의 `:10/:40`은 PM 검토안이다. 주기 승인 전에는 timer를 활성화하지 않는다.
+
 `/etc/systemd/system/spacecube-venue-job.service`를 아래 내용으로 저장한다.
 
 ```ini
@@ -121,7 +123,8 @@ StandardError=journal
 Description=Spacecube 공간 작업 매시 10분과 40분
 
 [Timer]
-OnCalendar=*-*-* *:10,40:00 Asia/Seoul
+# PM 검토안. 주기가 확정된 뒤에만 이 줄을 활성화한다.
+# OnCalendar=*-*-* *:10,40:00 Asia/Seoul
 AccuracySec=1s
 RandomizedDelaySec=0
 Persistent=false
@@ -155,7 +158,8 @@ VM의 시스템 시간대를 `Asia/Seoul`로 맞춘다. cron 종류에 따라 �
 SHELL=/bin/bash
 PATH=/usr/sbin:/usr/bin:/sbin:/bin
 MAILTO=""
-10,40 * * * * root /usr/sbin/runuser -u spacecube -g adm -- /opt/spacecube/ops/run-venue-job.sh >> /opt/spacecube/logs/venue-schedule.log 2>&1
+# 매시 :10/:40은 PM 검토안이다. 확정되기 전에는 활성화하지 않는다.
+# 10,40 * * * * root /usr/sbin/runuser -u spacecube -g adm -- /opt/spacecube/ops/run-venue-job.sh >> /opt/spacecube/logs/venue-schedule.log 2>&1
 ```
 
 기존 크롤러 예약을 비활성화하고 방식 A timer를 꺼 둔 뒤 활성화한다. `cron` 패키지가 없는 VM은 역할 설치 단계에서 운영 담당이 준비한다.
@@ -182,7 +186,7 @@ timer unit이 아직 없는 신규 VM은 `disable`할 대상이 없는지 확인
 - **기존 예약 찾기:** `systemctl list-timers --all`, `/etc/cron.d/`, `/etc/crontab`, root·운영 계정의 `crontab -l`에서 크롤러와 통합 실행기 호출을 확인한다. 109에는 `spacecube-crawler.timer`가 있을 수 있다. 이용 완료·집계·백업 작업은 각 담당 일정으로 유지한다.
 - **방식 전환:** 기존 예약만 끄고 진행 중인 공간 작업의 종료·인계를 확인한 다음 새 방식 하나만 켠다. timer를 끄는 것만으로 이미 실행 중인 service가 취소되지는 않는다.
 - **재배포:** 운영 담당이 선택 방식·주기·공통 파일의 실제 명령을 기록한다. #95와 협의하여 `infra/vm/lab/install-role.sh`의 설치 경로에서도 선택이 유지되게 한다. `remote109/ops/timers.snippet.sh`의 예전 weekly 타이머를 추가로 켜지 않는다. 설치기는 아직 이 선택 기능을 구현한 상태가 아니다.
-- **동작 확인:** #100 공통 진입점이 배포된 뒤에는 같은 계정·설정으로 1회 실행해 다음 :10/:40 로그, 신규·갱신·보충 수, 다섯 유형 준비 상태를 확인한다. #100 전의 단독 수동 대체는 위에서 저장한 계획의 `run_id`를 `--apply --resume <run_id>`로 적용하고 `logs/venue-supplement-<run_id>/report.json`을 확인한다. 공통 진입점의 원격 확인은 `sudo -u spacecube -g adm /opt/spacecube/ops/run-venue-job.sh`를 사용하며, 원격 작업은 노트북 주인과 운영 담당이 수행한다.
+- **동작 확인:** #100 공통 진입점이 배포된 뒤에는 같은 계정·설정으로 1회 실행해 확정된 주기의 로그, 신규·갱신·보충 수, 다섯 유형 준비 상태를 확인한다. :10/:40은 PM 검토안이므로 확정 전에 그 주기의 로그를 운영 검증 기준으로 사용하지 않는다. #100 전의 단독 수동 대체는 위에서 저장한 계획의 `run_id`를 `--apply --resume <run_id>`로 적용하고 `logs/venue-supplement-<run_id>/report.json`을 확인한다. 공통 진입점의 원격 확인은 `sudo -u spacecube -g adm /opt/spacecube/ops/run-venue-job.sh`를 사용하며, 원격 작업은 노트북 주인과 운영 담당이 수행한다.
 
 ## 7. #100과 담당별 요청에 반영할 내용
 
@@ -191,9 +195,17 @@ timer unit이 아직 없는 신규 VM은 `disable`할 대상이 없는지 확인
 | B | #99 입력 계약 연결, 계획 저장 후 자동 apply, 재개·공통 잠금, 확정 CLI를 이 안내에 반영 |
 | DB | HTTP 201 전용 유형별 신규 수와 부분 결과 전달, bootstrap·출처 준비, 시드·초기화 절차 |
 | A·api1 노트북 주인 | 실제 Python/계정/보호 설정 경로·권한 확인, api1 단독 실행·현장 이름 해석 확인 |
-| PM | 초기 준비 기준과 변경 #99 정책 관계 확인, 확정된 매시 :10/:40 주기의 시연 환경·운영 담당 확인 |
+| PM | 초기 준비 기준과 변경 #99 정책 관계 확인, :10/:40 주기 검토·시연 환경·운영 담당 확정 |
 | 공동·#95 담당 | 확정된 cron 설정과 공통 실행 파일을 재배포 후에도 보존, IP 대신 이름으로 설정 |
 
 통합 실행기·자동화가 늦어져도 월요일 시연은 크롤러 → 보충기 수동 순서로 준비한다. 장애 알림 확장·발표 이후 상시 주기 정착은 후속 작업으로 둔다.
 
 설정 문법 근거: [Ubuntu systemd.timer](https://manpages.ubuntu.com/manpages/noble/man5/systemd.timer.5.html), [systemd 시간 표현](https://manpages.ubuntu.com/manpages/noble/man7/systemd.time.7.html), [cron 표 형식](https://manpages.ubuntu.com/manpages/noble/man5/crontab.5.html). 문서 예시의 실제 VM 실행은 별도 검증 대상이다.
+
+## 8. 테스트 VM 통합 코드 배치와 cron smoke 확인
+
+테스트 VM `.232`에서는 통합 브랜치 소스를 `/opt/spacecube/backend`, `/opt/spacecube/crawler`, `/opt/spacecube/db`, `/opt/spacecube/simulator`에 배치한다. 기존 FastAPI 서비스는 `/opt/spacecube/releases/`의 배포본을 사용하므로 cron 확인 때 API 서비스를 교체하지 않는다. 크롤러 런타임 디렉터리 `/opt/spacecube/crawler/data`는 실행 계정이 쓸 수 있어야 하며, 초기에는 비어 있어도 된다. 설명은 [`crawler/data/README.md`](../../crawler/data/README.md)에 둔다.
+
+테스트 VM의 통합 작업은 `/opt/spacecube/ops/run-venue-job.sh`, systemd 단위 `/etc/systemd/system/spacecube-venue-job@.service`, 시스템 cron 파일 `/etc/cron.d/spacecube-venue-job`을 사용한다. API와 공유하는 암호화 자격 증명을 systemd가 전달한다. 시스템 cron 파일은 사용자 `crontab -e`에 표시되지 않으므로 `sudo cat /etc/cron.d/spacecube-venue-job`으로 확인한다.
+
+2026-11-09 KST에 실제 cron에서 `smoke` 인스턴스를 한 번 실행했다. 기존 실제 크롤링 결과를 입력으로 한 `dry-run`이 `Result=success`, `plan_valid=true`로 끝났고 새 크롤링·공간 등록은 하지 않았다. 확인 후 테스트 예약 줄은 주석 처리하고 파일을 보존했다. 테스트 VM의 `apply` 진입점은 실제 약관 확인 스크립트 `/opt/spacecube/ops/check-shareit-terms.sh`가 준비되지 않아 실행하지 않았다. 실제 `apply` 실행과 api1 `.214` 배포는 별도 검증 대상이다. `:10/:40` production 예시 줄도 PM이 주기를 확정할 때까지 주석 상태로 둔다.

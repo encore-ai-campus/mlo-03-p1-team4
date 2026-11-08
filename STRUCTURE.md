@@ -111,7 +111,7 @@ Pro_1/
 │  ├─ shareit_crawler.py      쉐어잇 속성 파서
 │  ├─ preprocess.py           seed 유형·지역·시설 매핑과 생성 문구·그림
 │  ├─ crawl_venues.py         crawl_raw·crawl_jobs·내부 API 등록 실행
-│  └─ data/                   기준선·표본 (지우지 않음)
+│  └─ data/                   사이트맵 기준선·로컬 표본. README만 추적하고 실행 자료는 Git 제외
 │
 ├─ simulator/
 │  ├─ generator/              [B·A·DB 연계] #75 과거 백필, #103 공간 보충 및 #100 통합 CLI·기본 프로필·공통 잠금

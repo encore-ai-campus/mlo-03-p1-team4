@@ -103,7 +103,7 @@ conda run -n pro_1 --no-capture-output python -m simulator.generator.run_pipelin
 
 최종 report는 크롤러 신규·보충 실제 성공·합계·남은 목표·크롤링 전 및 보충 후 primary 활성 수를 제공합니다. 예상 계획량은 `supplement.planned_by_category`, 실제 성공은 `supplemented_by_category`로 구분합니다. 외부 수집 실패는 확인된 부분 실적만 사용하고, 내부 장애나 미확정 등록이 있으면 성공분을 보존한 채 중단합니다. 크롤러 결과 저장 전에 끊겼다면 재수집하지 않고 멈추므로 운영자가 출처 ID로 실적을 대조해야 합니다. 코드·프로필·DB·API 대상 또는 저장된 크롤러 결과가 달라져도 재개를 거부합니다.
 
-11-08 사용자 결정으로 Ubuntu api1 한 대에서 **매시간 :10·:40, cron `10,40 * * * *`**을 사용합니다. 실제 Python·계정·설정·실행 직전 약관 확인 절차를 확인한 뒤 [배포 안내](../../infra/vm/venue-jobs-deploy.md)를 적용합니다. `--confirm-shareit-terms`는 호출자의 확인 표시이며 약관을 자동 검증하는 기능은 아닙니다.
+실제 배포 스케줄러는 Ubuntu api1 한 대의 cron으로 정했습니다. **매시 :10·:40은 PM 검토안**이므로 주기가 확정되기 전에는 활성화하지 않습니다. 주기와 실제 Python·계정·설정·실행 직전 약관 확인 절차를 확인한 뒤 [배포 안내](../../infra/vm/venue-jobs-deploy.md)를 적용합니다. `--confirm-shareit-terms`는 호출자의 확인 표시이며 약관을 자동 검증하는 기능은 아닙니다.
 
 ## 유형별 공간 보충 (#99) 단독 실행
 
