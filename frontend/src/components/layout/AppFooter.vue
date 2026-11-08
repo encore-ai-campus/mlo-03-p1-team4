@@ -32,14 +32,17 @@ const REPO = 'https://github.com/encore-ai-campus/mlo-03-p1-team4'
           <h2>프로젝트</h2>
           <span>팀 방조 · 노진산 · 이자연 · 이세훈 · 전희정</span>
           <span>역할 프론트·PM 1 · FastAPI 2 · DB 1</span>
-          <span>Vue 3 · FastAPI · MariaDB · MongoDB · AWS</span>
+          <span>Vue 3 · FastAPI · MariaDB · MongoDB · HAProxy · Nginx</span>
+          <span>배포 노트북 4대 · VM 7대 (로컬)</span>
+          <a href="/photos/credits.html">사진 출처 · 라이선스</a>
           <a :href="REPO" target="_blank" rel="noopener noreferrer">GitHub 저장소</a>
+          <a :href="`${REPO}/wiki`" target="_blank" rel="noopener noreferrer">프로젝트 위키</a>
         </section>
 
         <section class="footer__col" aria-label="안내">
           <h2>안내</h2>
           <span>결제는 모의 결제라 실제 돈이 나가지 않아요.</span>
-          <span>공간 정보는 공개 자료를 가공한 예시예요. 업체 실명과 사진은 쓰지 않아요.</span>
+          <span>공간 정보는 공개 자료를 가공한 예시예요. 업체 실명·실제 공간 사진은 표시하지 않으며, 유형별 분위기 참고 사진과 일러스트를 사용해요.</span>
           <span>탈퇴하면 이름 · 연락처 · 생년월일은 바로 지워져요.</span>
         </section>
       </div>
@@ -47,7 +50,7 @@ const REPO = 'https://github.com/encore-ai-campus/mlo-03-p1-team4'
       <div class="footer__bottom">
         <div class="footer__camp">
           <strong>[SK네트웍스 Family 엔코아AI캠퍼스] AI 레디 데이터 엔지니어링 캠프 3기 1차 프로젝트</strong>
-          <span>© 2026 팀 방조 · 교육용 데모로 실제 예약과 결제는 이루어지지 않아요.</span>
+          <span>© 2026 팀 방조</span>
         </div>
         <span class="footer__faint">발표 2026-11-09</span>
       </div>
@@ -133,7 +136,7 @@ const REPO = 'https://github.com/encore-ai-campus/mlo-03-p1-team4'
   text-decoration: underline;
 }
 .footer__bottom {
-  border-top: 1px solid var(--c-dark-line);
+
   padding-top: var(--sp-16);
   display: flex;
   flex-wrap: wrap;

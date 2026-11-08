@@ -2,159 +2,119 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8">
-<title>다락큐브 시스템 아키텍처 · 1차 구성(C안)</title>
+<title>다락큐브 시스템 아키텍처 · 1차 구성(로컬 VM)</title>
 <style>
-  :root {
-    --ink: #1f2430; --muted: #5b6475; --line: #4b5563; --read: #2563eb; --write: #c2410c;
-    --event: #15803d; --obs: #7c3aed;
-  }
+  :root { --ink: #1f2430; --muted: #5b6475; }
   * { box-sizing: border-box; margin: 0; }
-  body { width: 1800px; height: 1100px; background: #fff; font-family: 'Noto Sans KR', 'Malgun Gothic', sans-serif; color: var(--ink); position: relative; }
+  body { width: 1800px; height: 1180px; background: #fff; font-family: 'Noto Sans KR', 'Malgun Gothic', sans-serif; color: var(--ink); position: relative; }
   .title { position: absolute; left: 40px; top: 20px; font-size: 26px; font-weight: 700; }
   .sub { position: absolute; left: 40px; top: 58px; font-size: 14px; color: var(--muted); }
-
   .box { position: absolute; border-radius: 14px; }
-  .aws { left: 250px; top: 250px; width: 1130px; height: 810px; border: 2px solid #f59e0b; background: #fffdf7; }
-  .vpc { left: 270px; top: 290px; width: 1090px; height: 750px; border: 2px dashed #8c99ad; background: #fbfcfe; }
-  .az { top: 330px; height: 690px; border: 1.5px dashed #b6c0cf; background: transparent; }
-  .sn { border: 1.5px solid; }
-  .sn.pub { background: #f1f7ff; border-color: #93c5fd; }
-  .sn.priv { background: #fff6ef; border-color: #fdba74; }
-  .box-label { position: absolute; left: 12px; top: 6px; font-size: 13.5px; font-weight: 700; color: var(--muted); display: flex; gap: 8px; align-items: center; white-space: nowrap; }
-  .box-label img { width: 22px; height: 22px; }
-  .sn.pub .box-label { color: #1d4ed8; }
-  .sn.priv .box-label { color: #c2410c; top: auto; bottom: 6px; }
+  .router { left: 30px; top: 100px; width: 1740px; height: 1050px; border: 2px solid #0ea5e9; background: #f7fcff; }
+  .lap { border: 2px dashed #94a3b8; background: #ffffff; }
+  .lap.client { background: #fbfaff; border-color: #a78bfa; }
+  .box-label { position: absolute; left: 14px; top: 8px; font-size: 14px; font-weight: 700; color: var(--muted); display: flex; gap: 8px; align-items: center; white-space: nowrap; }
+  .router > .box-label { color: #0369a1; }
+  .box-label svg { width: 20px; height: 20px; }
+  .lap .spec { position: absolute; right: 14px; top: 10px; font-size: 12px; color: var(--muted); }
 
-  .card { position: absolute; background: #fff; border: 1.5px solid #cbd2dc; border-radius: 12px; padding: 10px 12px; box-shadow: 0 1px 2px rgba(15,23,42,.06); }
-  .card.opt { border-style: dashed; border-color: #94a3b8; background: #fcfdff; }
-  .hd { display: flex; align-items: center; gap: 8px; font-size: 15.5px; font-weight: 700; }
-  .hd img { width: 22px; height: 22px; }
-  .ip { font-size: 12px; color: var(--muted); margin-top: 2px; }
-  .icons { display: flex; gap: 14px; margin: 8px 0 6px; }
-  .icons div { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; }
-  .icons img { height: 30px; }
-  .card p { font-size: 12px; color: var(--muted); line-height: 1.45; }
+  .vm { position: absolute; background: #fff; border: 1.5px solid #cbd2dc; border-radius: 12px; padding: 10px 12px; box-shadow: 0 1px 2px rgba(15,23,42,.06); }
+  .vm .hd { display: flex; align-items: center; gap: 8px; font-size: 15.5px; font-weight: 700; }
+  .vm .hd code { font-size: 12px; font-weight: 700; background: #eef2f7; border-radius: 6px; padding: 1px 6px; color: #334155; }
+  .vm .ip { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .vm .icons { display: flex; gap: 12px; margin: 7px 0 5px; flex-wrap: wrap; }
+  .vm .icons div { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; }
+  .vm .icons img { height: 28px; }
+  .vm p { font-size: 12px; color: var(--muted); line-height: 1.45; }
   .chips { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 6px; }
-  .chip { font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 999px; border: 1px solid #cbd2dc; color: var(--muted); background: #f8fafc; }
-  .chip.sg { border-color: #fcd34d; background: #fffbeb; color: #92400e; }
+  .chip { font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 999px; border: 1px solid; }
+  .chip.fw { border-color: #fcd34d; background: #fffbeb; color: #92400e; }
   .chip.al { border-color: #c4b5fd; background: #f5f3ff; color: #6d28d9; }
 
-  .simple { position: absolute; background: #fff; border: 1.5px solid #cbd2dc; border-radius: 12px; padding: 10px 12px; text-align: center; }
-  .simple img { height: 34px; display: block; margin: 0 auto 4px; }
-  .simple b { display: block; font-size: 15px; }
-  .simple span { display: block; font-size: 12px; color: var(--muted); line-height: 1.4; }
+  .tool { position: absolute; left: 22px; width: 216px; background: #fff; border: 1.5px solid #ddd6fe; border-radius: 12px; padding: 10px 12px; text-align: center; }
+  .tool img { height: 30px; display: block; margin: 0 auto 4px; }
+  .tool b { display: block; font-size: 14.5px; }
+  .tool span { display: block; font-size: 12px; color: var(--muted); line-height: 1.4; }
 
-  .gc { position: absolute; left: 1420px; top: 300px; width: 340px; height: 310px; border: 1.5px solid #c4b5fd; background: #faf7ff; border-radius: 14px; }
-  .gc .box-label { position: static; margin: 12px 16px 0; color: #6d28d9; }
-  .gc .note { font-size: 12px; color: var(--muted); margin: 4px 16px 0; }
-  .gc .row { display: flex; align-items: center; gap: 12px; margin: 12px 16px 0; padding: 10px; background: #fff; border: 1px solid #ddd6fe; border-radius: 10px; }
-  .gc .row img { width: 38px; height: 38px; object-fit: contain; }
-  .gc .row b { font-size: 15px; display: block; }
-  .gc .row span { font-size: 12px; color: var(--muted); }
-
-  .panel { position: absolute; border: 1px solid #e2e8f0; border-radius: 12px; background: #f8fafc; padding: 10px 14px; font-size: 12.5px; color: var(--ink); }
+  .panel { position: absolute; border: 1px solid #e2e8f0; border-radius: 12px; background: #f8fafc; padding: 10px 14px; font-size: 12.5px; }
   .panel h4 { font-size: 13px; color: var(--muted); margin-bottom: 4px; }
-  .panel table { border-collapse: collapse; width: 100%; }
-  .panel td { padding: 2px 6px 2px 0; vertical-align: top; }
-  .panel td:first-child { font-weight: 700; white-space: nowrap; color: #92400e; }
 
-  svg.edges { position: absolute; inset: 0; width: 1800px; height: 1100px; pointer-events: none; }
+  svg.edges { position: absolute; inset: 0; width: 1800px; height: 1180px; pointer-events: none; }
   .lbl { font-size: 12.5px; fill: var(--ink); font-weight: 600; paint-order: stroke; stroke: #fff; stroke-width: 5px; stroke-linejoin: round; }
-  .legend { position: absolute; left: 40px; top: 830px; width: 190px; font-size: 12.5px; color: var(--muted); line-height: 1.9; }
-  .legend i { display: inline-block; width: 28px; height: 0; border-top: 3px solid; vertical-align: middle; margin-right: 6px; }
+  .legend { position: absolute; left: 1470px; top: 1012px; font-size: 12.5px; color: var(--muted); line-height: 1.75; }
+  .legend i { display: inline-block; width: 26px; height: 0; border-top: 3px solid; vertical-align: middle; margin-right: 6px; }
 </style>
 </head>
 <body>
-  <div class="title">다락큐브 시스템 아키텍처 · 1차 구성(C안)</div>
-  <div class="sub">AWS 프리 티어(크레딧) · 서울 리전 2a/2c · EC2 3대 + RDS · EC2는 Docker 없이 systemd · 팀원 n번 VPC 10.1n.0.0/16 · 2026-11-04</div>
+  <div class="title">다락큐브 시스템 아키텍처 · 1차 구성(로컬 VM)</div>
+  <div class="sub">팀 노트북 4대(16코어 · 32GB) · VirtualBox 브리지 · 서버 VM 7대(Ubuntu Server 24.04, systemd, Docker 없음) · 팀 공유기 한 대 · 2026-11-06(정문 HAProxy, 서버마다 Nginx) · IP는 예시</div>
 
-  <!-- 보안 그룹 -->
-  <div class="panel" style="left:40px; top:100px; width:500px">
-    <h4>보안 그룹 (인바운드)</h4>
-    <table>
-      <tr><td>sg-web</td><td>① · 80 ← 전체, 22 ← 내 IP/32 (HTTPS는 HTTP가 다 된 뒤)</td></tr>
-      <tr><td>sg-mongo</td><td>① · 27017 ← sg-app</td></tr>
-      <tr><td>sg-app</td><td>②③ · 8000 ← sg-web, 22 ← 내 IP/32</td></tr>
-      <tr><td>sg-db</td><td>RDS · 3306 ← sg-app (퍼블릭 액세스 끔)</td></tr>
-    </table>
+  <div class="box router"><div class="box-label">
+    <svg viewBox="0 0 24 24" fill="none" stroke="#0369a1" stroke-width="2" aria-hidden="true"><rect x="3" y="13" width="18" height="7" rx="2"/><path d="M7 17h.01M11 17h.01M8 9a6 6 0 0 1 8 0M5 6a10 10 0 0 1 14 0"/></svg>
+    팀 공유기 192.168.0.0/24 · 같은 네트워크(브리지) · VM마다 DHCP 예약 IP · 유선 권장</div></div>
+
+  <!-- 노트북 4 -->
+  <div class="box lap client" style="left:60px; top:150px; width:260px; height:970px"><div class="box-label">노트북 4 · FE·PM</div><div class="spec">VM 없음</div>
+    <div class="tool" style="top:50px"><img src="../../architecture/icons/vuejs.svg" alt=""><b>브라우저 (사용자·시연)</b><span>화면 · Grafana · 녹화</span></div>
+    <div class="tool" style="top:230px"><img src="../../architecture/icons/locust.png" alt=""><b>Locust</b><span>부하 · SameSlotRush<br>서버 끄기 시험 · 8089</span></div>
+    <div class="tool" style="top:420px"><img src="../../architecture/icons/python.svg" alt=""><b>Locust 페르소나</b><span>매일 자동 실행(작업 스케줄러)<br>X-Synthetic + 키</span></div>
+    <div class="tool" style="top:610px"><img src="../../architecture/icons/playwright.svg" alt=""><b>Playwright E2E</b><span>실제 API로 화면 흐름</span></div>
+    <div class="panel" style="left:22px; top:790px; width:216px"><h4>모든 VM 공통</h4>chrony · Asia/Seoul<br>ufw: 표의 포트만<br>systemd · logrotate 7일<br>/etc/hosts에 VM 이름</div>
   </div>
 
-  <!-- 사용자 -->
-  <div class="simple" style="left:600px; top:96px; width:190px"><img src="../../architecture/icons/vuejs.svg" alt=""><b>사용자 브라우저</b><span>Vue 3 화면</span></div>
-  <div class="simple" style="left:820px; top:96px; width:190px"><img src="../../architecture/icons/locust.png" alt=""><b>Locust (노트북)</b><span>가상 사용자 · X-Synthetic: 1</span></div>
-
-  <!-- 비용 -->
-  <div class="panel" style="left:1420px; top:100px; width:340px">
-    <h4>켜는 때와 비용 (대략)</h4>
-    <div>배포 리허설 · 측정 · 시연 때만 켬</div>
-    <div>작업 시간만 월 약 <b>$17</b> · 24시간 월 약 $57</div>
-    <div>replica는 측정하는 날 몇 시간만 (약 $0.1~0.5)</div>
-    <div>Budgets 알림 $10 · $30</div>
+  <!-- 노트북 1 -->
+  <div class="box lap" style="left:350px; top:150px; width:470px; height:970px"><div class="box-label">노트북 1 · DB 전희정 · 정문 + 데이터</div><div class="spec">VM 3 · 5c / 8GB</div></div>
+  <div class="vm" style="left:380px; top:200px; width:410px; height:200px">
+    <div class="hd">정문 <code>gw</code> · 로드밸런서</div><div class="ip">192.168.0.11 · 1c / 1GB</div>
+    <div class="icons"><div><img src="../../architecture/icons/haproxy.svg" alt="">HAProxy</div></div>
+    <p>api1·api2 라운드로빈 · /health 2초 능동 확인<br>/api/internal · /api/metrics 차단 · 통계 8404</p>
+    <div class="chips"><span class="chip fw">80 ← 공유기 전체</span><span class="chip fw">8404 ← mon</span><span class="chip al">Alloy</span></div>
   </div>
-
-  <div class="box aws"><div class="box-label"><img src="../../architecture/icons/aws.svg" alt="">AWS 서울 리전 (ap-northeast-2)</div></div>
-  <div class="box vpc"><div class="box-label">VPC 10.1n.0.0/16 · NAT 게이트웨이 없음</div></div>
-  <div class="box az" style="left:290px; width:615px"><div class="box-label">가용 영역 2a</div></div>
-  <div class="box az" style="left:925px; width:415px"><div class="box-label">가용 영역 2c</div></div>
-  <div class="box sn pub" style="left:305px; top:380px; width:585px; height:270px"><div class="box-label">public-a · 10.1n.1.0/24</div></div>
-  <div class="box sn pub" style="left:940px; top:380px; width:385px; height:270px"><div class="box-label">public-c · 10.1n.2.0/24</div></div>
-  <div class="box sn priv" style="left:305px; top:770px; width:585px; height:230px"><div class="box-label">private-db-a · 10.1n.21.0/24</div></div>
-  <div class="box sn priv" style="left:940px; top:770px; width:385px; height:230px"><div class="box-label">private-db-c · 10.1n.22.0/24</div></div>
-
-  <!-- ② FastAPI #1 -->
-  <div class="card" style="left:325px; top:430px; width:230px; height:200px">
-    <div class="hd"><img src="../../architecture/icons/ec2.svg" alt="">② FastAPI #1</div>
-    <div class="ip">10.1n.1.11 · t4g.micro</div>
-    <div class="icons"><div><img src="../../architecture/icons/fastapi.svg" alt="">FastAPI</div><div><img src="../../architecture/icons/python.svg" alt="">cron</div></div>
-    <p>uvicorn workers 2 · :8000<br>cron: 이용 완료 배치 · 크롤러</p>
-    <div class="chips"><span class="chip sg">sg-app</span><span class="chip al">Alloy</span></div>
-  </div>
-
-  <!-- ① 정문 -->
-  <div class="card" style="left:650px; top:430px; width:225px; height:200px">
-    <div class="hd"><img src="../../architecture/icons/ec2.svg" alt="">① 정문 EC2</div>
-    <div class="ip">10.1n.1.10 · 탄력적 IP · t4g.micro</div>
-    <div class="icons"><div><img src="../../architecture/icons/nginx.svg" alt="">Nginx</div><div><img src="../../architecture/icons/mongodb.svg" alt="">MongoDB 7</div></div>
-    <p>Vue 정적 파일 · /api → ②③<br>user_events · event_daily · crawl_raw</p>
-    <div class="chips"><span class="chip sg">sg-web</span><span class="chip sg">sg-mongo</span><span class="chip al">Alloy</span></div>
-  </div>
-
-  <!-- ③ FastAPI #2 -->
-  <div class="card" style="left:1015px; top:430px; width:230px; height:200px">
-    <div class="hd"><img src="../../architecture/icons/ec2.svg" alt="">③ FastAPI #2</div>
-    <div class="ip">10.1n.2.11 · t4g.micro</div>
-    <div class="icons"><div><img src="../../architecture/icons/fastapi.svg" alt="">FastAPI</div></div>
-    <p>②와 같은 코드 · 설정<br>cron 없음 · 한 대를 꺼도 버팀</p>
-    <div class="chips"><span class="chip sg">sg-app</span><span class="chip al">Alloy</span></div>
-  </div>
-
-  <!-- RDS -->
-  <div class="card" style="left:440px; top:810px; width:280px; height:150px">
-    <div class="hd"><img src="../../architecture/icons/rds.svg" alt="">RDS primary</div>
+  <div class="vm" style="left:380px; top:470px; width:410px; height:200px">
+    <div class="hd">MariaDB primary <code>db1</code></div><div class="ip">192.168.0.12 · 2c / 4GB</div>
     <div class="icons"><div><img src="../../architecture/icons/mariadb.svg" alt="">MariaDB 11.4</div></div>
-    <p>db.t4g.micro · 단일 AZ · STRICT sql_mode<br>쓰기 · 인증 · 내 것 · 표 12개</p>
-    <div class="chips"><span class="chip sg">sg-db</span></div>
+    <p>쓰기 · 인증 · 내 것 · 표 12개 · STRICT · 서울 시간<br>백업 cron: mariadb-dump 하루 1회 · 7일</p>
+    <div class="chips"><span class="chip fw">3306 ← api1 · api2 · db2</span><span class="chip al">Alloy + mysqld</span></div>
   </div>
-  <div class="card opt" style="left:1015px; top:810px; width:230px; height:150px">
-    <div class="hd"><img src="../../architecture/icons/rds.svg" alt="">read replica</div>
+  <div class="vm" style="left:380px; top:760px; width:410px; height:200px">
+    <div class="hd">MongoDB <code>mongo</code></div><div class="ip">192.168.0.13 · 2c / 3GB</div>
+    <div class="icons"><div><img src="../../architecture/icons/mongodb.svg" alt="">MongoDB 7</div></div>
+    <p>user_events(1년) · event_daily · crawl_raw · 인증 켬<br>백업 cron: mongodump 하루 1회 · 7일</p>
+    <div class="chips"><span class="chip fw">27017 ← api1 · api2</span><span class="chip al">Alloy + mongodb</span></div>
+  </div>
+
+  <!-- 노트북 2 -->
+  <div class="box lap" style="left:890px; top:150px; width:860px; height:420px"><div class="box-label">노트북 2 · A 이자연 · 앱 #1 + 관측</div><div class="spec">VM 2 · 4c / 6GB</div></div>
+  <div class="vm" style="left:920px; top:200px; width:380px; height:230px">
+    <div class="hd">FastAPI #1 <code>api1</code></div><div class="ip">192.168.0.21 · 2c / 2GB</div>
+    <div class="icons"><div><img src="../../architecture/icons/nginx.svg" alt="">Nginx</div><div><img src="../../architecture/icons/fastapi.svg" alt="">FastAPI</div><div><img src="../../architecture/icons/python.svg" alt="">cron</div></div>
+    <p>Nginx: Vue 정적 파일 · /api → 127.0.0.1:8000(uvicorn 2)<br>cron: 이용 완료(1시간) · 크롤러(주 1회) · event_daily<br>생성기(30일, 수동) · replay_events.py</p>
+    <div class="chips"><span class="chip fw">80 ← gw</span><span class="chip fw">8000 ← mon</span><span class="chip al">Alloy</span></div>
+  </div>
+  <div class="vm" style="left:1350px; top:200px; width:370px; height:300px">
+    <div class="hd">모니터링 <code>mon</code></div><div class="ip">192.168.0.22 · 2c / 4GB</div>
+    <div class="icons"><div><img src="../../architecture/icons/prometheus.svg" alt="">Prometheus</div><div><img src="../../architecture/icons/loki.png" alt="">Loki</div></div>
+    <div class="icons"><div><img src="../../architecture/icons/grafana.svg" alt="">Grafana</div></div>
+    <p>지표 15일 · 로그 14일<br>대시보드 4장: 서비스 · 예약 · DB · 이벤트<br>경보: 복제 지연 5초 · 오류율</p>
+    <div class="chips"><span class="chip fw">3000 · 9090 ← 공유기</span><span class="chip fw">3100 · 지표 받기 ← 모든 VM</span></div>
+  </div>
+
+  <!-- 노트북 3 -->
+  <div class="box lap" style="left:890px; top:600px; width:860px; height:390px"><div class="box-label">노트북 3 · B 이세훈 · 앱 #2 + 복제</div><div class="spec">VM 2 · 4c / 6GB</div></div>
+  <div class="vm" style="left:920px; top:650px; width:380px; height:200px">
+    <div class="hd">FastAPI #2 <code>api2</code></div><div class="ip">192.168.0.31 · 2c / 2GB</div>
+    <div class="icons"><div><img src="../../architecture/icons/nginx.svg" alt="">Nginx</div><div><img src="../../architecture/icons/fastapi.svg" alt="">FastAPI</div></div>
+    <p>api1과 같은 Nginx·코드 · cron 없음 · /metrics<br>노트북 3을 꺼도 HAProxy가 api1로만 보냄</p>
+    <div class="chips"><span class="chip fw">80 ← gw</span><span class="chip fw">8000 ← mon</span><span class="chip al">Alloy</span></div>
+  </div>
+  <div class="vm" style="left:1350px; top:650px; width:370px; height:200px">
+    <div class="hd">MariaDB replica <code>db2</code></div><div class="ip">192.168.0.32 · 2c / 4GB</div>
     <div class="icons"><div><img src="../../architecture/icons/mariadb.svg" alt="">read_only</div></div>
-    <p>측정하는 날만 만들고 지움<br>평소엔 primary가 읽기도 처리</p>
-    <div class="chips"><span class="chip sg">sg-db</span></div>
+    <p>GTID 복제 · 공개 조회 · 계속 켜 둠<br>(AWS 때는 측정하는 날만)</p>
+    <div class="chips"><span class="chip fw">3306 ← api1 · api2</span><span class="chip al">Alloy + mysqld</span></div>
   </div>
 
-  <!-- VPC 밖 -->
-  <div class="simple" style="left:40px; top:470px; width:180px"><b style="margin-top:4px">스페이스클라우드</b><span>sitemap · /space/&lt;id&gt;<br>robots.txt 준수 · 3초 간격</span></div>
-
-  <div class="gc">
-    <div class="box-label"><img src="../../architecture/icons/grafana.svg" alt="">Grafana Cloud (무료)</div>
-    <div class="note">지표 1만 시리즈 · 로그 월 50GB · 보관 14일</div>
-    <div class="row"><img src="../../architecture/icons/prometheus.svg" alt=""><div><b>Prometheus</b><span>node · mysqld · mongodb · nginx</span></div></div>
-    <div class="row"><img src="../../architecture/icons/loki.png" alt=""><div><b>Loki</b><span>app.log · events.log · Nginx 접근 로그</span></div></div>
-    <div class="row"><img src="../../architecture/icons/grafana.svg" alt=""><div><b>Grafana</b><span>대시보드 · 복제 지연 · 경보</span></div></div>
-  </div>
-  <div class="simple" style="left:1420px; top:770px; width:340px"><b style="margin-top:2px">운영자 (노트북)</b><span>Grafana 웹으로 대시보드 확인<br>EC2 접속은 SSH 22 · 내 IP/32만</span></div>
-
-  <svg class="edges" viewBox="0 0 1800 1100">
+  <svg class="edges" viewBox="0 0 1800 1180">
     <defs>
       <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#4b5563"/></marker>
       <marker id="aw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#c2410c"/></marker>
@@ -163,50 +123,44 @@
       <marker id="ao" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#7c3aed"/></marker>
     </defs>
     <g fill="none" stroke-width="2.4">
-      <!-- 사용자 → ① -->
-      <path d="M695 214 C695 320 720 330 720 428" stroke="#4b5563" marker-end="url(#a)"/>
-      <path d="M915 214 C915 320 800 330 800 428" stroke="#4b5563" marker-end="url(#a)"/>
-      <!-- ① → ②③ -->
-      <path d="M650 482 L557 482" stroke="#4b5563" marker-end="url(#a)"/>
-      <path d="M875 482 L1013 482" stroke="#4b5563" marker-end="url(#a)"/>
-      <!-- 이벤트 ②③ → ① MongoDB -->
-      <path d="M555 590 L648 590" stroke="#15803d" marker-end="url(#ae)"/>
-      <path d="M1015 590 L877 590" stroke="#15803d" marker-end="url(#ae)"/>
-      <!-- 쓰기 → primary -->
-      <path d="M470 632 C470 720 520 730 520 808" stroke="#c2410c" marker-end="url(#aw)"/>
-      <path d="M1060 632 C1060 730 700 720 660 808" stroke="#c2410c" marker-end="url(#aw)"/>
-      <!-- 공개 조회 → replica -->
-      <path d="M520 632 C520 710 1060 690 1080 808" stroke="#2563eb" stroke-dasharray="9 5" marker-end="url(#ar)"/>
-      <path d="M1185 632 L1185 808" stroke="#2563eb" stroke-dasharray="9 5" marker-end="url(#ar)"/>
-      <!-- 복제 -->
-      <path d="M722 890 L1013 890" stroke="#c2410c" stroke-dasharray="7 5" marker-end="url(#aw)"/>
-      <!-- 크롤링 -->
-      <path d="M325 545 L222 545" stroke="#4b5563" stroke-dasharray="7 5" marker-end="url(#a)"/>
-      <!-- Alloy → Grafana Cloud -->
-      <path d="M500 430 L500 362 L1418 362" stroke="#7c3aed" stroke-dasharray="7 5" marker-end="url(#ao)"/>
-      <path d="M850 430 L850 362" stroke="#7c3aed" stroke-dasharray="7 5"/>
-      <path d="M1130 430 L1130 362" stroke="#7c3aed" stroke-dasharray="7 5"/>
-      <!-- 운영자 → Grafana -->
-      <path d="M1590 768 L1590 612" stroke="#4b5563" marker-end="url(#a)"/>
+      <!-- 사용자·Locust → gw -->
+      <path d="M298 262 C340 262 340 262 378 262" stroke="#4b5563" marker-end="url(#a)"/>
+      <path d="M298 440 C345 440 340 330 378 320" stroke="#4b5563" marker-end="url(#a)"/>
+      <!-- gw → api1, api2 -->
+      <path d="M790 250 C850 250 860 250 918 250" stroke="#4b5563" marker-end="url(#a)"/>
+      <path d="M790 330 C860 330 850 700 918 700" stroke="#4b5563" marker-end="url(#a)"/>
+      <!-- 쓰기 → db1 -->
+      <path d="M940 432 C940 500 860 530 792 530" stroke="#c2410c" marker-end="url(#aw)"/>
+      <path d="M918 760 C860 760 850 600 792 590" stroke="#c2410c" marker-end="url(#aw)"/>
+      <!-- 공개 조회 → db2 -->
+      <path d="M1280 432 C1280 560 1320 620 1348 700" stroke="#2563eb" stroke-dasharray="9 5" marker-end="url(#ar)"/>
+      <path d="M1302 760 L1348 760" stroke="#2563eb" stroke-dasharray="9 5" marker-end="url(#ar)"/>
+      <!-- 복제 db1 → db2 -->
+      <path d="M700 672 C720 1030 1500 1060 1530 852" stroke="#c2410c" stroke-dasharray="7 5" marker-end="url(#aw)"/>
+      <!-- 이벤트 → mongo -->
+      <path d="M1000 852 C1000 900 900 880 792 870" stroke="#15803d" marker-end="url(#ae)"/>
+      <path d="M1100 432 C1100 600 870 640 860 760 C855 820 830 830 792 835" stroke="#15803d" marker-end="url(#ae)"/>
+      <!-- Alloy → mon -->
+      <path d="M1302 300 L1348 300" stroke="#7c3aed" stroke-dasharray="7 5" marker-end="url(#ao)"/>
+      <path d="M1600 648 L1600 502" stroke="#7c3aed" stroke-dasharray="7 5" marker-end="url(#ao)"/>
+      <path d="M1200 648 L1200 590 L1500 590 L1500 502" stroke="#7c3aed" stroke-dasharray="7 5" marker-end="url(#ao)"/>
+      <path d="M822 140 L1560 140 L1560 198" stroke="#7c3aed" stroke-dasharray="7 5" marker-end="url(#ao)"/>
     </g>
-    <text class="lbl" x="730" y="280">HTTP 80 · 탄력적 IP</text>
-    <text class="lbl" x="570" y="472">/api</text>
-    <text class="lbl" x="896" y="472">라운드로빈</text>
-    <text class="lbl" x="575" y="612" style="fill:#15803d">이벤트</text>
-    <text class="lbl" x="893" y="612" style="fill:#15803d">이벤트(응답 뒤)</text>
-    <text class="lbl" x="340" y="748" style="fill:#c2410c">쓰기 · 인증 · 내 것</text>
-    <text class="lbl" x="1196" y="730" style="fill:#2563eb">공개 조회</text>
-    <text class="lbl" x="790" y="880" style="fill:#c2410c">비동기 복제 (측정하는 날)</text>
-    <text class="lbl" x="232" y="533">주 1회 · ≤20건</text>
-    <text class="lbl" x="1180" y="352" style="fill:#7c3aed">Alloy: 로그 · 지표 push (443)</text>
-    <text class="lbl" x="1600" y="695">웹</text>
+    <text class="lbl" x="306" y="250">HTTP 80</text>
+    <text class="lbl" x="305" y="470">부하</text>
+    <text class="lbl" x="808" y="238">HTTP 80 라운드로빈</text>
+    <text class="lbl" x="950" y="470" style="fill:#c2410c">쓰기 · 인증 · 내 것</text>
+    <text class="lbl" x="1290" y="470" style="fill:#2563eb">공개 조회</text>
+    <text class="lbl" x="1000" y="1006" style="fill:#c2410c">비동기 복제 (GTID, 노트북 1 → 3)</text>
+    <text class="lbl" x="820" y="910" style="fill:#15803d">이벤트 (응답 뒤)</text>
+    <text class="lbl" x="1060" y="134" style="fill:#7c3aed">노트북 1의 VM 3대 Alloy → mon (로그 · 지표)</text>
   </svg>
 
   <div class="legend">
     <div><i style="border-color:#4b5563"></i>요청</div>
-    <div><i style="border-color:#c2410c"></i>쓰기 (primary)</div>
-    <div><i style="border-color:#2563eb; border-top-style:dashed"></i>읽기 (replica 있는 날)</div>
-    <div><i style="border-color:#15803d"></i>이벤트 (MongoDB)</div>
+    <div><i style="border-color:#c2410c"></i>쓰기 · 복제</div>
+    <div><i style="border-color:#2563eb; border-top-style:dashed"></i>읽기 (replica)</div>
+    <div><i style="border-color:#15803d"></i>이벤트</div>
     <div><i style="border-color:#7c3aed; border-top-style:dashed"></i>로그 · 지표</div>
   </div>
 </body>

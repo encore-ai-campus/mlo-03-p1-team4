@@ -9,9 +9,11 @@ __pycache__/
 .ruff_cache/
 .pytest_cache/
 .venv/
+.f61-testdeps/
 
 # 프론트 (frontend/.gitignore에도 있음)
 node_modules/
+postman/environments/Local.private.environment.yaml
 dist/
 coverage/
 playwright-report/
@@ -35,3 +37,9 @@ Thumbs.db
 
 # 크롤링 표본 원본(업체 이름 포함) — 공개 저장소에 올리지 않는다. 가공값은 MongoDB crawl_raw에
 crawler/data/
+
+# 각자 PC의 Claude Code 미리보기 설정
+.claude/launch.json
+
+# 디자인 점검 스킬(design-taste-frontend) 측정·스크린샷 출력
+.taste-skill/

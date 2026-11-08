@@ -13,7 +13,6 @@ import RoomCard from '@/components/domain/RoomCard.vue'
 import RoomCardSkeleton from '@/components/domain/RoomCardSkeleton.vue'
 import CategoryBento from '@/components/domain/CategoryBento.vue'
 import SlotStrip from '@/components/domain/SlotStrip.vue'
-import HourlyChart from '@/components/domain/HourlyChart.vue'
 import { useReveal } from '@/composables/useReveal'
 import { useEventLogger } from '@/composables/useEventLogger'
 import { nextDays, nowInSeoul } from '@/utils/date'
@@ -25,10 +24,10 @@ const categories = ref([])
 const regions = ref([])
 const allRooms = ref([])
 const newRooms = ref([])
+const newTotal = ref(0)
 const newLoading = ref(true)
 const newError = ref('')
 const todaySlots = ref(null)
-const hourly = ref([])
 const reviews = ref([])
 const loadingRooms = ref(true)
 const error = ref('')
@@ -48,7 +47,11 @@ async function loadRooms() {
 async function loadNewRooms() {
   newLoading.value = true
   newError.value = ''
-  try { newRooms.value = (await api.getNewVenues()).items }
+  try {
+    const res = await api.getNewVenues()
+    newRooms.value = res.items
+    newTotal.value = res.total ?? res.items.length
+  }
   catch (e) { newError.value = e.message ?? '새 공간을 불러오지 못했어요.' }
   finally { newLoading.value = false }
 }
@@ -58,7 +61,6 @@ onMounted(async () => {
     api.getRegions().then((r) => { regions.value = r }),
     api.getTodaySlots().then((r) => { todaySlots.value = r }),
     loadNewRooms(),
-    api.getHourlyUsage().then((r) => { hourly.value = r }),
     api.getRecentReviews().then((r) => { reviews.value = r.items }),
     loadRooms(),
   ])
@@ -71,15 +73,21 @@ const regionOptions = computed(() => ['전국', ...regions.value])
 const peopleOptions = ['1', '2', '4', '6', '8', '10', '15'].map((n) => ({ value: n, label: `${n}명` }))
 function submitSearch() {
   const query = { category: form.value.category, sido: form.value.region === '전국' ? undefined : form.value.region, date: form.value.date, people: form.value.people }
-  log('search', query)
+  log('search_submit', query)
   router.push({ path: '/search', query })
 }
 const sortOptions = [{ value: 'default', label: '추천순' }, { value: 'popular', label: '인기순' }, { value: 'price', label: '낮은 가격순' }, { value: 'rating', label: '평점순' }]
 const tabs = computed(() => [{ value: 'all', label: '전체' }, ...categories.value.map((c) => ({ value: c.code, label: c.name }))])
-const shown = computed(() => allRooms.value)
+// 추천순에서는 최근 등록(크롤링·신규) 공간을 앞에 몇 곳 세워, 공간이 늘면 메인 목록에도 바로 보이게 한다.
+const FRESH_FIRST = 4
+const shown = computed(() => {
+  if (sort.value !== 'default') return allRooms.value
+  const fresh = newRooms.value.filter((n) => tab.value === 'all' || n.category?.code === tab.value).slice(0, FRESH_FIRST)
+  const ids = new Set(fresh.map((n) => n.venue_id))
+  return [...fresh.map((n) => ({ ...n, fresh: true })), ...allRooms.value.filter((r) => !ids.has(r.venue_id))].slice(0, 12)
+})
 const availableNow = computed(() => allRooms.value.filter((r) => r.slots?.some((s) => !s.taken && s.hour > nowInSeoul().hour)).length)
 const emptyCategory = computed(() => categories.value.find((c) => c.code === tab.value)?.name ?? '')
-const { target: chartTarget, visible: chartVisible } = useReveal()
 const { target: reviewsTarget, visible: reviewsVisible } = useReveal()
 const won = (n) => n.toLocaleString('ko-KR')
 </script>
@@ -113,7 +121,7 @@ const won = (n) => n.toLocaleString('ko-KR')
     <div class="section__head section__head--row section__head--tight">
       <h2 id="bento-title" class="section__title">어떤 공간이 필요하세요?</h2>
       <RouterLink :to="{ path: '/search', query: { now: 1 } }" class="now-link">
-        <span class="now-link__dot" aria-hidden="true" />지금 바로 들어갈 수 있는 곳 <strong class="num">{{ availableNow }}곳</strong>
+        지금 바로 들어갈 수 있는 곳 <strong class="num">{{ availableNow }}곳</strong>
       </RouterLink>
     </div>
     <CategoryBento v-if="categories.length" :categories="categories" />
@@ -122,12 +130,12 @@ const won = (n) => n.toLocaleString('ko-KR')
   <section class="section container" aria-labelledby="new-title">
     <div class="section__head">
       <h2 id="new-title" class="section__title">새로 문을 연 공간</h2>
-      <p class="section__sub">등록 후 14일 동안 여기에 보여요</p>
+      <p class="section__sub">등록 후 14일 동안 여기에 보여요<template v-if="newTotal"> · 지금 <strong class="num">{{ newTotal }}곳</strong></template></p>
     </div>
     <UiCarousel label="새로 문을 연 공간">
       <template v-if="newRooms.length">
         <RouterLink v-for="n in newRooms" :key="n.venue_id" :to="`/venues/${n.venue_id}`" class="new-card">
-          <span class="new-card__art"><RoomArt :image="n.image" /><span class="new-card__badge">NEW</span></span>
+          <span class="new-card__art"><RoomArt :image="n.image" :category="n.category" :seed="n.venue_id" /></span>
           <span class="new-card__body">
             <span class="new-card__open num">{{ n.registered_on }} 오픈 · {{ n.new_days_left }}일 남음</span>
             <span class="new-card__name">{{ n.name }}</span>
@@ -169,6 +177,7 @@ const won = (n) => n.toLocaleString('ko-KR')
             :room="r"
             :index="i"
             :rank="sort === 'popular' ? i + 1 : 0"
+            :fresh="Boolean(r.fresh)"
             
           />
         </div>
@@ -181,11 +190,6 @@ const won = (n) => n.toLocaleString('ko-KR')
   </section>
 
   <section class="section container insights">
-    <div ref="chartTarget" class="panel reveal" :class="{ 'is-visible': chartVisible }" aria-labelledby="chart-title">
-      <h2 id="chart-title" class="panel__title">몰리는 시간대</h2>
-      <p class="section__sub">최근 4주 평균 예약률 · 평일 (예시 데이터)</p>
-      <HourlyChart v-if="hourly.length" :values="hourly" :visible="chartVisible" />
-    </div>
     <div ref="reviewsTarget" class="panel reveal" :class="{ 'is-visible': reviewsVisible }" aria-labelledby="reviews-title">
       <div class="panel__head">
         <h2 id="reviews-title" class="panel__title">최근 후기</h2>
@@ -195,7 +199,7 @@ const won = (n) => n.toLocaleString('ko-KR')
         <li v-for="v in reviews" :key="v.review_id" class="review">
           <div class="review__meta">
             <span class="review__type">{{ categories.find((c) => c.code === v.category)?.name }}</span>
-            <span class="review__stars" :aria-label="`별점 ${v.rating}점`">{{ '★'.repeat(v.rating) }}{{ '☆'.repeat(5 - v.rating) }}</span>
+            <span class="review__stars">별점 {{ v.rating }}</span>
             <span class="review__by num">{{ v.author }} · {{ v.created_at.slice(0, 10) }}</span>
           </div>
           <p class="review__text">{{ v.content }}</p>
@@ -207,12 +211,11 @@ const won = (n) => n.toLocaleString('ko-KR')
 
 <style scoped>
 .hero {
-  padding-block: var(--sp-24) var(--sp-20, 20px);
+  padding-block: var(--sp-32) var(--sp-32);
   background: var(--c-surface);
-  border-bottom: 1px solid var(--c-line);
 }
 .hero__title {
-  font-size: clamp(1.625rem, 2.4vw, 2.125rem);
+  font-size: clamp(2rem, 3.6vw, 3.25rem);
   font-weight: 900;
   line-height: 1.22;
   letter-spacing: -0.03em;
@@ -228,7 +231,6 @@ const won = (n) => n.toLocaleString('ko-KR')
   gap: var(--sp-12);
   margin-top: var(--sp-16);
   padding: var(--sp-12);
-  border: 1px solid var(--c-line-strong);
   border-radius: var(--r-lg);
   background: var(--c-paper);
 }
@@ -263,24 +265,14 @@ const won = (n) => n.toLocaleString('ko-KR')
   align-items: center;
   gap: var(--sp-8);
   min-height: var(--tap);
-  padding: 0 var(--sp-16);
-  border-radius: 999px;
-  background: var(--c-ink);
-  color: var(--c-on-dark);
-  font-size: var(--fs-15);
+  color: var(--c-brand-ink);
+  font-size: var(--fs-16);
+  text-underline-offset: 4px;
   text-decoration: none;
   transition: background-color var(--t-fast);
 }
 .now-link:hover {
-  background: var(--c-ink-2);
-  color: var(--c-on-dark);
-}
-.now-link__dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: var(--c-now-on-dark);
-  box-shadow: 0 0 0 3px rgba(52, 209, 122, 0.25);
+  text-decoration: underline;
 }
 .section__head--row {
   display: flex;
@@ -322,16 +314,15 @@ const won = (n) => n.toLocaleString('ko-KR')
 .new-card {
   display: flex;
   flex-direction: column;
-  border: 1px solid var(--c-line);
   border-radius: var(--r-lg);
   background: var(--c-surface);
   color: var(--c-ink);
   text-decoration: none;
   overflow: hidden;
-  transition: border-color var(--t-fast);
+  transition: background-color var(--t-fast);
 }
 .new-card:hover {
-  border-color: var(--c-brand);
+  background: var(--c-fill);
 }
 .new-card__art {
   position: relative;
@@ -340,17 +331,6 @@ const won = (n) => n.toLocaleString('ko-KR')
 .new-card__art-sk {
   aspect-ratio: 400 / 260;
 }
-.new-card__badge {
-  position: absolute;
-  left: var(--sp-12);
-  top: var(--sp-12);
-  padding: 2px 8px;
-  border-radius: 6px;
-  background: var(--c-danger);
-  color: var(--c-on-dark);
-  font-size: var(--fs-12);
-  font-weight: 900;
-}
 .new-card__body {
   display: flex;
   flex-direction: column;
@@ -358,9 +338,8 @@ const won = (n) => n.toLocaleString('ko-KR')
   padding: var(--sp-12) var(--sp-16) var(--sp-16);
 }
 .new-card__open {
-  font-size: var(--fs-13);
-  font-weight: 700;
-  color: var(--c-danger);
+  font-size: var(--fs-15);
+  color: var(--c-muted);
 }
 .new-card__name {
   font-size: var(--fs-20);
@@ -383,15 +362,8 @@ const won = (n) => n.toLocaleString('ko-KR')
   display: grid;
   gap: var(--sp-24);
 }
-@media (min-width: 1024px) {
-  .insights {
-    grid-template-columns: 3fr 2fr;
-    align-items: start;
-  }
-}
 .panel {
   padding: var(--sp-24);
-  border: 1px solid var(--c-line);
   border-radius: var(--r-lg);
   background: var(--c-surface);
 }
@@ -429,11 +401,7 @@ const won = (n) => n.toLocaleString('ko-KR')
   list-style: none;
 }
 .review {
-  padding-block: var(--sp-16);
-  border-top: 1px solid var(--c-line);
-}
-.review:first-child {
-  border-top: 0;
+  padding-block: var(--sp-12);
 }
 .review__meta {
   display: flex;
@@ -443,15 +411,11 @@ const won = (n) => n.toLocaleString('ko-KR')
   font-size: var(--fs-13);
 }
 .review__type {
-  padding: 2px 8px;
-  border-radius: 6px;
-  background: var(--c-brand-soft);
-  color: var(--c-brand-ink);
+  color: var(--c-ink);
   font-weight: 700;
 }
 .review__stars {
-  color: var(--c-star-ink);
-  letter-spacing: 1px;
+  color: var(--c-muted);
 }
 .review__by {
   margin-left: auto;

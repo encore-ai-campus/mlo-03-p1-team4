@@ -1,0 +1,49 @@
+$kind: http-request
+id: a4af08701c5d44d1b2587501
+name: Read my reservations
+order: 3000
+url: '{{base_url}}/reservations/me?page=1&size=50'
+method: GET
+headers:
+  - key: Accept
+    value: application/json
+auth:
+  type: bearer
+  credentials:
+    - key: token
+      value: '{{access_token}}'
+queryParams:
+  - key: page
+    value: '1'
+  - key: size
+    value: '50'
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('My reservations returns a paged response', () => {
+        pm.response.to.have.status(200);
+        const body = pm.response.json();
+        pm.expect(body).to.include({ page: 1, size: 50, total: 1 });
+        pm.expect(body.items).to.be.an('array').with.length(1);
+      });
+
+      pm.test('New reservation is visible with payment and venue details', () => {
+        const body = pm.response.json();
+        const reservationId = Number(pm.environment.get('reservation_id'));
+        const item = body.items.find((candidate) => candidate.reservation_id === reservationId);
+        pm.expect(item).to.exist;
+        pm.expect(item.status).to.equal('confirmed');
+        pm.expect(item.date).to.equal(pm.environment.get('booking_date'));
+        pm.expect(item.created_at).to.match(/\+09:00$/);
+        pm.expect(item.can_cancel).to.equal(true);
+        pm.expect(item).to.have.property('review_id', null);
+        pm.expect(item.payment).to.include({
+          method: pm.environment.get('method'),
+          status: 'paid',
+          refunded_at: null
+        });
+        pm.expect(item.venue.venue_id).to.equal(Number(pm.environment.get('venue_id')));
+        pm.expect(item.venue).to.have.all.keys('venue_id', 'name', 'category', 'region', 'image');
+        pm.expect(item.venue.image).to.equal('art:group-0');
+      });

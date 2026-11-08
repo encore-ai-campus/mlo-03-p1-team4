@@ -4,7 +4,7 @@ Codex와 Claude Code가 함께 읽는 작업 지침입니다. 사람이 채팅�
 
 ## 프로젝트
 
-스터디룸·스튜디오·카페·강의실·파티룸을 전국에서 1시간 단위로 예약하는 서비스(공간큐브, 가칭). 4명이 프론트 1, FastAPI 2(A·B), DB 1로 나눠 만든다. 설계는 **2026-11-03 확정안**(`docs/산출물_01~04`, `docs/백엔드_A·B`)이 기준이다. 코드는 크롤러와 프론트(Vue: 화면 7개, 목업 데이터)까지 있고, 프론트는 11-03 확정안(`/venues`·한 번 결제·후기 모아보기)을 목업에 반영했다. 실제 API 연결은 아직이다. 각 파트는 따로 진행하고 git으로 합친다.
+스터디룸·스튜디오·카페·강의실·파티룸을 전국에서 1시간 단위로 예약하는 서비스(다락큐브). 4명이 프론트 1, FastAPI 2(A·B), DB 1로 나눠 만든다. 설계는 **2026-11-03 확정안**(`docs/산출물_01~04`, `docs/백엔드_A·B`)이 기준이다. 코드는 크롤러와 프론트(Vue: 화면 7개, 목업 데이터)까지 있고, 프론트는 11-03 확정안(`/venues`·한 번 결제·후기 모아보기)을 목업에 반영했다. 실제 API 연결은 아직이다. 각 파트는 따로 진행하고 git으로 합친다.
 
 ## 작업 시작 순서
 
@@ -21,7 +21,7 @@ Codex와 Claude Code가 함께 읽는 작업 지침입니다. 사람이 채팅�
 | 표·컬럼·제약·인덱스, MongoDB 컬렉션 | `docs/산출물_04_DB명세서.md` + `db/migrations/0001_init.sql`(11-04부터 기준)·`docs/db/mongo_init.js` | 표를 바꿀 때는 `0002_…` 새 마이그레이션 + 명세서 같이 |
 | API 경로·요청·응답, 파트 약속 | `docs/백엔드_A_회원_후기_이벤트.md`, `docs/백엔드_B_공간_예약_결제_크롤링.md` | 프론트도 이 응답 모양을 따른다 |
 | 오류 코드·문구·프론트 처리 | `docs/오류코드.md` | 여기 없는 코드는 쓰지 않는다 |
-| 구성·primary/replica 경로·네트워크·포트 | `docs/산출물_02_시스템아키텍처_흐름도.md` | IP 번호 규칙은 `docs/AWS_네트워크_설계.md`, 1차 AWS 배치·비용은 `docs/AWS_프리티어_구성.md`(프리 티어) |
+| 구성·primary/replica 경로·네트워크·포트 | `docs/산출물_02_시스템아키텍처_흐름도.md` | **1차 배치는 `docs/로컬_VM_구성.md`**(노트북 4대 · VM 7대, 11-05). AWS(`AWS_프리티어_구성.md`·`AWS_네트워크_설계.md`)는 참고안 |
 | 화면 흐름·시퀀스 | `docs/산출물_03_서비스흐름도.md` | |
 | 프론트가 고칠 것(11-03 변경) | `docs/프론트_변경목록_11-03.md` | |
 | 화면 패턴·움직임·글꼴 | `docs/공간대여_04_UI패턴_글꼴.md` | |
@@ -35,18 +35,22 @@ Codex와 Claude Code가 함께 읽는 작업 지침입니다. 사람이 채팅�
 | --- | --- |
 | `frontend/` | 프론트 |
 | `backend/app/core/`, `backend/app/main.py`, A 파일(`auth`·`users`·`reviews`·`events`·`health`), `backend/scripts/`, `infra/monitoring/` | FastAPI A |
-| B 파일(`catalog`·`venues`·`reservations`·`internal`, `slot_repo`·`payment_repo`), `backend/app/jobs/`, `simulator/locust/`, `infra/nginx/` | FastAPI B |
-| `db/`, `docs/db/`, `crawler/`, `simulator/generator/`, `infra/local/` | DB |
+| B 파일(`catalog`·`venues`·`reservations`·`internal`, `slot_repo`·`payment_repo`), `backend/app/jobs/`, `simulator/locust/`, `infra/nginx/`, `infra/haproxy/` | FastAPI B |
+| `db/`, `docs/db/`, `crawler/`, `infra/local/` | DB |
+| `simulator/generator/` | B 본체·세션·예약, A 회원·후기 연결 확인, DB 공간 보충·집계·정리·CSV (#75 PM 결정) |
 | `docs/`(위 제외), `infra/aws/`, `STATE.md`, `STRUCTURE.md` | 공동 |
 
 - 요청받은 파트의 파일만 고친다. 다른 파트 파일을 고쳐야 하면 멈추고 무엇을 왜 고쳐야 하는지 알린다.
 - 아래 **약속**은 여러 파트가 같이 쓴다. 이름·인자·반환 형태를 바꾸지 말고, 바꿔야 하면 사람에게 먼저 묻는다. 자세한 형태는 `docs/백엔드_A` 3절, `docs/백엔드_B` 3절.
   - `get_db_write()` primary 세션 / `get_db_read()` replica 세션(실패하면 primary로 대체) (A 제공)
   - `get_current_user()` → `CurrentUser(user_id)`, primary에서 확인 (A 제공)
-  - `log_event(session_id, user_id, event_type, venue_id=None, category=None, payload=None, is_synthetic=False)` — MongoDB는 내부 스레드 풀로, 부르는 쪽은 기다리지 않음 (A 제공)
+  - `log_event(session_id, user_id, event_type, venue_id=None, category=None, payload=None, is_synthetic=False, *, products=None)` — 앞의 7개 인자는 유지. 예약 서버 이벤트는 B가 확정한 `products`를 키워드로 전달. MongoDB는 내부 스레드 풀로 처리 (A 제공, #60 PM 승인)
   - `get_today()`·`get_now()` → Asia/Seoul 오늘·지금. `get_now()`는 **시간대 없는 한국 시각**(MariaDB `DATETIME`과 같음), `TODAY_OVERRIDE`는 테스트 전용 (A 제공)
   - `AppError(code, message, status, detail=None)`, `paginate()`, `is_synthetic_request()`, `get_session_id()`(헤더 `X-Session-Id`), `reservation_counter` (A 제공)
   - `reservation_repo.get_owned(db, user_id, reservation_id)` → `(reservation_id, venue_id, reserve_date, start_hour, end_hour, status, created_at)` 또는 `None` (B 제공)
+  - `reservation_repo.count_cancellable(db, user_id)` → `int`: 시작 전 `confirmed` 예약 수, 탈퇴 전 확인용 (B 제공, 11-05)
+  - `reservation_repo.review_context_query(*, active_only: bool = True)` → `Select`: `reservation_id`, `venue_id`, `venue_name`, `category`(`categories.code`) 열을 반환하는 예약·공간·유형 조회식. 공개 후기는 기본값으로 비활성 공간 제외, 내 후기는 `False`로 포함. A가 직접 import하며 DB 실행·commit·rollback은 하지 않음 (B 제공, #43 PM 승인)
+  - `review_repo.get_review_ids(db, reservation_ids) -> dict[int, int]`: B가 본인 소유로 확인한 현재 페이지 예약 ID와 primary 세션을 전달. A가 삭제된 후기까지 SQL 한 번으로 조회해 `{reservation_id: review_id}` 반환, 후기 없으면 매핑에서 제외. 빈 입력은 SQL 없이 `{}`. commit·rollback 없음 (A 제공, #45 PM 승인)
   - 뷰 `v_venue_rating(venue_id, rating_avg, review_count)` (DB 제공)
   - 표·컬럼 이름, API 경로와 응답 형식
 
@@ -59,9 +63,9 @@ Codex와 Claude Code가 함께 읽는 작업 지침입니다. 사람이 채팅�
 - 예약 상태는 `confirmed` → `completed`(끝나는 시각이 지나면, 1시간 배치) 또는 `cancelled`(이용 시작 전, 칸 삭제, 결제 `refunded`). `pending`·`expired`·결제 대기 10분·`/confirm`은 없다.
 - 결제는 모의 결제만. 결제수단은 `transfer`·`card`·`phone`(API 값 = DB 값). 실제 결제 연동 코드를 만들지 않는다.
 - 회원이 쓰는 글은 후기만(예약당 1개, `completed`일 때만). 자유게시판·댓글·공지·관리자 역할은 없다.
-- 사용자 이벤트는 `events.log`(→ Alloy → Loki)에 먼저 쓰고 MongoDB `user_events`에는 응답 뒤 백그라운드로 쓴다. MongoDB가 꺼져도 예약·이벤트 API는 성공해야 한다.
-- 공간 이미지는 일러스트 풀(`art:<종류>-<색>`, `frontend/src/components/domain/RoomArt.vue`)을 돌려 쓴다. 크롤링한 사진·업체 실명·원문 소개를 저장하지 않는다.
-- 가상 데이터는 `is_synthetic = true`. API로 넣을 때 헤더 `X-Synthetic: 1`.
+- 사용자 이벤트는 `events.log`(→ Alloy → Loki)에 먼저 쓰고 MongoDB `space_rental_analytics.events`에는 응답 뒤 백그라운드로 쓴다. MongoDB가 꺼져도 예약·이벤트 API는 성공해야 한다. 파일 기록 실패 시 이벤트 API는 503이다(#60).
+- 공간 이미지는 프론트의 유형별 일러스트와 유형별 CCL 분위기 참고 이미지 풀(`frontend/public/photos/`)에서 보여 준다. CCL 사진은 `category.code`와 공간 ID로 프론트에서 안정 선택하고, 실제 등록 공간 사진이 아님을 표시하며 출처·저작자·라이선스·변경 사실을 공개한다. `art:<종류>-<색>` API 계약은 바꾸지 않는다. 크롤링한 사진·업체 실명·원문 소개를 저장하지 않는다.
+- 가상 데이터는 `is_synthetic = true`. API로 넣을 때 헤더 `X-Synthetic: 1` + `X-Synthetic-Key`(= `.env` `SYNTHETIC_API_KEY`). 키가 없거나 틀리면 401 `UNAUTHORIZED` (11-05 A6)
 - 시간대 Asia/Seoul(MongoDB 저장은 UTC), 날짜 `YYYY-MM-DD`, 금액은 원 단위 정수. 오늘·지금은 `get_today()`·`get_now()`로만 읽는다(`date.today()`·`datetime.now()` 직접 호출 금지).
 - 오류 응답 `{"code","message","detail"}`, 목록 응답 `{"items","page","size","total"}`.
 
@@ -109,7 +113,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File verify.ps1
 
 - `.env`, 비밀번호, JWT 키, AWS 키를 파일에 쓰거나 커밋하지 않는다. 예시는 `.env.example`에 이름만.
 - 로그(`app.log`·`events.log`·Nginx)에 이메일·비밀번호·토큰·휴대폰·생년월일을 남기지 않는다. 사람은 `user_id`로만 가리킨다.
-- AWS 리소스 생성·변경·삭제, 요금이 나가는 명령은 실행하지 않는다. 사람이 한다. AWS 구성은 프리 티어 안에서 정한다(`docs/AWS_프리티어_구성.md`).
+- AWS 리소스 생성·변경·삭제, 요금이 나가는 명령은 실행하지 않는다. 사람이 한다. 1차 배포는 로컬 VM이다(`docs/로컬_VM_구성.md`). 팀원 노트북의 VM 설정 변경은 그 노트북 주인이 한다.
 - Docker 등 무거운 프로그램을 사람에게 묻지 않고 켜지 않는다.
 - DB `DROP`·`TRUNCATE`·대량 `DELETE`는 로컬 테스트 스키마(`spacecube_test`) 외에는 하지 않는다.
 - 외부 사이트 크롤링은 `crawler/AGENTS.md` 규칙 안에서만. 실행당 상세 페이지 20건을 넘기려면 사람 승인을 받는다.

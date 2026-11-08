@@ -30,6 +30,3 @@ export const facilities = [
     facility_id: 8, name: '음식 반입'
   }
 ];
-export const hourlyUsage = [
-  18, 30, 46, 58, 52, 47, 55, 63, 72, 84, 96, 91, 70, 41
-];

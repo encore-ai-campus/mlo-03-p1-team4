@@ -37,7 +37,7 @@ npm run dev
 | `src/pages/` | 라우트별 화면 7개 + `PlaceholderPage.vue`(없는 주소), `UiShowcasePage.vue`(/ui) |
 | `src/components/layout/` | AppHeader(스티키), AppFooter, SplitLayout, SidebarLayout |
 | `src/components/ui/` | BaseButton, UiChip, UiTabs, UiAccordion, UiDialog, UiDrawer, UiSelect, UiMenu, UiTooltip, UiSkeleton, UiCarousel, UiInput, UiPagination, AppToaster |
-| `src/components/domain/` | RoomArt(공간 일러스트 9종), RoomCard(+Skeleton), CategoryBento, SlotStrip, SlotGrid, DateStrip, ReviewCard, SearchFilters, HourlyChart |
+| `src/components/domain/` | RoomArt(CCL 분위기 참고 사진·유형별 일러스트), RoomCard(+Skeleton), CategoryBento, SlotStrip, SlotGrid, DateStrip, ReviewCard, SearchFilters |
 | `src/composables/` | useAuth, useBooking(예약 신청 흐름), useReveal(스크롤 리빌), useEventLogger(활동 로그) |
 | `src/api/` | client(오류 형식·목업 지연), catalog·venues·reservations(B), auth·users·reviews(A), mock/ |
 | `src/utils/` | date.js: 날짜(YYYY-MM-DD)·시간 범위·금액 표시 |
@@ -69,6 +69,7 @@ Vue 공식 스캐폴드(`create-vue`)의 구성을 그대로 따릅니다. 커�
 
 - 처음 E2E를 돌리는 PC는 `npx playwright install chromium`을 한 번 합니다.
 - 결과 보고서: `playwright-report/index.html` (git에 올리지 않음)
+- 실제 서버로 돌리기(VM 배포 뒤): `E2E_BASE_URL=http://gw`이면 개발 서버를 띄우지 않고 그 주소로 갑니다. `E2E_SYNTHETIC_KEY`(= 서버 `.env`의 `SYNTHETIC_API_KEY`, 저장소에 넣지 않음)를 주면 모든 요청에 `X-Synthetic: 1`·`X-Synthetic-Key`가 붙어 가상 데이터로 저장됩니다. 지금 시나리오는 목업 시연 계정·고정 시계를 전제로 하므로, 실제 서버용 시나리오는 #9에서 따로 맞춥니다.
 - 아직 없는 것: 시각 회귀(스크린샷 비교), 커버리지 기준, CI(git 저장소가 생기면 GitHub Actions에서 루트 `verify.ps1 -E2E`와 같은 순서로)
 - 저장소 전체(파이썬 포함)를 한 번에 볼 때는 루트의 `verify.ps1` ([AGENTS.md](../AGENTS.md) 검증)
 

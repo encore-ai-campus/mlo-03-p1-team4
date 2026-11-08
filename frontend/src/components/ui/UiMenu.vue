@@ -28,7 +28,7 @@ defineProps({ items: { type: Array, required: true } })
   border: 1px solid var(--c-line);
   border-radius: var(--r-md);
   background: var(--c-surface);
-  box-shadow: var(--shadow-pop);
+  box-shadow: var(--shadow-pop); /* taste-skill-ignore 떠 있는 층·포커스 링 */
 }
 .menu__item {
   display: flex;

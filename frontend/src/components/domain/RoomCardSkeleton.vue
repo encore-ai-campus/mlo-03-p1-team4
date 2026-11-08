@@ -21,7 +21,6 @@ import UiSkeleton from '@/components/ui/UiSkeleton.vue'
 .sk-card {
   border-radius: var(--r-lg);
   background: var(--c-surface);
-  box-shadow: var(--shadow-card);
 }
 .sk-card__media {
   aspect-ratio: 400 / 260;

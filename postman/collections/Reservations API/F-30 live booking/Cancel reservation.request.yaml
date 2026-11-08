@@ -1,0 +1,44 @@
+$kind: http-request
+id: 9d2039c5e9044ea9b2a00ef1
+name: Cancel reservation
+order: 5000
+url: '{{base_url}}/reservations/{{reservation_id}}/cancel'
+method: POST
+headers:
+  - key: X-Session-Id
+    value: '{{session_id}}'
+  - key: Accept
+    value: application/json
+auth:
+  type: bearer
+  credentials:
+    - key: token
+      value: '{{access_token}}'
+scripts:
+  - type: beforeRequest
+    language: text/javascript
+    code: |-
+      const required = ['access_token', 'reservation_id'];
+      const missing = required.filter((key) => !pm.environment.get(key));
+      if (missing.length > 0) {
+        console.warn(`Skipping cancellation; set values or run Create reservation first: ${missing.join(', ')}`);
+        pm.execution.skipRequest();
+      }
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('Cancellation returns the documented success response', () => {
+        pm.response.to.have.status(200);
+        const body = pm.response.json();
+        pm.expect(body.reservation_id).to.equal(Number(pm.environment.get('reservation_id')));
+        pm.expect(body.status).to.equal('cancelled');
+        pm.expect(body.can_cancel).to.equal(false);
+      });
+
+      pm.test('Payment is fully marked refunded', () => {
+        const body = pm.response.json();
+        pm.expect(body.total_price).to.be.a('number').above(0);
+        pm.expect(body.payment.status).to.equal('refunded');
+        pm.expect(body.payment.method).to.equal(pm.environment.get('method'));
+        pm.expect(body.payment.refunded_at).to.match(/\+09:00$/);
+      });

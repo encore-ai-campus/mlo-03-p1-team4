@@ -1,0 +1,20 @@
+[Unit]
+Description=Spacecube isolated health check (109)
+After=network.target spacecube.service
+BindsTo=spacecube.service
+PartOf=spacecube.service
+
+[Service]
+Type=simple
+User=spacecube
+Group=adm
+WorkingDirectory=/opt/spacecube/backend
+EnvironmentFile=/etc/spacecube/.env
+Environment=PYTHONPATH=/opt/spacecube/backend
+Environment=LOG_DIR=/opt/spacecube/backend/logs
+ExecStart=/opt/spacecube/venv/bin/uvicorn health_app:app --app-dir /opt/spacecube/deploy/health --host 127.0.0.1 --port 8001 --workers 1 --timeout-keep-alive 1 --no-access-log
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=spacecube.service

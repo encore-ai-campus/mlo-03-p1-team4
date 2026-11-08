@@ -73,18 +73,23 @@ const userMenu = [
 </template>
 
 <style scoped>
-/* 스티키 헤더: 스크롤하면 그림자를 단다 (높이는 움직이지 않음) */
+/* 스티키 헤더: 반투명·흐림·그림자 없이 평평한 바탕 (높이는 움직이지 않음)
+   스크롤하면 하단에 주 색 선을 그어 '고정된 상단바'임을 보여 준다(11-07 팀 피드백). 선은 높이를 바꾸지 않게 그림자로 그린다. */
 .header {
   position: sticky;
   top: 0;
   z-index: 40;
-  background: rgba(255, 255, 255, 0.92);
-  backdrop-filter: saturate(1.4) blur(8px);
-  border-bottom: 1px solid var(--c-line);
-  transition: box-shadow var(--t-base);
+  background: var(--c-paper);
+  box-shadow: inset 0 -1px 0 var(--c-line);
+  transition: box-shadow var(--t-fast) var(--ease-out);
 }
 .header.is-compact {
-  box-shadow: 0 2px 12px rgba(23, 22, 29, 0.06);
+  box-shadow: inset 0 -2px 0 var(--c-brand);
+}
+@media (prefers-reduced-motion: reduce) {
+  .header {
+    transition: none;
+  }
 }
 .header__inner {
   display: flex;
@@ -151,16 +156,15 @@ const userMenu = [
   min-width: var(--tap);
   justify-content: center;
   padding: 0 var(--sp-12);
-  border: 1px solid var(--c-line-strong);
+  border: 0;
   border-radius: var(--r-md);
-  background: var(--c-surface);
+  background: var(--c-fill);
   font-weight: 500;
   cursor: pointer;
 }
 .user-btn:hover,
 .menu-btn:hover {
-  border-color: var(--c-brand);
-  color: var(--c-brand-ink);
+  background: var(--c-line-strong);
 }
 .menu-btn {
   padding: 0;
@@ -173,7 +177,6 @@ const userMenu = [
   display: flex;
   align-items: center;
   min-height: 52px;
-  border-bottom: 1px solid var(--c-line);
   color: var(--c-ink);
   font-size: var(--fs-16);
   font-weight: 700;

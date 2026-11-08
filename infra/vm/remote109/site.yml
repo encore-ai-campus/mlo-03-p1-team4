@@ -1,0 +1,193 @@
+---
+- name: 새 시스템 VM의 공통 환경 준비
+  hosts: nodes
+  become: true
+  gather_facts: false
+  tasks:
+    - name: SSH 준비 대기
+      ansible.builtin.wait_for_connection:
+        timeout: 240
+    - name: cloud-init 완료 확인
+      ansible.builtin.command: cloud-init status --wait
+      changed_when: false
+    - name: 공통 패키지 설치
+      ansible.builtin.apt:
+        name: [curl, ca-certificates, gnupg, unzip, chrony, ufw, python3-venv, prometheus-node-exporter]
+        state: present
+        update_cache: true
+        cache_valid_time: 3600
+        lock_timeout: 180
+    - name: Grafana 공식 저장소 키 폴더
+      ansible.builtin.file:
+        path: /etc/apt/keyrings
+        state: directory
+        mode: '0755'
+    - name: Grafana 공식 키 설치
+      ansible.builtin.get_url:
+        url: https://apt.grafana.com/gpg-full.key
+        dest: /etc/apt/keyrings/grafana.asc
+        mode: '0644'
+    - name: Grafana 공식 apt 저장소
+      ansible.builtin.apt_repository:
+        repo: deb [signed-by=/etc/apt/keyrings/grafana.asc] https://apt.grafana.com stable main
+        filename: grafana
+        state: present
+    - name: Alloy 설치
+      ansible.builtin.apt:
+        name: alloy
+        state: present
+        lock_timeout: 180
+    - name: 설정 묶음 전달
+      ansible.builtin.copy:
+        src: /home/playdata/spacecube109/config.tar.gz
+        dest: /tmp/spacecube-config.tar.gz
+        mode: '0644'
+      register: config_archive
+    - name: 공개 설정 폴더
+      ansible.builtin.file:
+        path: /tmp/lab
+        state: directory
+        mode: '0755'
+    - name: 공개 설정 펼치기
+      ansible.builtin.unarchive:
+        src: /tmp/spacecube-config.tar.gz
+        dest: /tmp/lab
+        remote_src: true
+        extra_opts: ["--overwrite"]
+    - name: 이전 역할 설치 완료 여부
+      ansible.builtin.stat:
+        path: /var/lib/spacecube/role-ready
+      register: role_state
+
+- name: 앱 비밀값과 코드 준비
+  hosts: apps
+  become: true
+  gather_facts: false
+  tasks:
+    - name: 비밀값 폴더
+      ansible.builtin.file:
+        path: /etc/spacecube
+        state: directory
+        mode: '0700'
+    - name: 앱 런타임 환경 전달
+      ansible.builtin.copy:
+        content: "{{ lookup('ansible.builtin.file', '/home/playdata/.config/spacecube109/app/.env') }}\n"
+        dest: /etc/spacecube/.env
+        mode: '0600'
+      no_log: true
+      diff: false
+      register: runtime_env
+    - name: 최신 소스·프론트 배포 묶음
+      ansible.builtin.copy:
+        src: /home/playdata/spacecube109/payload.tar.gz
+        dest: /tmp/payload.tar.gz
+        mode: '0644'
+      register: payload_archive
+
+- name: 서비스 설치·기동
+  hosts: nodes
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Grafana 비밀값 폴더
+      ansible.builtin.file:
+        path: /etc/grafana
+        state: directory
+        mode: '0755'
+      when: inventory_hostname == 'mon'
+    - name: Grafana 초기 인증 전달
+      ansible.builtin.copy:
+        content: "{{ lookup('ansible.builtin.file', '/home/playdata/.config/spacecube109/grafana/.env') }}\n"
+        dest: /etc/grafana/.env
+        mode: '0600'
+      when: inventory_hostname == 'mon'
+      no_log: true
+      diff: false
+      register: grafana_env
+    - name: 역할별 apt·systemd 설치
+      ansible.builtin.command: "bash /tmp/lab/install-role.sh {{ inventory_hostname }}"
+      register: installed
+      changed_when: "'ROLE_READY=' in installed.stdout"
+      when: config_archive.changed or (payload_archive.changed | default(false)) or (runtime_env.changed | default(false)) or (grafana_env.changed | default(false)) or not role_state.stat.exists
+    - name: 관측 설정 폴더
+      ansible.builtin.file:
+        path: /tmp/observability
+        state: directory
+        mode: '0755'
+    - name: 관측 설정 복사
+      ansible.builtin.command: cp -a /tmp/lab/. /tmp/observability/
+      changed_when: false
+      when: installed is not skipped
+    - name: Alloy·Loki 자체 지표 반영
+      ansible.builtin.command: "bash /tmp/lab/refresh-observability.sh {{ inventory_hostname }}"
+      changed_when: true
+      when: installed is not skipped
+    - name: 역할 상태 폴더
+      ansible.builtin.file:
+        path: /var/lib/spacecube
+        state: directory
+        mode: '0755'
+    - name: 역할 설치 완료 기록
+      ansible.builtin.copy:
+        content: "{{ inventory_hostname }}\n"
+        dest: /var/lib/spacecube/role-ready
+        mode: '0644'
+
+- name: 새 Grafana 초기 계정 확인
+  hosts: mon
+  become: true
+  gather_facts: false
+  tasks:
+    - name: 초기 관리자 확인 도구
+      ansible.builtin.copy:
+        src: init_grafana_admin.py
+        dest: /usr/local/sbin/spacecube-init-grafana.py
+        mode: '0700'
+    - name: 런타임 설정과 초기 계정 일치 확인
+      ansible.builtin.command: python3 /usr/local/sbin/spacecube-init-grafana.py
+      register: grafana_admin
+      changed_when: (grafana_admin.stdout | from_json).changed
+
+- name: DB 연결과 실제 API 확인
+  hosts: apps
+  become: true
+  gather_facts: false
+  tasks:
+    - name: 앱·primary·replica 헬스 확인
+      ansible.builtin.uri:
+        url: http://127.0.0.1:8000/health
+        status_code: 200
+        return_content: true
+      register: health
+      retries: 15
+      delay: 2
+      until: health.status == 200
+    - name: 실제 유형 API 확인
+      ansible.builtin.uri:
+        url: http://127.0.0.1:8000/categories
+        status_code: 200
+    - name: replica 연결도 정상인지 확인
+      ansible.builtin.assert:
+        that: health.json.replica is not defined
+        fail_msg: replica 연결 실패입니다. primary 대체만으로 통과시키지 않습니다.
+
+- name: DB 포함 최종 프록시 헬스체크 적용
+  hosts: gw
+  become: true
+  gather_facts: false
+  tasks:
+    - name: 최종 HAProxy 설정 검증
+      ansible.builtin.command: haproxy -c -f /tmp/lab/haproxy-final.cfg
+      changed_when: false
+    - name: 최종 HAProxy 설정 적용
+      ansible.builtin.copy:
+        src: /tmp/lab/haproxy-final.cfg
+        dest: /etc/haproxy/haproxy.cfg
+        remote_src: true
+        mode: '0644'
+      register: proxy_final
+    - name: HAProxy 재적재
+      ansible.builtin.systemd:
+        name: haproxy
+        state: reloaded
+      when: proxy_final.changed

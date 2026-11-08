@@ -63,21 +63,20 @@ const attrs = computed(() => {
   padding: 0 var(--sp-24);
   font-size: var(--fs-16);
 }
+/* 짙은 바탕(오늘 남은 칸·요약 바) 안에서는 --btn-* 로 색을 뒤집는다 */
 .btn--primary {
-  background: var(--c-brand);
-  color: var(--c-on-dark);
+  background: var(--btn-bg, var(--c-brand));
+  color: var(--btn-ink, var(--c-on-dark));
 }
 .btn--primary:hover:not(:disabled) {
-  background: var(--c-brand-hover);
+  background: var(--btn-bg-hover, var(--c-brand-hover));
 }
 .btn--secondary {
-  background: var(--c-surface);
-  border-color: var(--c-line-strong);
+  background: var(--c-fill);
   color: var(--c-ink);
 }
 .btn--secondary:hover:not(:disabled) {
-  border-color: var(--c-brand);
-  color: var(--c-brand-ink);
+  background: var(--c-line-strong);
 }
 .btn--quiet {
   background: transparent;

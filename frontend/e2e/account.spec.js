@@ -1,13 +1,14 @@
 // 회원·후기 확정안: 필수 동의, 나이 검증, 내 후기, 안전한 취소와 탈퇴.
 import { test, expect } from '@playwright/test'
-import { fixClock, loginFirst } from './helpers'
+import { DEMO_USER, fixClock, loginFirst } from './helpers'
 
 test.beforeEach(async ({ page }) => fixClock(page))
 
+// '예약 내역'처럼 헤더와 내 메뉴에 같은 이름의 링크가 있으면 보이는 첫 링크를 누른다. 폰은 내 메뉴 드로어를 연다.
 async function openMenu(page, label) {
-  const link = page.getByRole('link', { name: label, exact: true })
-  if (!(await link.isVisible())) await page.getByRole('button', { name: '내 메뉴', exact: true }).click()
-  await page.getByRole('link', { name: label, exact: true }).click()
+  const visible = page.getByRole('link', { name: label, exact: true }).filter({ visible: true })
+  if (!(await visible.count())) await page.getByRole('button', { name: '내 메뉴', exact: true }).click()
+  await visible.first().click()
 }
 
 test('가입 필수 동의와 만 14세 검증 뒤 가입하고 로그인한다', async ({ page }) => {
@@ -30,7 +31,7 @@ test('가입 필수 동의와 만 14세 검증 뒤 가입하고 로그인한다'
   await expect(submit).toBeDisabled()
   await form.getByLabel('[필수] 개인정보 수집·이용', { exact: true }).check()
   await expect(submit).toBeEnabled()
-  await form.getByRole('button', { name: '시연용 이용약관 전문 보기' }).click()
+  await form.getByRole('button', { name: '이용약관 전문 보기' }).click()
   await expect(form.getByText(/실제 결제나 공간 이용 계약은 발생하지 않습니다/)).toBeVisible()
   await submit.click()
   await expect(form.getByText('만 14세 이상부터 가입할 수 있어요.', { exact: true })).toBeVisible()
@@ -40,6 +41,31 @@ test('가입 필수 동의와 만 14세 검증 뒤 가입하고 로그인한다'
   await page.locator('form').getByLabel('비밀번호', { exact: true }).fill('account1234')
   await page.locator('form').getByRole('button', { name: '로그인', exact: true }).click()
   await expect(page).toHaveURL('/')
+})
+
+test('헤더 사용자 메뉴에서 로그아웃하면 홈으로 가고 회원 화면은 다시 로그인을 요구한다', async ({ page }) => {
+  await loginFirst(page, '/me')
+  await page.getByRole('button', { name: / 님$/ }).click()
+  await page.getByRole('menuitem', { name: '로그아웃', exact: true }).click()
+  await expect(page).toHaveURL('/')
+  await expect(page.locator('[data-sonner-toast]').filter({ hasText: '로그아웃했어요' })).toBeVisible()
+  await expect(page.getByRole('button', { name: / 님$/ })).toHaveCount(0)
+  await expect(page.getByRole('link', { name: '회원가입', exact: true })).toBeVisible()
+  expect(await page.evaluate(() => JSON.parse(sessionStorage.getItem('spacecube.session'))?.token ?? null)).toBeNull()
+  await page.goto('/me')
+  await expect(page).toHaveURL(/\/login\?next=(\/|%2F)me$/)
+})
+
+test('내 예약 내역의 내 메뉴에서도 로그아웃할 수 있다', async ({ page }) => {
+  await loginFirst(page, '/me')
+  // 화면 전환(페이드)이 끝나 내 예약 화면이 그려진 뒤에 넓은 화면/좁은 화면 메뉴를 판단한다
+  await expect(page.getByRole('heading', { level: 1, name: '예약 내역' })).toBeVisible()
+  const button = page.getByRole('button', { name: '로그아웃', exact: true })
+  if (!(await button.first().isVisible())) await page.getByRole('button', { name: '내 메뉴', exact: true }).click()
+  await page.getByRole('button', { name: '로그아웃', exact: true }).filter({ visible: true }).first().click()
+  await expect(page).toHaveURL('/')
+  await expect(page.locator('[data-sonner-toast]').filter({ hasText: '로그아웃했어요' })).toBeVisible()
+  await expect(page.getByRole('link', { name: '회원가입', exact: true })).toBeVisible()
 })
 
 test('이용 완료 예약에 쓴 후기가 내 후기에 바로 보인다', async ({ page }) => {
@@ -66,12 +92,23 @@ test('취소 창은 취소하지 않기에 초점을 두고 취소하면 환불�
   await expect(page.getByText(/환불 완료/).first()).toBeVisible()
 })
 
-test('탈퇴 전 이용 예정 예약을 알리고 확인한 뒤 개인정보를 지운다', async ({ page }) => {
-  await loginFirst(page, '/me')
+test('이용 예정 예약이 있으면 탈퇴를 막고 예약 내역으로 안내한 뒤, 모두 취소하면 탈퇴된다', async ({ page }) => {
+  await loginFirst(page, '/me?section=account')
+  await page.getByRole('button', { name: '회원 탈퇴', exact: true }).click()
+  let dialog = page.getByRole('dialog', { name: '회원 탈퇴', exact: true })
+  await expect(dialog.getByText('이용 예정 예약이 2건 있어요. 예약 내역에서 먼저 취소해 주세요.')).toBeVisible()
+  await expect(dialog.getByRole('button', { name: '탈퇴하기', exact: true })).toHaveCount(0)
+  await dialog.getByRole('button', { name: '예약 내역 보기', exact: true }).click()
+  await expect(page).toHaveURL(/\/me\?tab=confirmed$/)
+  for (let i = 0; i < 2; i++) {
+    await page.getByRole('button', { name: '예약 취소', exact: true }).first().click()
+    const cancel = page.getByRole('dialog', { name: '이 예약을 취소할까요?', exact: true })
+    await cancel.getByRole('button', { name: '예약 취소', exact: true }).click()
+    await expect(cancel).toBeHidden()
+  }
   await openMenu(page, '회원 정보')
   await page.getByRole('button', { name: '회원 탈퇴', exact: true }).click()
-  const dialog = page.getByRole('dialog', { name: '회원 탈퇴', exact: true })
-  await expect(dialog.getByText(/이용 예정 예약이 2건/)).toBeVisible()
+  dialog = page.getByRole('dialog', { name: '회원 탈퇴', exact: true })
   const submit = dialog.getByRole('button', { name: '탈퇴하기', exact: true })
   await expect(submit).toBeDisabled()
   await dialog.getByRole('checkbox', { name: '개인정보 삭제와 예약·후기 유지 내용을 확인했어요.' }).check()
@@ -79,4 +116,64 @@ test('탈퇴 전 이용 예정 예약을 알리고 확인한 뒤 개인정보를
   await expect(page).toHaveURL('/')
   await page.goto('/me')
   await expect(page).toHaveURL(/\/login\?next=/)
+})
+
+test('회원 정보에서 이름·휴대폰·소식 받기를 바꾸고 비밀번호를 바꾼다', async ({ page }) => {
+  await loginFirst(page, '/me?section=account')
+  const info = page.getByRole('region', { name: '기본 정보' })
+  const save = info.getByRole('button', { name: '회원 정보 저장', exact: true })
+  await expect(save).toBeDisabled()
+  await info.getByLabel('휴대폰 번호', { exact: true }).fill('0101234')
+  await save.click()
+  await expect(info.getByText('휴대폰 번호를 010-1234-5678 형식으로 적어 주세요.')).toBeVisible()
+  await info.getByLabel('휴대폰 번호', { exact: true }).fill('010-9876-5432')
+  await info.getByLabel('이름', { exact: true }).fill('새이름')
+  await info.getByLabel('새 공간·할인 소식 받기(선택)').check()
+  await save.click()
+  await expect(page.locator('[data-sonner-toast]').filter({ hasText: '회원 정보를 저장했어요.' })).toBeVisible()
+  await expect(save).toBeDisabled()
+  // 저장 버튼이 다시 꺼진 것은 화면의 회원 정보가 서버 응답(새 값)으로 바뀌었다는 뜻이다
+  await expect(info.getByLabel('이름', { exact: true })).toHaveValue('새이름')
+
+  const pw = page.getByRole('region', { name: '비밀번호 변경' })
+  // 목업 시연 계정은 8자 이상이면 어떤 비밀번호든 받으므로, 틀린 값은 8자 미만으로 넣는다
+  await pw.getByLabel('현재 비밀번호', { exact: true }).fill('wrong1')
+  await pw.getByLabel('새 비밀번호', { exact: true }).fill('newpass1234')
+  await pw.getByLabel('새 비밀번호 확인', { exact: true }).fill('newpass1234')
+  await pw.getByRole('button', { name: '비밀번호 변경', exact: true }).click()
+  await expect(pw.getByText('현재 비밀번호가 맞지 않아요.')).toBeVisible()
+  await pw.getByLabel('현재 비밀번호', { exact: true }).fill(DEMO_USER.password)
+  await pw.getByRole('button', { name: '비밀번호 변경', exact: true }).click()
+  await expect(page.locator('[data-sonner-toast]').filter({ hasText: '비밀번호를 바꿨어요.' })).toBeVisible()
+  await expect(pw.getByLabel('현재 비밀번호', { exact: true })).toHaveValue('')
+})
+
+test('내가 쓴 후기를 고치고, 지우기 창은 지우지 않기에 초점을 둔 뒤 지운다', async ({ page }) => {
+  await loginFirst(page, '/me?tab=completed&review=1003')
+  const write = page.getByRole('dialog', { name: '후기 쓰기', exact: true })
+  await write.getByRole('radio', { name: '4점', exact: true }).check()
+  await write.getByLabel('어땠나요?', { exact: true }).fill('조용해서 좋았어요.')
+  await write.getByRole('button', { name: '후기 올리기', exact: true }).click()
+  await expect(write).toBeHidden()
+  await openMenu(page, '내가 쓴 후기')
+  const mine = page.getByRole('listitem').filter({ hasText: '조용해서 좋았어요.' })
+  await mine.getByRole('button', { name: /후기 고치기$/ }).click()
+  const edit = page.getByRole('dialog', { name: '후기 고치기', exact: true })
+  await expect(edit.getByLabel('어땠나요?', { exact: true })).toHaveValue('조용해서 좋았어요.')
+  await edit.getByLabel('어땠나요?', { exact: true }).fill('조용하고 의자가 편했어요.')
+  await edit.getByRole('button', { name: '고친 후기 저장', exact: true }).click()
+  await expect(edit).toBeHidden()
+  await expect(page.getByText('조용하고 의자가 편했어요.', { exact: true })).toBeVisible()
+  await page.getByRole('listitem').filter({ hasText: '조용하고 의자가 편했어요.' }).getByRole('button', { name: /후기 지우기$/ }).click()
+  const del = page.getByRole('dialog', { name: '이 후기를 지울까요?', exact: true })
+  await expect(del.getByRole('button', { name: '지우지 않기', exact: true })).toBeFocused()
+  await del.getByRole('button', { name: '후기 지우기', exact: true }).click()
+  await expect(del).toBeHidden()
+  await expect(page.getByText('조용하고 의자가 편했어요.', { exact: true })).toHaveCount(0)
+  // #45: 지운 후기도 예약당 한 번으로 남아, 예약 내역에서 다시 '후기 쓰기'가 나오지 않는다
+  await openMenu(page, '예약 내역')
+  await page.getByRole('tab', { name: /이용 완료/ }).click()
+  const booking = page.getByRole('listitem').filter({ hasText: '예약 1003' })
+  await expect(booking.getByText('후기 작성 완료')).toBeVisible()
+  await expect(booking.getByRole('button', { name: '후기 쓰기', exact: true })).toHaveCount(0)
 })

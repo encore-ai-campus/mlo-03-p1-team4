@@ -92,7 +92,7 @@ watch(
     router.replace({
       query: { category: p.category, sido: p.sido, sigungu: p.sigungu, people: p.people, date: p.date, q: p.q || undefined, facilities: p.facilities || undefined, now: p.now ? '1' : undefined },
     })
-    log('search', { ...p })
+    log('search_submit', { ...p })
     load()
   },
   { deep: true },
@@ -134,7 +134,7 @@ const summary = computed(() => {
   if (!selectedRoom.value || !sel.value.hours.length) return null
   const n = sel.value.hours.length
   const short = checkingSelection.value || n < minHours.value
-  return { room: selectedRoom.value, time: rangeLabel(sel.value.hours), n, total: won(selectedRoom.value.price_per_hour * n), short }
+  return { room: selectedRoom.value, time: rangeLabel(sel.value.hours), n, total: won(selectedRoom.value.price_per_hour * n), short, checking: checkingSelection.value }
 })
 
 function selectionFor(venueId) {
@@ -204,20 +204,21 @@ function resetFilters() {
       <div v-else-if="items.length" class="results">
         <article v-for="r in items" :key="r.venue_id" class="result" :class="{ 'is-selected': sel.venueId === r.venue_id }">
           <div class="result__info">
-            <span class="result__thumb"><RoomArt :image="r.image" /></span>
+            <span class="result__thumb"><RoomArt :image="r.image" :category="r.category" :seed="r.venue_id" /></span>
             <div class="result__text">
-              <span class="result__type">{{ r.category.name }} · {{ r.region.sido }} {{ r.region.sigungu }}</span>
               <h3 class="result__name"><RouterLink :to="`/venues/${r.venue_id}`">{{ r.name }}</RouterLink></h3>
+              <span class="result__type">{{ r.category.name }} · {{ r.region.sido }} {{ r.region.sigungu }}</span>
               <span class="result__meta num">최대 {{ r.capacity_max }}명 · {{ won(r.price_per_hour) }}/시간<template v-if="r.min_hours > 1"> · 최소 {{ r.min_hours }}시간</template></span>
             </div>
           </div>
           <div class="result__slots">
             <SlotGrid
               :slots="r.slots"
+              :min="r.min_hours ?? 1"
               :model-value="selectionFor(r.venue_id)"
               :label="`${r.name} 시간 칸`"
               @update:model-value="(h) => setSelection(r.venue_id, h)"
-              @select="(h) => log('select_slot', { venue_id: r.venue_id, hour: h })"
+              @select="(h) => log('rental_slot_select', { venue_id: r.venue_id, hour: h })"
             />
           </div>
         </article>
@@ -243,7 +244,8 @@ function resetFilters() {
         <p class="sumbar__text">
           <strong>{{ summary.room.name }}</strong>
           <span class="num">{{ dateLabel(date) }} · {{ summary.time }} ({{ summary.n }}시간)</span>
-          <span v-if="summary.short" class="sumbar__warn">이 공간은 최소 {{ minHours }}시간부터 예약할 수 있어요</span>
+          <span v-if="summary.checking" class="sumbar__warn">최소 이용시간 확인 중</span>
+          <span v-else-if="summary.short" class="sumbar__warn">이 공간은 최소 {{ minHours }}시간부터 예약할 수 있어요</span>
           <strong v-else class="sumbar__total num">{{ summary.total }}</strong>
         </p>
         <BaseButton size="lg" :loading="booking" :disabled="summary.short" @click="submit">예약 신청하기</BaseButton>
@@ -333,8 +335,8 @@ function resetFilters() {
   border-color: var(--c-brand);
 }
 .legend__box--off {
-  background: repeating-linear-gradient(135deg, var(--c-slot-taken) 0 4px, var(--c-slot-taken-2) 4px 8px);
-  border-color: var(--c-slot-taken-2);
+  background: var(--c-slot-taken);
+  border-color: var(--c-slot-taken);
 }
 .results {
   display: flex;
@@ -345,14 +347,13 @@ function resetFilters() {
   display: grid;
   gap: var(--sp-12);
   padding: var(--sp-16);
-  border: 1px solid var(--c-line);
   border-radius: var(--r-lg);
   background: var(--c-surface);
-  transition: border-color var(--t-fast), box-shadow var(--t-fast);
+  transition: background-color var(--t-fast);
 }
 .result.is-selected {
-  border-color: var(--c-brand);
-  box-shadow: 0 0 0 1px var(--c-brand);
+  outline: 2px solid var(--c-brand);
+  outline-offset: -2px;
 }
 .result__info {
   display: flex;
@@ -371,9 +372,8 @@ function resetFilters() {
   min-width: 0;
 }
 .result__type {
-  font-size: var(--fs-12);
-  font-weight: 700;
-  color: var(--c-brand-ink);
+  font-size: var(--fs-13);
+  color: var(--c-muted);
 }
 .result__name {
   font-size: var(--fs-16);
@@ -450,7 +450,10 @@ function resetFilters() {
   border-radius: var(--r-lg);
   background: var(--c-ink);
   color: var(--c-on-dark);
-  box-shadow: var(--shadow-pop);
+  --btn-bg: var(--c-on-dark);
+  --btn-ink: var(--c-brand);
+  --btn-bg-hover: var(--c-surface);
+  box-shadow: var(--shadow-pop); /* taste-skill-ignore 떠 있는 층·포커스 링 */
 }
 .sumbar__text {
   display: flex;

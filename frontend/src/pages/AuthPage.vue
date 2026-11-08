@@ -89,9 +89,11 @@ watch(
 )
 watch(terms, () => delete se.terms)
 
+// 길이 상한(72바이트, bcrypt 한계)은 일반 사용자에게 낯선 기준이라 넘었을 때만 쉬운 말로 보여 준다.
+const pwTooLong = computed(() => new TextEncoder().encode(sf.password).length > 72)
 const pwChecks = computed(() => [
   { ok: sf.password.length >= 8, label: '8자 이상' },
-  { ok: new TextEncoder().encode(sf.password).length <= 72, label: '72바이트 이하' },
+  ...(pwTooLong.value ? [{ ok: false, label: '너무 길어요. 영문·숫자는 72자, 한글은 24자까지 쓸 수 있어요' }] : []),
 ])
 const allTerms = computed({
   get: () => terms.service && terms.privacy,
@@ -104,8 +106,8 @@ const genderOptions = [
   { value: '4', label: '2000년대 출생 · 여성' },
 ]
 const termItems = [
-  { value: 'service', title: '시연용 이용약관 전문 보기', body: '이 약관은 다락큐브 프로젝트의 모의 예약 서비스에 적용됩니다. 실제 결제나 공간 이용 계약은 발생하지 않습니다. 만 14세 이상만 가입할 수 있습니다. 공간은 1시간 단위로 최소 이용시간부터 최대 4시간까지 예약합니다. 결제 버튼을 누르면 모의 결제와 예약을 함께 처리하며 먼저 결제를 마친 예약이 확정됩니다. 이용 시작 전까지 예약을 취소할 수 있고 모의 결제 금액은 전액 환불 처리됩니다. 지난 시간의 예약은 이용 완료로 저장됩니다. 후기는 이용 완료한 본인 예약에 한 번, 이용일과 예약한 날 중 늦은 날부터 7일 안에 작성할 수 있습니다. 탈퇴 시 개인정보는 즉시 지워지고 예약·결제·후기는 회원 번호로 남습니다. 이 내용은 프로젝트 시연용 안내이며 실제 서비스 운영 약관은 별도로 확정해야 합니다.' },
-  { value: 'privacy', title: '시연용 개인정보 수집·이용 전문 보기', body: '이 내용은 다락큐브 프로젝트의 모의 서비스에 대한 동의 안내입니다. 회원 식별·로그인과 예약 확인을 위해 이름, 이메일, 비밀번호, 휴대폰 번호를 받고, 생년월일 6자리와 성별 구분 숫자 1자리는 만 14세 이상 가입 자격 확인에 사용합니다. 주민등록번호 전체는 수집하지 않습니다. 필수 항목의 수집·이용 동의를 거부할 수 있으나 회원가입은 할 수 없습니다. 탈퇴하면 이름·연락처·생년월일·이메일 등 개인정보를 즉시 지우고 비밀번호를 무작위 값으로 대체합니다. 예약·결제·후기는 회원 번호로 남으며 공개 후기 작성자는 ‘탈퇴한 회원’으로 표시됩니다. 선택한 새 공간 소식 수신 동의는 거절해도 가입·예약에 영향이 없습니다. 실제 서비스의 운영자·문의처·처리방침은 서비스 운영 전 별도로 확정해야 합니다.' },
+  { value: 'service', title: '이용약관 전문 보기', body: '이 약관은 다락큐브의 공간 예약 서비스에 적용됩니다. 실제 결제나 공간 이용 계약은 발생하지 않습니다. 만 14세 이상만 가입할 수 있습니다. 공간은 1시간 단위로 최소 이용시간부터 최대 4시간까지 예약합니다. 결제 버튼을 누르면 모의 결제와 예약을 함께 처리하며 먼저 결제를 마친 예약이 확정됩니다. 이용 시작 전까지 예약을 취소할 수 있고 모의 결제 금액은 전액 환불 처리됩니다. 지난 시간의 예약은 이용 완료로 저장됩니다. 후기는 이용 완료한 본인 예약에 한 번, 이용일과 예약한 날 중 늦은 날부터 7일 안에 작성할 수 있습니다. 탈퇴 시 개인정보는 즉시 지워지고 예약·결제·후기는 회원 번호로 남습니다.' },
+  { value: 'privacy', title: '개인정보 수집·이용 전문 보기', body: '이 내용은 다락큐브 회원가입에 필요한 개인정보 수집·이용 동의 안내입니다. 회원 식별·로그인과 예약 확인을 위해 이름, 이메일, 비밀번호, 휴대폰 번호를 받고, 생년월일 6자리와 성별 구분 숫자 1자리는 만 14세 이상 가입 자격 확인에 사용합니다. 주민등록번호 전체는 수집하지 않습니다. 필수 항목의 수집·이용 동의를 거부할 수 있으나 회원가입은 할 수 없습니다. 탈퇴하면 이름·연락처·생년월일·이메일 등 개인정보를 즉시 지우고 비밀번호를 무작위 값으로 대체합니다. 예약·결제·후기는 회원 번호로 남으며 공개 후기 작성자는 ‘탈퇴한 회원’으로 표시됩니다. 선택한 새 공간 소식 수신 동의는 거절해도 가입·예약에 영향이 없습니다.' },
 ]
 
 async function verifyEmail() {
@@ -133,7 +135,8 @@ async function submitSignup() {
   if (signing.value) return
   if (!sf.name.trim()) se.name = '이름을 적어 주세요.'
   if (emailState.value !== 'ok' && !se.email) await verifyEmail()
-  if (!pwChecks.value.every((c) => c.ok)) se.password = '비밀번호는 8자 이상, 72바이트 이하로 적어 주세요.'
+  if (sf.password.length < 8) se.password = '비밀번호는 8자 이상으로 적어 주세요.'
+  else if (pwTooLong.value) se.password = '비밀번호가 너무 길어요. 영문·숫자는 72자, 한글은 24자까지 쓸 수 있어요.'
   if (sf.password2 !== sf.password) se.password2 = '비밀번호가 서로 달라요.'
   if (!/^01[016789]-?\d{3,4}-?\d{4}$/.test(sf.phone.trim())) se.phone = '휴대폰 번호를 010-1234-5678 형식으로 적어 주세요.'
   if (!/^\d{6}$/.test(sf.birth)) se.birth = '생년월일을 숫자 6자리로 적어 주세요.'
@@ -192,7 +195,6 @@ async function submitSignup() {
                 <UiInput v-model="lf.password" label="비밀번호" type="password" name="password" autocomplete="current-password" :error="le.password" />
                 <BaseButton type="submit" size="lg" class="wide" :loading="logging">로그인</BaseButton>
                 <p class="hint">처음이신가요? <button type="button" class="link" @click="tab = 'signup'">회원가입</button></p>
-                <p class="demo">시연용 계정: study@example.com · 비밀번호 아무거나 8자 이상</p>
               </form>
 
               <!-- 회원가입 -->
@@ -231,7 +233,7 @@ async function submitSignup() {
                   <label class="check check--all"><input v-model="allTerms" type="checkbox" />필수 항목 모두 동의</label>
                   <label class="check"><input v-model="terms.service" type="checkbox" :aria-invalid="Boolean(se.terms && !terms.service)" />[필수] 이용약관</label>
                   <label class="check"><input v-model="terms.privacy" type="checkbox" :aria-invalid="Boolean(se.terms && !terms.privacy)" />[필수] 개인정보 수집·이용</label>
-                  <label class="check check--optional"><input v-model="terms.marketing" type="checkbox" />[선택] 새 공간 소식 받기</label>
+                  <label class="check"><input v-model="terms.marketing" type="checkbox" />[선택] 새 공간 소식 받기</label>
                   <p v-if="se.terms" class="err" role="alert">{{ se.terms }}</p>
                   <UiAccordion :items="termItems" />
                 </fieldset>
@@ -290,10 +292,9 @@ async function submitSignup() {
 }
 .card {
   padding: var(--sp-24);
-  border: 1px solid var(--c-line);
+  border: 0;
   border-radius: var(--r-lg);
   background: var(--c-surface);
-  box-shadow: var(--shadow-lift);
 }
 .form {
   display: flex;
@@ -325,14 +326,6 @@ async function submitSignup() {
   text-decoration: underline;
   cursor: pointer;
 }
-.demo {
-  padding: var(--sp-12);
-  border: 1px dashed var(--c-line-strong);
-  border-radius: var(--r-md);
-  color: var(--c-subtle);
-  font-size: var(--fs-13);
-  text-align: center;
-}
 .pw {
   display: flex;
   gap: var(--sp-12);
@@ -352,12 +345,14 @@ async function submitSignup() {
   color: var(--c-success);
   font-weight: 700;
 }
+/* 약관 묶음 규칙: 줄은 모두 --tap(44px) 간격, 묶음 구분은 '모두 동의' 아래 선 하나 + 위아래 --sp-4.
+   필수·선택은 여백이 아니라 [필수]·[선택] 글자로 나눈다. */
 .terms {
   display: flex;
   flex-direction: column;
   margin: 0;
   padding: var(--sp-12) var(--sp-16);
-  border: 1px solid var(--c-line);
+  border: 1px solid transparent;
   border-radius: var(--r-md);
 }
 .terms.has-error {
@@ -372,18 +367,22 @@ async function submitSignup() {
 }
 .check input {
   flex: none;
-  width: 20px;
-  height: 20px;
+  width: var(--check);
+  height: var(--check);
+  margin: 0;
   accent-color: var(--c-brand);
 }
 .check--all {
-  padding-bottom: var(--sp-8);
-  border-bottom: 1px solid var(--c-line);
+  position: relative;
+  margin-bottom: var(--sp-8);
   font-weight: 800;
 }
-.check--optional {
-  margin-top: var(--sp-8);
-  border-top: 1px solid var(--c-line);
+.check--all::after {
+  content: '';
+  position: absolute;
+  inset: auto 0 calc(-1 * var(--sp-4) - 0.5px);
+  height: 1px;
+  background: var(--c-line);
 }
 .err {
   color: var(--c-danger);

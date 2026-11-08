@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { useEventLogger } from '@/composables/useEventLogger'
 import MainPage from '@/pages/MainPage.vue'
 import { useAuthStore } from '@/stores/auth'
 import { setUnauthorizedHandler } from '@/api/client'
@@ -36,8 +37,16 @@ router.beforeEach((to) => {
   }
 })
 
+// 내 메뉴(/me)는 같은 화면에서 section으로 예약 내역·내 후기·회원 정보를 바꾸므로 제목도 따라 바꾼다
+const ME_TITLES = { reviews: '내가 쓴 후기', account: '회원 정보' }
 router.afterEach((to) => {
-  document.title = to.meta.title === '다락큐브' ? '다락큐브 · 1시간 단위 공간 예약' : `${to.meta.title} · 다락큐브`
+  const title = to.name === 'me' ? ME_TITLES[to.query.section] ?? to.meta.title : to.meta.title
+  document.title = title === '다락큐브' ? '다락큐브 · 1시간 단위 공간 예약' : `${title} · 다락큐브`
+})
+// 화면 진입 이벤트(page_view): 경로가 바뀔 때만 보낸다(같은 화면의 검색 조건·탭 변경은 제외).
+router.afterEach((to, from, failure) => {
+  if (failure || (from.matched.length && to.path === from.path)) return
+  try { useEventLogger().log('page_view') } catch { /* 기록 실패가 이동을 막지 않음 */ }
 })
 
 setUnauthorizedHandler(() => {

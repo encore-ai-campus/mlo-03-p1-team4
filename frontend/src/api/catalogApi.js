@@ -1,5 +1,5 @@
 import { USE_MOCK, mockDelay, request, query } from './client';
-import { categories, hourlyUsage } from './mock/catalog';
+import { categories } from './mock/catalog';
 import { VENUES, venueItem, pageOf } from './mock/db';
 import { searchVenues, getVenue, getSlots } from './venuesApi';
 import { getReviews } from './reviewsApi';
@@ -36,9 +36,6 @@ export async function getTodaySlots(id = 1) {
   return {
     venue_id: Number(id), name: v.name, price_per_hour: v.price_per_hour, date, day, date_label: `${day} ${dateLabel(date)}`, slots
   };
-}
-export function getHourlyUsage() {
-  return mockDelay(hourlyUsage);
 }
 export function getRecentReviews() {
   return getReviews({

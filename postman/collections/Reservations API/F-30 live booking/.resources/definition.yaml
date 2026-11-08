@@ -1,0 +1,5 @@
+$kind: collection
+id: d68e5495599bd5d6dc551dff
+name: F-30 live booking
+description: 실제 spacecube_test DB에 예약을 생성하고 F-40 목록·상세 조회 후 취소·환불을 확인합니다. 테스트 공간과 액세스 토큰을 지정한 경우에만 실행하세요.
+order: 2000

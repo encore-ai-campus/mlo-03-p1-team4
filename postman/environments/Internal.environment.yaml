@@ -1,0 +1,37 @@
+name: Internal local
+values:
+  - key: base_url
+    value: 'http://127.0.0.1:8000'
+    enabled: true
+    type: default
+    description: 로컬 테스트 API 주소
+  - key: allow_internal_write
+    value: ''
+    enabled: true
+    type: default
+    description: 로컬 spacecube_test 쓰기 확인 시에만 1
+  - key: internal_api_key
+    value: ''
+    enabled: true
+    type: secret
+    description: 값을 공유하거나 커밋하지 않는 내부 키
+  - key: venue_json
+    value: ''
+    enabled: true
+    type: default
+    description: 고유 synthetic 출처의 신규 등록 JSON 문자열
+  - key: updated_venue_json
+    value: ''
+    enabled: true
+    type: default
+    description: 같은 출처의 변경 JSON 문자열
+  - key: invalid_venue_json
+    value: ''
+    enabled: true
+    type: default
+    description: 검증 실패를 확인할 잘못된 출처 JSON 문자열
+  - key: ignored_facility
+    value: ''
+    enabled: true
+    type: default
+    description: 신규 등록에서 무시할 시설 이름

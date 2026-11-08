@@ -1,0 +1,3 @@
+$kind: collection
+name: Internal venues API
+description: F-61 내부 공간 등록·재전송·갱신·출처 검증 계약을 확인합니다.

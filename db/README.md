@@ -1,11 +1,13 @@
 # db — MariaDB·MongoDB 스키마와 데이터 (담당: DB)
 
+> **11-05 결정:** 1차 배포는 로컬 VM입니다. MariaDB primary는 `db1`(노트북 1), replica는 `db2`(노트북 3, GTID 복제), MongoDB는 `mongo`(노트북 1) VM입니다([로컬 VM 구성](../docs/로컬_VM_구성.md)). 아래의 RDS·EC2 내용은 AWS 참고안입니다. (DB 담당 파일: 안내 한 줄만 더함)
+
 기준은 [DB 명세서](../docs/산출물_04_DB명세서.md)입니다. MariaDB 표는 이 폴더 [`migrations/0001_init.sql`](migrations/0001_init.sql)이 기준입니다(11-04 실행 검증 뒤 옮김). MongoDB 초기화는 [docs/db/mongo_init.js](../docs/db/mongo_init.js).
 
 | 저장소 | 무엇 | 위치 |
 | --- | --- | --- |
 | MariaDB 11.4 (RDS primary + read replica) | 표 12개(regions, categories, facilities, users, venues, venue_facilities, venue_images, reservations, reservation_slots, payments, reviews, crawl_jobs) + 뷰 `v_venue_rating` | `migrations/0001_init.sql` |
-| MongoDB 7 (EC2) | `user_events`(TTL 1년), `event_daily`, `crawl_raw` | `docs/db/mongo_init.js` |
+| MongoDB 7 | `space_rental_analytics.events`(TTL 365일), `event_daily`, `crawl.crawl_raw` (11-06 F-60 새 구조) | `docs/db/mongo_init.js` |
 
 | 폴더 | 내용 |
 | --- | --- |
