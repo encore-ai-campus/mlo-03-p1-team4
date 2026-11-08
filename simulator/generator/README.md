@@ -7,7 +7,7 @@
 - api1의 **별도 Python 프로세스**에서 저장소 루트를 작업 폴더로 실행합니다. API 서버 프로세스 안에 import해 실행하지 않습니다.
 - 기존 `pro_1` 환경만 사용합니다. 새 패키지·DDL·HTTP API 변경은 없습니다.
 - 과거 행동 백필은 `backend/.env` 또는 기존 환경변수의 `DB_WRITE_URL`, `MONGO_URL`, `MONGO_DB`를 사용합니다. 공간 보충은 `DB_WRITE_URL`·`INTERNAL_API_KEY`를 사용합니다. 실제 비밀값은 실행 기록에 저장하지 않습니다.
-- 크롤링이 끝난 뒤 B의 공간 보충기가 primary에서 활성 공간 수를 다시 세고, **유형별 최소 6개**까지 필요한 수만 `/internal/venues`로 등록합니다. 크롤러가 등록한 양은 부족분 계산에 쓰지 않습니다. 이미 목표 이상인 공간은 삭제하지 않습니다.
+- 공간 보충은 이번 크롤링에서 유형별로 새로 등록된 유효 공간 수를 입력받아 목표 6개까지 부족분만 `/internal/venues`에 등록합니다. `max(0, 6 - newly_registered_by_category[유형])`으로 계산하며, primary의 기존 활성 수는 참고 공간 조회와 실행 전후 보고에만 씁니다.
 - 과거 행동 백필 전에는 MongoDB `events`에 공식 `docs/db/mongo_init.js`의 strict/error validator, `uq_event_id`, `received_at` 기준 365일 TTL이 먼저 적용돼 있어야 합니다. 생성기는 스키마·인덱스를 만들지 않습니다.
 
 ## 명령
@@ -82,35 +82,64 @@ DB 연결 없이 계획만 확인하려면 `--dry-run --snapshot <공간 JSON �
 
 ## 유형별 공간 보충 (#99)
 
-보충기는 회원·예약 백필 CLI와 분리된 `venue_supplement` 명령입니다. 기본 프로필은 버전 관리되는 `venue_profiles.json`이며, 기본 목표는 유형별 활성 6곳입니다. 같은 유형의 활성·검증된 크롤링 공간이 있으면 한 공간의 지역·가격·인원·시간·시설 속성을 함께 사용합니다. 사용할 공간이 없으면 해당 유형의 기본 프로필을 적용합니다. 이름·소개는 생성하고 이미지는 유형별 `art:` 코드를 씁니다.
+보충기는 회원·예약 백필 CLI와 분리된 `venue_supplement` 명령입니다. 크롤러 연동 실행은 모든 유형을 포함한 `newly_registered_by_category`를 받아 이번 실행의 신규 등록 목표를 채웁니다. `--manual` 실행은 크롤러 입력 없이 유형별 6건씩 고정 계획합니다. 같은 유형의 활성·검증된 크롤링 공간이 있으면 한 공간의 지역·가격·인원·시간·시설 속성을 함께 사용합니다. 사용할 공간이 없으면 해당 유형의 기본 프로필을 적용합니다. 이름·소개는 생성하고 이미지는 유형별 `art:` 코드를 씁니다.
+
+primary 조회 시 공간 유형 5개가 모두 있는지, 지역·시설 기초 데이터가 비어 있지 않은지 먼저 검사합니다. 누락되면 구체적인 원인을 알리고 공간 스냅샷 조회·계획 저장·등록 전에 중단합니다. 신규 실행의 dry-run/apply와 기존 실행 재개에 모두 적용하며, 중단된 재개의 기존 기록은 보존합니다. 기초 데이터가 준비돼 있지만 특정 기본 프로필의 지역·시설만 맞지 않는 경우에는 해당 유형을 실패로 기록하고 다른 유형의 계획은 계속 만듭니다.
 
 api1 또는 개발 환경의 저장소 루트에서 실행합니다. DB 연결은 `backend/.env` 또는 실행 환경의 `DB_WRITE_URL`·`INTERNAL_API_KEY`를 사용합니다. 비밀값은 명령 인자나 실행 기록에 넣지 않습니다.
 
 ```powershell
-# primary 기준 미리보기: 기본은 화면에만 출력하고 DB·크롤러 상태를 쓰지 않음
-conda run -n pro_1 --no-capture-output python -m simulator.generator.venue_supplement --dry-run
+$counts = '{"studyroom":0,"studio":2,"cafe":0,"lectureroom":6,"partyroom":0}'
 
-# 승인된 설정으로 계획을 보존한 뒤 검토
-conda run -n pro_1 --no-capture-output python -m simulator.generator.venue_supplement --dry-run --save-plan --seed 9901
+# 이번 크롤링 입력 기준 미리보기: DB는 참고 조회만 하고 업무 데이터를 쓰지 않음
+conda run -n pro_1 --no-capture-output python -m simulator.generator.venue_supplement --dry-run --newly-registered-by-category $counts
 
-# 실제 등록: 새 작업은 매번 다른 seed를 사용
-conda run -n pro_1 --no-capture-output python -m simulator.generator.venue_supplement --apply --seed 9902
+# 재개 가능한 계획을 저장해 검토 (저장한 뒤 같은 run_id로 apply/resume)
+conda run -n pro_1 --no-capture-output python -m simulator.generator.venue_supplement --dry-run --save-plan --seed 9901 --newly-registered-by-category $counts
 
-# 중단된 작업: 출력된 run_id로 같은 계획을 재개
+# 새 실제 등록: 새 실행마다 아직 사용하지 않은 seed와 실제 크롤러 결과 사용
+conda run -n pro_1 --no-capture-output python -m simulator.generator.venue_supplement --apply --seed 9902 --newly-registered-by-category $counts
+
+# 중단된 작업: 저장된 입력·계획·성공분으로 재개
 conda run -n pro_1 --no-capture-output python -m simulator.generator.venue_supplement --apply --resume <run_id>
 ```
 
-`--target`은 기본값 6을 덮어쓸 때, `--profiles`는 별도 JSON 프로필을 검토할 때 사용합니다. `--resume`은 저장된 seed·목표·프로필·코드·DB·API 대상을 확인하고, 기존 계획에 남은 요청만 처리합니다. 응답이 유실된 요청은 primary에서 출처 ID와 속성을 대조합니다. 이미 활성 바닥선을 채웠으면 남은 요청은 건너뜁니다.
+통합 실행기가 동작하지 않고 DB·내부 API가 사용할 수 있을 때는 Linux 저장소 루트에서 수동 모드로 유형별 6건씩 실행합니다. 먼저 계획을 확인하고 실제 등록을 시작합니다.
 
-`logs/venue-supplement-<run_id>/`에 `manifest.json`, `plan.json`, `state.json`, `report.json`을 기록합니다. 계획에는 실행 시점의 유형별 활성 수와 부족분, 선택한 참고 속성, 실제 요청 JSON을 담고, 업체명·원문 소개·사진은 담지 않습니다. 기록은 재개를 위해 보존합니다. 보충 단독 실행과 #100 통합 실행은 `logs/.venue-pipeline.lock`을 공유합니다.
+```bash
+python -m simulator.generator.venue_supplement --manual --dry-run --save-plan
+# 위 명령에서 출력한 run_id로 검토한 계획을 적용한다. 중단돼도 같은 명령으로 재개한다.
+python -m simulator.generator.venue_supplement --apply --resume <run_id>
+```
+
+수동 실행 한 번은 새 공간 30건을 계획합니다. DB의 기존 공간 수는 계획량에 영향을 주지 않으며, 수동 실행을 새로 시작하면 다시 30건을 계획합니다. 중단된 실행은 저장된 `run_id`로 재개해 같은 실행의 성공분을 중복 등록하지 않습니다. 수동 기록에는 `supplement_mode=manual`, 크롤러 실적 `null`을 저장해 실제 0건 입력과 구분합니다. 수동 모드에는 `--newly-registered-by-category`와 `--target`을 함께 지정할 수 없습니다.
+
+수동모드는 콘솔의 stderr에 유형별 보충 수·총합·완료 여부를 한국어로 출력하고, 같은 문구를 `report.json`의 `summary_text`에 저장합니다. stdout은 JSON이므로 파일로 저장하거나 프로그램에서 읽을 수 있습니다. 크롤러 신규 등록 수는 `미확인`으로 표시하며, dry-run의 보충 계획과 apply의 실제 성공 수를 구분합니다. 부분 실패·미확정 항목은 성공 수에 포함하지 않고, 재개 후에는 같은 실행의 누적 성공 수를 표시합니다. 기본 dry-run은 파일을 저장하지 않으므로 기록이 필요하면 `--save-plan`을 지정합니다.
+
+```text
+수동모드 보충 결과
+실행 ID: <run_id>
+크롤러 신규 등록: 미확인
+스터디룸: 수동 보충 성공 6곳 / 목표 6곳
+스튜디오: 수동 보충 성공 6곳 / 목표 6곳
+카페: 수동 보충 성공 6곳 / 목표 6곳
+강의실: 수동 보충 성공 6곳 / 목표 6곳
+파티룸: 수동 보충 성공 6곳 / 목표 6곳
+합계: 수동 보충 성공 30곳 / 목표 30곳
+실행 결과: 완료
+```
+
+크롤러 입력 JSON은 `studyroom`, `studio`, `cafe`, `lectureroom`, `partyroom`을 모두 포함해야 하고 값은 0 이상의 정수여야 합니다. 크롤러가 신규 등록하지 않은 유형은 0으로 보냅니다. `--target`은 일반 크롤러 입력 모드에서 기본값 6을 덮어쓸 때, `--profiles`는 별도 JSON 프로필을 검토할 때 사용합니다. `--resume`은 저장된 실행 ID·모드·seed·유형별 입력·목표·프로필·코드·DB·API 대상을 확인하고 남은 계획만 처리합니다. 같은 실행의 생성 성공분을 재개 시 목표에서 차감합니다. 응답 유실 요청은 primary에서 출처 ID와 속성을 대조하며, 이전 활성 공간 수는 보충량에 영향을 주지 않습니다.
+
+기본 `--dry-run`은 출력만 반환하며 파일을 남기지 않습니다. `--save-plan` 또는 `--apply`는 `logs/venue-supplement-<run_id>/`에 `manifest.json`, `plan.json`, `state.json`, `report.json`을 기록합니다. 계획에는 모드·목표·크롤러 입력(수동 모드는 null)·유형별 부족분·보고용 활성 수·참고 속성·실제 요청 JSON을 담습니다. 보고서는 크롤러 신규 등록·생성기 실제 성공·합계·실제 잔여 목표와 계획 기준 예상 합계·잔여 목표를 구분하고 DB 전후 활성 수도 따로 기록합니다. dry-run의 `complete`는 `completion_basis: projected`로 계획 가능 여부를 나타내며, `supplemented_by_category`와 `total_newly_registered_by_category`에는 실제 성공만 반영합니다. 업체명·원문 소개·사진은 기록하지 않습니다. 재개용 기록은 보존합니다. 기록에는 정책 버전을 넣으며, 기존 DB 활성 수 기준으로 저장된 구버전 계획은 새 실행 기준으로 재개하지 않습니다. 같은 seed로 저장된 실행이 있으면 새 실행을 거부합니다. 보충 단독 실행과 #100 통합 실행은 `logs/.venue-pipeline.lock`을 공유합니다.
 
 기존 DB 스냅샷으로 요청만 만들 때는 아래 오프라인 명령을 쓸 수 있습니다. HTTP 요청이나 DB 변경은 하지 않습니다.
 
 ```powershell
-conda run -n pro_1 --no-capture-output python -m simulator.generator.topup --snapshot vetted_venues.json --output logs/topup-requests.json --seed 9903 --target 6
+conda run -n pro_1 --no-capture-output python -m simulator.generator.topup --snapshot vetted_venues.json --output logs/topup-requests.json --seed 9903 --target 6 --newly-registered-by-category '{"studyroom":0,"studio":0,"cafe":0,"lectureroom":0,"partyroom":0}'
 ```
 
-사전 계획·검증은 끝났지만 운영 MariaDB 등록과 api1 재개 확인은 아직 수행하지 않았습니다.
+테스트 VM api1(`192.168.0.232`)과 primary `spacecube_test`에서 수동 30건 등록·source ID 재조회를 확인했습니다. 재개·응답 유실·부분 성공은 전용 회귀 테스트로 검증합니다. 월요일 실제 배포 대상은 [배포 안내](../../infra/vm/venue-jobs-deploy.md)의 api1이며, 문서의 `/opt/spacecube` 경로는 설치 예시이므로 현장 IP·계정·Python·설정 경로를 확인해야 합니다. 실제 발표 환경 배포와 cron 연결은 #100의 후속 작업입니다.
 
 ## 검증
 

@@ -59,27 +59,31 @@ def load_catalog(db):
 
 def get_synthetic_source(db, source_id):
     """재개 시 같은 출처 공간의 상태·속성을 대조한다."""
-    row = db.execute(
-        select(
-            Venue.venue_id,
-            Venue.source_id,
-            Venue.is_active,
-            Venue.name,
-            Venue.description,
-            Venue.notice,
-            Venue.capacity_max,
-            Venue.price_per_hour,
-            Venue.min_hours,
-            Venue.open_hour,
-            Venue.close_hour,
-            Category.code.label("category_code"),
-            Region.sido,
-            Region.sigungu,
+    row = (
+        db.execute(
+            select(
+                Venue.venue_id,
+                Venue.source_id,
+                Venue.is_active,
+                Venue.name,
+                Venue.description,
+                Venue.notice,
+                Venue.capacity_max,
+                Venue.price_per_hour,
+                Venue.min_hours,
+                Venue.open_hour,
+                Venue.close_hour,
+                Category.code.label("category_code"),
+                Region.sido,
+                Region.sigungu,
+            )
+            .join(Category, Category.category_id == Venue.category_id)
+            .join(Region, Region.region_id == Venue.region_id)
+            .where(Venue.source_site == "synthetic", Venue.source_id == source_id)
         )
-        .join(Category, Category.category_id == Venue.category_id)
-        .join(Region, Region.region_id == Venue.region_id)
-        .where(Venue.source_site == "synthetic", Venue.source_id == source_id)
-    ).mappings().one_or_none()
+        .mappings()
+        .one_or_none()
+    )
     if row is None:
         return None
 

@@ -1,4 +1,4 @@
-"""#99: 현재 활성 공간 수에 맞춰 검증된 등록 요청을 결정적으로 만든다."""
+"""#99: 이번 실행의 신규 등록 수를 채울 요청을 결정적으로 만든다."""
 
 import argparse
 import hashlib
@@ -36,12 +36,17 @@ REQUIRED_ATTRIBUTES = (
 )
 
 
+def validate_newly_registered_by_category(value):
+    """유형별 크롤러 신규 등록 수 전체 매핑을 검증한다."""
+    if not isinstance(value, dict) or set(value) != set(CATEGORIES):
+        raise ValueError("유형별 신규 등록 수는 다섯 유형을 모두 포함해야 합니다.")
+    if any(type(value[category]) is not int or value[category] < 0 for category in CATEGORIES):
+        raise ValueError("유형별 신규 등록 수는 0 이상의 정수여야 합니다.")
+    return {category: value[category] for category in CATEGORIES}
+
+
 def valid_candidate(row, catalog=None):
-    if (
-        not row.get("is_active")
-        or not row.get("verified")
-        or row.get("source_site") not in SOURCES
-    ):
+    if not row.get("is_active") or not row.get("verified") or row.get("source_site") not in SOURCES:
         return False
     if any(row.get(key) is None for key in REQUIRED_ATTRIBUTES):
         return False
@@ -97,13 +102,23 @@ def _payload(*, category, number, seed, source, profile=None):
 
 
 def prepare(
-    snapshot, *, target=6, seed=99, profiles=None, catalog=None, profile_version="1"
+    snapshot,
+    *,
+    newly_registered_by_category,
+    target=6,
+    seed=99,
+    profiles=None,
+    catalog=None,
+    profile_version="1",
 ):
-    """활성 수를 세고 유효한 기존 공간 또는 기본 프로필로 요청을 만든다."""
+    """크롤러 신규 등록 수와 목표의 차이를 유효한 요청으로 만든다."""
     if target < 0:
         raise ValueError("목표 수는 0 이상이어야 합니다.")
     if seed < 0:
         raise ValueError("seed는 0 이상이어야 합니다.")
+    newly_registered_by_category = validate_newly_registered_by_category(
+        newly_registered_by_category
+    )
 
     venues = snapshot["venues"]
     counts = Counter(
@@ -111,16 +126,14 @@ def prepare(
         for row in venues
         if row.get("is_active") and row.get("category_code") in CATEGORIES
     )
-    existing_ids = {
-        row.get("source_id") for row in venues if row.get("source_site") == "synthetic"
-    }
+    existing_ids = {row.get("source_id") for row in venues if row.get("source_site") == "synthetic"}
     prepared = []
     references = {}
     reference_snapshots = {}
     failures = {}
 
     for category in CATEGORIES:
-        missing = max(0, target - counts[category])
+        missing = max(0, target - newly_registered_by_category[category])
         if not missing:
             continue
         candidates = sorted(
@@ -197,9 +210,11 @@ def prepare(
             made += 1
 
     return {
+        "newly_registered_by_category": newly_registered_by_category,
         "active_counts": {category: counts[category] for category in CATEGORIES},
         "missing_by_category": {
-            category: max(0, target - counts[category]) for category in CATEGORIES
+            category: max(0, target - newly_registered_by_category[category])
+            for category in CATEGORIES
         },
         "target_per_category": target,
         "references": references,
@@ -241,11 +256,28 @@ def main(argv=None):
     command.add_argument("--output", type=Path, required=True)
     command.add_argument("--seed", type=int, default=99)
     command.add_argument("--target", type=int, default=6)
+    command.add_argument(
+        "--newly-registered-by-category",
+        required=True,
+        help="다섯 유형을 모두 포함하는 신규 등록 수 JSON",
+    )
     command.add_argument("--profiles", type=Path, default=DEFAULT_PROFILES)
     args = command.parse_args(argv)
     snapshot = json.loads(args.snapshot.read_text(encoding="utf-8"))
     profiles = _load_profiles(args.profiles)
-    result = prepare(snapshot, target=args.target, seed=args.seed, profiles=profiles)
+    try:
+        newly_registered_by_category = validate_newly_registered_by_category(
+            json.loads(args.newly_registered_by_category)
+        )
+    except (json.JSONDecodeError, ValueError) as error:
+        command.error(str(error))
+    result = prepare(
+        snapshot,
+        newly_registered_by_category=newly_registered_by_category,
+        target=args.target,
+        seed=args.seed,
+        profiles=profiles,
+    )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"등록 요청 {len(result['requests'])}건: {args.output}")

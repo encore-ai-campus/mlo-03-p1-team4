@@ -33,7 +33,7 @@
 - [ ] `api1`: Nginx(apt), Vue 빌드(`frontend`에서 `npm run build` → `dist/`) 복사, `infra/nginx/README.md` 서버용 설정(정적 파일 + `/api` → `127.0.0.1:8000`), `stub_status` + nginx exporter (11-06 B안)
 - [ ] `api1`: 정기 작업 — 크롤러는 [cron 또는 systemd timer 중 하나](venue-jobs-deploy.md)를 선택. 이용 완료·`replay_events.py`·집계 일정은 담당 설정을 확인(109 실제 이용 완료 :05·집계 :20과 구분)
 - [ ] `api1`: 크롤러·생성기 실행 환경과 키(`INTERNAL_API_KEY`, DB·MongoDB 접속 정보)는 A가 설치(11-05 #38). 생성기 과거 30일 백필은 수동으로 한 번, 먼저 회원 100명으로 검증
-- [ ] `api1`: #10 bootstrap → #99 공간 보충 → 생성기 → 집계·CSV 순서로 준비. #99는 실행별 신규 등록 수 기준으로 정책이 변경됐으나 현재 코드는 이전 활성 수 기준이므로 입력 계약 구현·검증을 확인한다. #100 전에는 [수동 대체 절차](venue-jobs-deploy.md)를 따르며, 통합 실행기 준비 후 정기 작업의 공통 진입점을 실제 apply 명령으로 전환
+- [ ] `api1`: #10 bootstrap → #99 공간 보충 → 생성기 → 집계·CSV 순서로 준비. #99 브랜치 코드는 실행별 신규 등록 수 입력을 사용한다. 실제 대상 환경의 입력·등록·재개를 검증한 뒤, #100 통합 실행기가 준비되면 정기 작업의 공통 진입점을 실제 apply 명령으로 전환한다. 통합 실행기 전에는 [수동 대체 절차](venue-jobs-deploy.md)를 따른다.
 - [ ] `mon`: Prometheus(15일, 원격 쓰기 받기 켬), Loki(14일), Grafana(3000) + 현재 11개 대시보드(서비스·프록시·서버·DB·이벤트·수집 로그) + 경보(복제 지연 5초, 오류율)
 - [ ] 두 VM 모두 Alloy, `ufw` 규칙
 
