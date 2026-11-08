@@ -1,0 +1,66 @@
+{
+  "version": 1,
+  "target_per_category": 6,
+  "common": {
+    "open_hour": 9,
+    "close_hour": 23,
+    "facilities": ["인터넷/WIFI", "금연", "전기"]
+  },
+  "categories": {
+    "studyroom": {
+      "name": "스터디룸",
+      "sido": "서울",
+      "sigungu": "마포구",
+      "capacity_max": 6,
+      "price_per_hour": 12000,
+      "min_hours": 1,
+      "feature": "집중 공간",
+      "facilities": ["의자/테이블", "화이트보드"],
+      "images": ["art:group-0", "art:group-1", "art:seminar-0"]
+    },
+    "studio": {
+      "name": "스튜디오",
+      "sido": "서울",
+      "sigungu": "성동구",
+      "capacity_max": 10,
+      "price_per_hour": 33000,
+      "min_hours": 1,
+      "feature": "촬영 공간",
+      "facilities": ["전신거울", "탈의실"],
+      "images": ["art:studio-0", "art:studio-1", "art:meeting-0"]
+    },
+    "cafe": {
+      "name": "카페",
+      "sido": "서울",
+      "sigungu": "성동구",
+      "capacity_max": 20,
+      "price_per_hour": 50000,
+      "min_hours": 1,
+      "feature": "모임 공간",
+      "facilities": ["의자/테이블", "내부화장실", "음식물반입가능"],
+      "images": ["art:lounge-0", "art:lounge-1", "art:duo-0"]
+    },
+    "lectureroom": {
+      "name": "강의실",
+      "sido": "서울",
+      "sigungu": "강남구",
+      "capacity_max": 20,
+      "price_per_hour": 35000,
+      "min_hours": 1,
+      "feature": "강의 공간",
+      "facilities": ["의자/테이블", "TV/프로젝터", "화이트보드"],
+      "images": ["art:seminar-0", "art:seminar-1", "art:meeting-0"]
+    },
+    "partyroom": {
+      "name": "파티룸",
+      "sido": "서울",
+      "sigungu": "송파구",
+      "capacity_max": 12,
+      "price_per_hour": 45000,
+      "min_hours": 2,
+      "feature": "모임 공간",
+      "facilities": ["의자/테이블", "내부화장실", "음식물반입가능", "음향/마이크"],
+      "images": ["art:partyroom-0", "art:partyroom-1", "art:lounge-0"]
+    }
+  }
+}

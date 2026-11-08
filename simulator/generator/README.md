@@ -1,13 +1,66 @@
-# generator — 과거 행동 데이터 백필
+# generator — 주간 공간 수집·보충과 과거 행동 데이터 백필
 
-기준은 [#75 PM 결정](https://github.com/encore-ai-campus/mlo-03-p1-team4/issues/75#issuecomment-6684120999)입니다. B가 본체·세션·예약을 구현하고, A가 회원·후기 서비스와 이벤트 빌더 사용을 확인하며, DB가 공간 보충·집계·정리·CSV를 담당합니다.
+주간 공간 수집·보충 기준은 [#99](https://github.com/encore-ai-campus/mlo-03-p1-team4/issues/99), 연결 실행 기준은 [#100](https://github.com/encore-ai-campus/mlo-03-p1-team4/issues/100)입니다. 과거 행동 백필은 [#75 PM 결정](https://github.com/encore-ai-campus/mlo-03-p1-team4/issues/75#issuecomment-6684120999)을 따릅니다.
+
+## #99/#100 주간 크롤링과 공간 보충
+
+`run_pipeline.py`는 api1의 별도 Python 프로세스에서 `crawler.crawl_venues.run_configured()`를 호출하고, 이번 실행에서 HTTP 201로 새 등록된 수만 유형별 6개 목표에서 빼서 부족분을 `/internal/venues`로 보충합니다. 현재 DB의 기존 공간 수는 목표 계산에 쓰지 않습니다. 응답 200은 신규 등록으로 세지 않습니다.
+
+보충 공간은 `venue_profiles.json`의 기본 프로필 또는 같은 유형의 유효한 활성 크롤링 공간을 기준으로 만듭니다. 요청에는 `source_site=synthetic`, `X-Synthetic: 1`, 실행별 결정적 `source_id`, 생성 문구, `art:` 이미지가 들어갑니다. 기존 내부 API와 DDL은 바꾸지 않으며, 공간을 삭제하거나 비활성화하지 않습니다.
+
+실행 전에 두 사이트의 sitemap baseline이 있어야 합니다. 처음 한 번 기준선을 만들 때는 쉐어잇 이용약관을 확인하고 robots.txt 규칙을 따릅니다.
+
+```powershell
+conda run -n pro_1 --no-capture-output python -m crawler.crawl_venues baseline --site all
+```
+
+미리보기 JSON은 `newly_registered_by_category` 아래에 다섯 유형의 HTTP 201 건수를 모두 넣습니다. 크롤러 결과 전체 JSON도 사용할 수 있습니다.
+
+```json
+{
+  "newly_registered_by_category": {
+    "studyroom": 1,
+    "studio": 0,
+    "cafe": 2,
+    "lectureroom": 0,
+    "partyroom": 0
+  }
+}
+```
+
+```powershell
+# 읽기 전용 계획. DB에서 기준 공간을 읽을 수 있지만 업무 행·실행 기록을 쓰지 않음
+conda run -n pro_1 --no-capture-output python -m simulator.generator.run_pipeline --mode dry-run --crawler-result .\crawler-result.json
+
+# 실제 주간 실행: 쉐어잇 이용약관을 실행 직전에 확인한 뒤 표시
+conda run -n pro_1 --no-capture-output python -m simulator.generator.run_pipeline --mode apply --confirm-shareit-terms
+
+# 중단 후 저장된 crawler_result.json과 보충 plan.json을 사용해 재개
+conda run -n pro_1 --no-capture-output python -m simulator.generator.run_pipeline --mode resume --run-id <manifest의 run_id>
+```
+
+`apply`는 SpaceCloud·ShareIt 상세 페이지를 합쳐 실행당 최대 20건 확인하고, 크롤러는 주간 모드에서 유형별 최대 1건씩(총 최대 5건) 신규 등록합니다. `backend/.env`의 DB·MongoDB·`INTERNAL_API_KEY`·`SYNTHETIC_API_KEY`와 로컬 API `GET /health`의 `status=ok`가 필요합니다. 등록 응답이 불확실하거나 DB·내부 API·설정 오류가 나면 보충을 멈춥니다. 확인된 외부 수집 오류는 불확실 등록이 없을 때 부분 결과로 보충을 계속할 수 있습니다. `resume`은 크롤러를 다시 부르지 않습니다. 크롤러 결과 파일이 저장되기 전에 끊겼다면 자동 재수집하지 않고 멈춥니다.
+
+실행 기록은 `logs/venue-pipeline-<id>/`에 `manifest.json`, `crawler_result.json`, `state.json`, `report.json`을, `logs/venue-supplement-<id>/`에 `manifest.json`, `plan.json`, `state.json`, `report.json`을 저장합니다. 내부 키·DB 접속 URL은 기록하지 않습니다. 파이프라인과 단독 보충기는 같은 MariaDB 이름 잠금을 사용합니다.
+
+PM 댓글에 적힌 30분 간격 `:10`·`:40` 실행은 대상 서버 환경을 확인한 뒤 등록합니다. 이 저장소 작업은 cron/systemd를 설치하지 않습니다.
+
+단독 보충기는 저장된 크롤러 결과만으로도 실행할 수 있습니다.
+
+```powershell
+conda run -n pro_1 --no-capture-output python -m simulator.generator.venue_supplement --mode dry-run --crawler-result .\crawler-result.json
+conda run -n pro_1 --no-capture-output python -m simulator.generator.venue_supplement --mode apply --crawler-result .\crawler-result.json
+conda run -n pro_1 --no-capture-output python -m simulator.generator.venue_supplement --mode resume --run-id <manifest의 run_id>
+```
+
+## #75 과거 행동 생성 실행 조건
 
 ## 실행 조건
 
 - api1의 **별도 Python 프로세스**에서 저장소 루트를 작업 폴더로 실행합니다. API 서버 프로세스 안에 import해 실행하지 않습니다.
 - 기존 `pro_1` 환경만 사용합니다. 새 패키지·DDL·HTTP API 변경은 없습니다.
 - `backend/.env` 또는 기존 환경변수의 `DB_WRITE_URL`, `MONGO_URL`, `MONGO_DB`를 사용합니다. 실제 비밀값은 실행 기록에 저장하지 않습니다.
-- DB 담당이 크롤링 공간을 등록한 뒤 부족한 유형을 `/internal/venues`로 보충합니다. 실제 적재는 **유형별 최소 6개**가 있어야 시작합니다. 이미 목표 이상인 공간은 삭제하지 않습니다.
+- #75 백필을 `--apply`하기 전에 유형별 활성 공간이 최소 6개 있어야 합니다. 위 #99/#100 실행기로 부족분을 채울 수 있습니다. 기존 공간은 삭제하지 않습니다.
 - MongoDB `events`에는 공식 `docs/db/mongo_init.js`의 strict/error validator, `uq_event_id`, `received_at` 기준 365일 TTL이 먼저 적용돼 있어야 합니다. 생성기는 스키마·인덱스를 만들지 않습니다.
 
 ## 명령

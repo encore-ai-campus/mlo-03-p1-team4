@@ -114,8 +114,12 @@ Pro_1/
 │  └─ data/                   기준선·표본 (지우지 않음)
 │
 ├─ simulator/
-│  ├─ generator/              [B 본체·A 연결 확인·DB 후속] #75 서비스 호출 기반 과거 백필 CLI
-│  │  └─ tests/              고정 방문량·시각·부분 실패·실제 MariaDB 서비스/재개 검증
+│  ├─ generator/              [B] #75 과거 백필, #99 공간 보충, #100 크롤링 통합 실행
+│  │  ├─ venue_profiles.json  유형별 기본 보충 프로필·시설·art 이미지
+│  │  ├─ venue_supplement.py  HTTP 201 기준 계획·적용·불확실 응답 복구
+│  │  ├─ run_pipeline.py      주간 크롤링→보충 실행·중단·재개
+│  │  ├─ venue_pipeline_lock.py 크롤러와 단독 보충기가 공유하는 primary DB 잠금
+│  │  └─ tests/              #75 회귀와 #99/#100 오프라인 계획·실행 복구 검증
 │  └─ locust/                 [B] 부하·동시성 (예정)
 │     ├─ daily_locustfile.py   [B] 네 페르소나 일일 조회·명시적 쓰기 시나리오
 │     ├─ run_daily.ps1         [B] pro_1·모드·날짜·실행 로그를 묶는 Windows 실행기

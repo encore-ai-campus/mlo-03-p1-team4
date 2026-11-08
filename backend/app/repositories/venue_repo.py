@@ -49,6 +49,77 @@ def list_generator_venues(db: Session) -> list[dict]:
     return [dict(row) for row in rows]
 
 
+def list_supplement_references(db: Session) -> list[dict]:
+    """활성 크롤링 공간만 유형별 보충 기준으로 primary에서 읽는다."""
+    rows = db.execute(
+        select(
+            Venue.venue_id,
+            Venue.source_site,
+            Venue.source_id,
+            Venue.name,
+            Venue.capacity_max,
+            Venue.price_per_hour,
+            Venue.min_hours,
+            Venue.open_hour,
+            Venue.close_hour,
+            Category.code.label("category_code"),
+            Region.sido,
+            Region.sigungu,
+        )
+        .join(Category, Category.category_id == Venue.category_id)
+        .join(Region, Region.region_id == Venue.region_id)
+        .where(
+            Venue.is_active.is_(True),
+            Venue.source_site.in_(("spacecloud", "shareit")),
+        )
+        .order_by(Venue.venue_id)
+    ).mappings()
+    references = []
+    for row in rows:
+        reference = dict(row)
+        reference["facilities"] = [
+            item["name"] for item in list_facilities(db, reference["venue_id"])
+        ]
+        references.append(reference)
+    return references
+
+
+def get_source_snapshot(db: Session, source_site: str, source_id: str) -> dict | None:
+    """정확한 출처 키를 primary에서 읽어 불확실한 upsert를 대조한다."""
+    row = (
+        db.execute(
+            select(
+                Venue.venue_id,
+                Venue.source_site,
+                Venue.source_id,
+                Venue.name,
+                Venue.description,
+                Venue.notice,
+                Venue.capacity_max,
+                Venue.price_per_hour,
+                Venue.min_hours,
+                Venue.open_hour,
+                Venue.close_hour,
+                Venue.is_active,
+                Category.code.label("category_code"),
+                Region.sido,
+                Region.sigungu,
+            )
+            .join(Category, Category.category_id == Venue.category_id)
+            .join(Region, Region.region_id == Venue.region_id)
+            .where(Venue.source_site == source_site, Venue.source_id == source_id)
+        )
+        .mappings()
+        .one_or_none()
+    )
+    if row is None:
+        return None
+    snapshot = dict(row)
+    snapshot["facilities"] = [item["name"] for item in list_facilities(db, snapshot["venue_id"])]
+    snapshot["images"] = list_images(db, snapshot["venue_id"])
+    return snapshot
+
+
 def get_booking_info(db: Session, venue_id: int) -> RowMapping | None:
     """예약 검증에 필요한 공간 상태·시간·요금과 유형 코드를 primary에서 읽는다."""
     query = (
