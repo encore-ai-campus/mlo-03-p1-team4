@@ -88,16 +88,16 @@ api1의 저장소 루트에서 별도 Python 프로세스로 실행합니다. `b
 conda run -n pro_1 --no-capture-output python -m simulator.generator.analytics --base-date 2026-11-07 --days 30 --output-root logs/analytics
 ```
 
-같은 기간을 다시 실행하면 `event_daily` 해당 날짜를 원천 `events`에서 다시 계산합니다. 중간 실패로 집계가 비었으면 같은 명령을 재실행해 복구합니다. 컬렉션·인덱스는 만들지 않으며, 공식 `mongo_init.js`의 `event_daily` 복합 UNIQUE 인덱스가 없으면 쓰기 전에 중단합니다. 출력을 시작하기 전에 날짜 범위의 기존 집계가 지워지므로, api1 한 대에서만 실행하고 실패 시 같은 기간을 곧바로 재실행합니다.
+같은 기간을 다시 실행하면 `db/aggregate/event_daily.py`의 기존 집계기를 호출해 `event_daily`를 원천 `events`에서 재계산합니다. 집계기와 CSV 래퍼 모두 컬렉션·인덱스를 만들지 않습니다. 공식 `mongo_init.js`의 `event_daily` 복합 UNIQUE 인덱스가 없으면 쓰기 전에 중단합니다. 같은 기간의 중복 실행은 이 래퍼의 파일 잠금으로 막고, 실패 시 같은 명령을 재실행합니다.
 
-11-07 파일럿용 30일 집계는 위 명령을 수동 1회 실행합니다. 이후 매일 04:00 KST cron에서는 닫힌 어제 하루만 다시 계산하도록 같은 명령에 `--days 1`을 사용합니다. 새벽 실행 실패는 해당 하루 명령을 수동 재실행합니다.
+109 api1의 100명·30일 파일럿과 `event_daily` 재집계는 11-07 이미 실행·기록됐습니다(`STATE.md` #19·#75 행). 위 명령은 해당 결과의 원천 이벤트 CSV가 필요할 때 사용합니다. 최종 배치의 일별 스케줄은 현재 109 api1에 등록된 집계 타이머와 중복되지 않도록 A가 실제 구성을 먼저 확인합니다.
 
 실행 결과는 다음 두 CSV를 원자적으로 교체합니다.
 
 - `events-<시작일>-<기준일>-synthetic.csv`: 가상 원천 이벤트. CSV 한 행은 이벤트와 각 `products[]` 상품 ID 조합이며 상품이 없는 이벤트도 한 행을 냅니다. 같은 이벤트에 상품이 여러 개면 `event_id`가 여러 행에 나타납니다.
 - `events-<시작일>-<기준일>-event-daily.csv`: `date,event_type,venue_id,is_synthetic,count` 집계. 발표 그래프는 이벤트 건수로 표시합니다.
 
-api1의 04:00 KST cron 등록은 A 담당입니다. 아래 형태로 실행 파일과 인자를 전달한 뒤 A가 서비스 계정, exit code, 로그 회전까지 연결합니다.
+최종 api1의 일별 스케줄 등록은 A 담당입니다. 아래 형태는 후보 명령이며, 109 api1에는 `event_daily` :20 타이머가 이미 있다는 진행 기록을 확인하고 **동일 작업을 두 번 등록하지 않습니다**. A가 실제 서비스 계정, exit code, 로그 회전을 연결합니다.
 
 ```text
 python -m simulator.generator.analytics --days 1 --output-root /var/lib/spacecube/analytics
@@ -131,7 +131,7 @@ api1에서 `timedatectl`로 OS 시간이 Asia/Seoul인지 확인합니다. 서�
 0 4 * * * cd /실제/저장소/경로 && /pro_1/python/절대경로 -m simulator.generator.analytics --days 1 --output-root /실제/분석/출력경로 >> /실제/로그/경로/event-daily.log 2>&1
 ```
 
-등록 후 `crontab -l`로 명령을 확인하고, 같은 서비스 계정에서 `--base-date YYYY-MM-DD --days 1`을 수동 실행해 종료 코드 0과 CSV 두 파일을 확인합니다. 같은 날짜 재실행 결과가 같아야 합니다. 실행 실패나 종료 코드가 0이 아니면 해당 날짜를 수동 재실행하고 로그를 확인합니다. 로그 파일 회전과 cron 실행 감시는 A 운영 설정에서 연결합니다. 집계 삭제 뒤 실패하면 일시적으로 해당 날짜 집계가 비므로 즉시 재실행해야 합니다.
+등록 후 `crontab -l` 또는 기존 systemd timer 목록으로 중복 여부를 확인하고, 같은 서비스 계정에서 `--base-date YYYY-MM-DD --days 1`을 수동 실행해 종료 코드 0과 CSV 두 파일을 확인합니다. 같은 날짜 재실행 결과가 같아야 합니다. 실행 실패나 종료 코드가 0이 아니면 해당 날짜를 수동 재실행하고 로그를 확인합니다. 로그 파일 회전과 실행 감시는 A 운영 설정에서 연결합니다.
 
 ## 검증
 

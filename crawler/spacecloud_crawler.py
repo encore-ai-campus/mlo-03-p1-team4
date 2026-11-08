@@ -213,9 +213,13 @@ def parse_space(source_id: str | int, html: str) -> SpaceInfo:
     address = business.get("address") or {}
     if not isinstance(address, dict):
         address = {}
-    street = address.get("streetAddress") or ""
-    if not isinstance(street, str):
-        street = ""
+    # 스페이스클라우드는 상세 도로명을 제공하지 않는다. 지역·법정동만
+    # 조합하고 streetAddress는 상세 주소일 수 있으므로 읽거나 보존하지 않는다.
+    address_parts = []
+    for key in ("addressRegion", "addressLocality"):
+        value = address.get(key)
+        if isinstance(value, str):
+            address_parts.extend(value.split())
     rating = business.get("aggregateRating") or {}
     if not isinstance(rating, dict):
         rating = {}
@@ -229,7 +233,7 @@ def parse_space(source_id: str | int, html: str) -> SpaceInfo:
         open_hours=(
             hours.get_text(" ", strip=True).removeprefix("영업시간").strip() if hours else None
         ),
-        address_region=" ".join(street.split()[:2]) or None,
+        address_region=" ".join(address_parts[:2]) or None,
         area_m2=float(area.group(1)) if area else None,
         rating=_optional_float(rating.get("ratingValue")),
         review_count=_optional_int(rating.get("reviewCount")),
@@ -246,12 +250,21 @@ def sanitized_dict(space: SpaceInfo) -> dict:
         space.open_hours or "",
     )
     data["open_hours"] = hours.group(0) if hours else None
-    region = (space.address_region or "").split()[:2]
-    data["address_region"] = (
-        " ".join(region)
-        if len(region) == 2 and all(re.fullmatch(r"[가-힣]{2,20}", part) for part in region)
-        else None
+    # 파싱 중 필요한 동 이름도 파일·콘솔 출력 전에 시·구로 바꾼다.
+    # preprocess가 SpaceInfo를 사용하므로 실행 시점에만 가져온다.
+    from crawler.preprocess import SeedMaps
+    from db.loaders.load_seed import resolve
+
+    maps = SeedMaps.load()
+    region, _reason = resolve(
+        space.address_region or "",
+        maps.sido_alias,
+        maps.sigungu_alias,
+        maps.regions,
+        maps.legal_dong,
+        maps.legal_dong_city_aliases,
     )
+    data["address_region"] = " ".join(region) if region is not None else None
     return data
 
 

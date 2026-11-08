@@ -24,6 +24,7 @@ const categories = ref([])
 const regions = ref([])
 const allRooms = ref([])
 const newRooms = ref([])
+const newTotal = ref(0)
 const newLoading = ref(true)
 const newError = ref('')
 const todaySlots = ref(null)
@@ -46,7 +47,11 @@ async function loadRooms() {
 async function loadNewRooms() {
   newLoading.value = true
   newError.value = ''
-  try { newRooms.value = (await api.getNewVenues()).items }
+  try {
+    const res = await api.getNewVenues()
+    newRooms.value = res.items
+    newTotal.value = res.total ?? res.items.length
+  }
   catch (e) { newError.value = e.message ?? '새 공간을 불러오지 못했어요.' }
   finally { newLoading.value = false }
 }
@@ -73,7 +78,14 @@ function submitSearch() {
 }
 const sortOptions = [{ value: 'default', label: '추천순' }, { value: 'popular', label: '인기순' }, { value: 'price', label: '낮은 가격순' }, { value: 'rating', label: '평점순' }]
 const tabs = computed(() => [{ value: 'all', label: '전체' }, ...categories.value.map((c) => ({ value: c.code, label: c.name }))])
-const shown = computed(() => allRooms.value)
+// 추천순에서는 최근 등록(크롤링·신규) 공간을 앞에 몇 곳 세워, 공간이 늘면 메인 목록에도 바로 보이게 한다.
+const FRESH_FIRST = 4
+const shown = computed(() => {
+  if (sort.value !== 'default') return allRooms.value
+  const fresh = newRooms.value.filter((n) => tab.value === 'all' || n.category?.code === tab.value).slice(0, FRESH_FIRST)
+  const ids = new Set(fresh.map((n) => n.venue_id))
+  return [...fresh.map((n) => ({ ...n, fresh: true })), ...allRooms.value.filter((r) => !ids.has(r.venue_id))].slice(0, 12)
+})
 const availableNow = computed(() => allRooms.value.filter((r) => r.slots?.some((s) => !s.taken && s.hour > nowInSeoul().hour)).length)
 const emptyCategory = computed(() => categories.value.find((c) => c.code === tab.value)?.name ?? '')
 const { target: reviewsTarget, visible: reviewsVisible } = useReveal()
@@ -118,7 +130,7 @@ const won = (n) => n.toLocaleString('ko-KR')
   <section class="section container" aria-labelledby="new-title">
     <div class="section__head">
       <h2 id="new-title" class="section__title">새로 문을 연 공간</h2>
-      <p class="section__sub">등록 후 14일 동안 여기에 보여요</p>
+      <p class="section__sub">등록 후 14일 동안 여기에 보여요<template v-if="newTotal"> · 지금 <strong class="num">{{ newTotal }}곳</strong></template></p>
     </div>
     <UiCarousel label="새로 문을 연 공간">
       <template v-if="newRooms.length">
@@ -165,6 +177,7 @@ const won = (n) => n.toLocaleString('ko-KR')
             :room="r"
             :index="i"
             :rank="sort === 'popular' ? i + 1 : 0"
+            :fresh="Boolean(r.fresh)"
             
           />
         </div>

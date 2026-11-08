@@ -17,6 +17,7 @@ sys.path.insert(0, str(ROOT / "backend"))
 
 from app.core.clock import get_today  # noqa: E402 -- backend 경로를 먼저 추가한다.
 from app.core.config import get_settings  # noqa: E402 -- backend 경로를 먼저 추가한다.
+from db.aggregate.event_daily import aggregate_day, export_csv  # noqa: E402 -- DB 집계기를 재사용한다.
 
 KST = ZoneInfo("Asia/Seoul")
 EVENT_FIELDS = (
@@ -79,51 +80,6 @@ def atomic_csv(path, fields, rows):
     temporary.replace(path)
 
 
-def daily_pipeline(start_utc, end_utc):
-    return [
-        {"$match": {"occurred_at": {"$gte": start_utc, "$lt": end_utc}}},
-        {"$unwind": {"path": "$products", "preserveNullAndEmptyArrays": True}},
-        {
-            "$group": {
-                "_id": {
-                    "event_id": "$event_id",
-                    "date": {
-                        "$dateToString": {
-                            "format": "%Y-%m-%d",
-                            "date": "$occurred_at",
-                            "timezone": "Asia/Seoul",
-                        }
-                    },
-                    "event_type": "$event_name",
-                    "venue_id": {"$ifNull": ["$products.product_id", None]},
-                    "is_synthetic": "$is_synthetic",
-                },
-            }
-        },
-        {
-            "$group": {
-                "_id": {
-                    "date": "$_id.date",
-                    "event_type": "$_id.event_type",
-                    "venue_id": "$_id.venue_id",
-                    "is_synthetic": "$_id.is_synthetic",
-                },
-                "count": {"$sum": 1},
-            }
-        },
-        {
-            "$project": {
-                "_id": 0,
-                "date": "$_id.date",
-                "event_type": "$_id.event_type",
-                "venue_id": "$_id.venue_id",
-                "is_synthetic": "$_id.is_synthetic",
-                "count": 1,
-            }
-        },
-    ]
-
-
 def export_event_rows(events, start_utc, end_utc):
     query = {
         "occurred_at": {"$gte": start_utc, "$lt": end_utc},
@@ -165,15 +121,6 @@ def export_event_rows(events, start_utc, end_utc):
                 }
             )
     return rows
-
-
-def daily_rows(collection, start_date, end_date):
-    return list(
-        collection.find(
-            {"date": {"$gte": start_date.isoformat(), "$lt": end_date.isoformat()}},
-            {"_id": 0, "date": 1, "event_type": 1, "venue_id": 1, "is_synthetic": 1, "count": 1},
-        ).sort([("date", 1), ("event_type", 1), ("venue_id", 1), ("is_synthetic", 1)])
-    )
 
 
 def parse_args(argv=None):
@@ -227,29 +174,22 @@ def main(argv=None):
             raise RuntimeError("event_daily 복합 UNIQUE 인덱스를 먼저 적용하세요.")
 
         with run_lock(args.output_root / ".event_daily.lock"):
-            # 동일 구간을 항상 원천 events에서 다시 계산하므로 재실행해도 count가 누적되지 않는다.
-            rebuilt = list(events.aggregate(daily_pipeline(start_utc, end_utc), allowDiskUse=True))
+            days = [start_date + timedelta(days=offset) for offset in range(args.days)]
+            results = [aggregate_day(database, day) for day in days]
             rows = export_event_rows(events, start_utc, end_utc)
-            daily.delete_many(
-                {"date": {"$gte": start_date.isoformat(), "$lt": args.base_date.isoformat()}}
-            )
-            if rebuilt:
-                daily.insert_many(rebuilt, ordered=True)
-
-            daily_export = daily_rows(daily, start_date, args.base_date)
             atomic_csv(args.output_root / f"{prefix}-synthetic.csv", EVENT_FIELDS, rows)
-            atomic_csv(
-                args.output_root / f"{prefix}-event-daily.csv",
-                ("date", "event_type", "venue_id", "is_synthetic", "count"),
-                daily_export,
-            )
+            daily_path = args.output_root / f"{prefix}-event-daily.csv"
+            temporary = daily_path.with_suffix(".csv.tmp")
+            daily_count = export_csv(database, days, temporary)
+            temporary.replace(daily_path)
 
         print(
             json.dumps(
                 {
                     "start_date": start_date.isoformat(),
                     "end_date_exclusive": args.base_date.isoformat(),
-                    "daily_groups": len(rebuilt),
+                    "daily_groups": daily_count,
+                    "days_rebuilt": len(results),
                     "synthetic_csv_rows": len(rows),
                     "output_root": str(args.output_root.resolve()),
                 },

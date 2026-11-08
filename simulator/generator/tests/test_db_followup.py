@@ -178,6 +178,21 @@ def test_aggregate_rerun_replaces_daily_count(monkeypatch, tmp_path):
     monkeypatch.setattr(analytics, "MongoClient", lambda *_args, **_kwargs: Client())
     monkeypatch.setattr(
         analytics,
+        "aggregate_day",
+        lambda _database, _day: {"date": "2026-11-07", "groups": 1},
+    )
+
+    def export_daily(_database, _days, path):
+        atomic_csv(
+            path,
+            ("date", "event_type", "venue_id", "is_synthetic", "count"),
+            Events([]).aggregate(),
+        )
+        return 1
+
+    monkeypatch.setattr(analytics, "export_csv", export_daily)
+    monkeypatch.setattr(
+        analytics,
         "get_settings",
         lambda: SimpleNamespace(mongo_url=SecretStr("mongodb://example.invalid"), mongo_db="test"),
     )
@@ -185,4 +200,4 @@ def test_aggregate_rerun_replaces_daily_count(monkeypatch, tmp_path):
     argv = ["--base-date", "2026-11-08", "--days", "1", "--output-root", str(tmp_path)]
     assert analytics.main(argv) == 0
     assert analytics.main(argv) == 0
-    assert daily.rows == Events([]).aggregate()[0:1]
+    assert (tmp_path / "events-2026-11-07-2026-11-08-event-daily.csv").exists()

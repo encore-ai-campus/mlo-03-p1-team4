@@ -15,7 +15,9 @@ def inspect(report, events_path, daily_path):
     unique_events = {row["event_id"] for row in rows}
     sessions = {row["session_id"] for row in rows if row["session_id"]}
     dates = Counter(row["occurred_at(KST)"][:10] for row in rows)
-    daily_synthetic = sum(int(row["count"]) for row in daily if row["is_synthetic"] == "True")
+    daily_synthetic = sum(
+        int(row["count"]) for row in daily if row["is_synthetic"].lower() == "true"
+    )
     checks = {
         "event_ids_match_report": len(unique_events) == report["events"],
         "sessions_match_report": len(sessions) == report["sessions"],
@@ -38,10 +40,13 @@ def inspect(report, events_path, daily_path):
                     event_type: sum(
                         int(row["count"])
                         for row in daily
-                        if row["event_type"] == event_type and row["is_synthetic"] == "True"
+                        if row["event_type"] == event_type
+                        and row["is_synthetic"].lower() == "true"
                     )
                     for event_type in {
-                        row["event_type"] for row in daily if row["is_synthetic"] == "True"
+                        row["event_type"]
+                        for row in daily
+                        if row["is_synthetic"].lower() == "true"
                     }
                 }.items()
             )

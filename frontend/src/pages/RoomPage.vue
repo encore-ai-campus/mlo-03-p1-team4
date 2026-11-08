@@ -201,7 +201,7 @@ function scrollToBooking() {
         </ul>
 
         <nav class="subnav" aria-label="이 페이지 안에서 이동">
-          <a v-for="s in sections" :key="s.id" :href="`#${s.id}`" class="subnav__link">{{ s.label }}</a>
+          <a v-for="s in sections" :key="s.id" :href="`#${s.id}`" class="subnav__link" @click="log('product_section_click', { venue_id: room.venue_id })">{{ s.label }}</a>
         </nav>
 
         <section id="intro" class="block">
