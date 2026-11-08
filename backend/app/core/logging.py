@@ -11,7 +11,7 @@ import sys
 from contextlib import contextmanager, suppress
 from contextvars import ContextVar
 from pathlib import Path
-from threading import RLock
+from threading import Lock, RLock
 from time import monotonic, sleep
 
 from app.core.clock import get_event_time
@@ -19,7 +19,19 @@ from app.core.config import get_settings
 from app.core.metrics import event_file_lock_wait_seconds, event_file_write_duration_seconds
 
 request_id_context: ContextVar[str | None] = ContextVar("request_id", default=None)
-_file_lock = RLock()
+_file_locks = {}
+_file_locks_guard = Lock()
+
+
+def _thread_lock_for(path: Path):
+    # 실제 기록은 파일별 잠금으로 보호하고, 이 잠금은 조회·생성 중에만 잡는다.
+    key = path.resolve()
+    with _file_locks_guard:
+        lock = _file_locks.get(key)
+        if lock is None:
+            lock = RLock()
+            _file_locks[key] = lock
+        return lock
 
 
 class EventFileWriteError(OSError):
@@ -74,8 +86,10 @@ _fields = (
 @contextmanager
 def _process_lock(path: Path):
     # workers=2가 같은 파일을 쓸 때 JSON 줄이 서로 섞이지 않게 한다.
+    path = path.resolve()
+    thread_lock = _thread_lock_for(path)
     thread_wait_started = monotonic()
-    if not _file_lock.acquire(timeout=0.1):
+    if not thread_lock.acquire(timeout=0.5):
         event_file_lock_wait_seconds.labels(scope="thread").observe(
             monotonic() - thread_wait_started
         )
@@ -131,7 +145,7 @@ def _process_lock(path: Path):
                     )
                     process_wait_recorded = True
 
-            deadline = monotonic() + 0.1
+            deadline = monotonic() + 0.5
             while True:
                 try:
                     acquire()
@@ -159,7 +173,7 @@ def _process_lock(path: Path):
                             "process_unlock", event_file_failure_reason(error), type(error).__name__
                         ) from error
     finally:
-        _file_lock.release()
+        thread_lock.release()
 
 
 def append_json(path: Path, document: dict) -> None:
