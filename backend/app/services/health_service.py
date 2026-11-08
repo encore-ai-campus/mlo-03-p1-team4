@@ -8,6 +8,7 @@ from threading import Lock
 
 from app.core.db import check_database
 from app.core.errors import fail
+from app.core.metrics import health_dependency_up
 from app.core.mongo import check_mongo
 
 _lock = Lock()
@@ -39,6 +40,9 @@ def get_health() -> dict[str, str]:
             results[name] = future in completed and future.result()
         except Exception:
             results[name] = False
+
+    for name, healthy in results.items():
+        health_dependency_up.labels(dependency=name).set(int(healthy))
 
     if not results["primary"]:
         raise fail("SERVICE_UNAVAILABLE", 503)

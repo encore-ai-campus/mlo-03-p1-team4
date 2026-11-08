@@ -102,6 +102,11 @@ def test_mongo_failure_preserves_event_file_and_api_success(event_app, monkeypat
     response = http.post("/events", json={"session_id": SESSION, "events": [frontend_event()]})
     assert response.status_code == 202
     assert response.json() == {"accepted": 1, "ignored": []}
+    metrics = http.get("/metrics").text
+    assert "event_accepted_total" in metrics
+    assert "event_file_written_total" in metrics
+    assert "mongo_event_write_failures_total" in metrics
+    assert "event_writer_queue_size" in metrics
     assert attempted.wait(5)
     assert order == ["file", "mongo"]
     document = json.loads((log_dir / "events.log").read_text(encoding="utf-8").splitlines()[0])
@@ -122,6 +127,22 @@ def test_mongo_duplicate_error_counts_as_replayed_duplicate(monkeypatch):
 
     monkeypatch.setattr(events, "get_event_collection", lambda: Collection())
     assert events.insert_event_documents([{"event_id": SESSION}]) == (0, 1)
+
+
+def test_writer_records_mongo_success_and_duplicate(monkeypatch):
+    from prometheus_client import REGISTRY
+
+    monkeypatch.setattr(events, "insert_event_documents", lambda docs: (0, len(docs)))
+    writer = events._EventWriter()
+    before_written = REGISTRY.get_sample_value("mongo_event_written_total") or 0
+    before_duplicates = REGISTRY.get_sample_value("mongo_event_duplicates_total") or 0
+    try:
+        writer.queue.put({"event_id": "one"})
+        writer.queue.join()
+        assert REGISTRY.get_sample_value("mongo_event_written_total") == before_written
+        assert REGISTRY.get_sample_value("mongo_event_duplicates_total") == before_duplicates + 1
+    finally:
+        writer.stop()
 
 
 def test_replay_skips_legacy_and_preserves_new_event_id(tmp_path, monkeypatch):

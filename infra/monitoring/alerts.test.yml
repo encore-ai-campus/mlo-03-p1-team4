@@ -3,6 +3,34 @@ rule_files:
   - alerts.yml
 evaluation_interval: 1m
 tests:
+  - name: 이벤트_파일_실패_경보
+    interval: 1m
+    input_series:
+      - series: 'event_file_write_failures_total{stage="write_event",reason="disk_full"}'
+        values: '0 1 1 1 1 1'
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: EventFileWriteFailure
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: 'events.log 기록 실패'
+  - name: mongo_degraded가_2분_지속되면_경보
+    interval: 1m
+    input_series:
+      - series: 'health_dependency_up{vm="api1",dependency="mongo"}'
+        values: '0 0 0 0 0'
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: HealthDependencyDown
+        exp_alerts:
+          - exp_labels:
+              vm: api1
+              dependency: mongo
+              severity: warning
+            exp_annotations:
+              summary: 'api1 mongo 저장소 확인 실패'
   - name: 정상_슬롯_충돌만_있으면_경보_없음
     interval: 1m
     input_series:

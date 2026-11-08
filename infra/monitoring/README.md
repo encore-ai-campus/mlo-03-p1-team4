@@ -43,9 +43,13 @@ Grafana Explore에서 예를 들어 `{server="api1",source="events"}` 또는 `{s
 - Prometheus: [`prometheus.service.example`](prometheus.service.example)의 `--storage.tsdb.retention.time=15d`. remote-write receiver 플래그 없음.
 - Loki: [`loki.yml`](loki.yml)의 `retention_period: 336h`, TSDB 24시간 인덱스, retention을 켠 Compactor, `delete_request_store: filesystem`.
 - 경보: [`alerts.yml`](alerts.yml). node exporter scrape 실패, Mongo 이벤트 저장 실패, 정상 예약 충돌 409를 분모에서 제외한 FastAPI 5xx 비율을 감시한다. 복제 지연 경보는 실제 exporter 이름을 확인한 뒤 추가한다.
+- 이벤트 지표: `event_accepted_total`은 허용 이벤트의 문서 검증이 끝나 파일 기록을 시도할 때, `event_file_written_total`은 `events.log` append 성공 직후 증가한다. `mongo_event_written_total`은 백그라운드 writer의 새 저장 건수, `mongo_event_duplicates_total`은 `event_id` 중복으로 건너뛴 건수다. `mongo_event_write_failures_total`은 실패·대기열 포화/종료 건수이며 기존 `event_file_write_failures_total{stage,reason}`은 파일 실패 단계·원인을 구분한다. 이 값들은 이벤트 건수이며 HTTP 요청 수가 아니다. 이벤트 API 202는 파일 기록 성공을 뜻하며 Mongo 저장 완료를 뜻하지 않는다.
+- `event_writer_queue_size`는 현재 writer 대기 문서 수의 근삿값이다. 두 작업자가 이미 꺼낸 처리 중 문서는 제외한다. `health_dependency_up{dependency="primary|replica|mongo"}`는 마지막 `/health` 확인 결과(1 정상, 0 장애)다. 지표가 아직 없거나 오래됐다면 상태를 알 수 없으므로 `up{job="api"}`로 앱 scrape 상태도 함께 확인한다. primary 장애 503, replica/Mongo 장애 degraded인 API 계약은 유지한다.
+- 현재 Uvicorn은 서버당 worker 2개다. Python client의 일반 카운터·게이지는 프로세스별 메모리인데 Prometheus는 해당 주소의 한 worker에만 닿을 수 있다. 따라서 대시보드의 이벤트 합계·대기열·health 값은 전체 worker의 정확한 합계/상태가 아니다. `events.log`의 Loki 유입도 함께 보고, VM에서 실제 scrape와 worker별 수집 방식을 검증하기 전에는 전체 건수로 해석하지 않는다.
 - 규칙 예제: [`alerts.test.yml`](alerts.test.yml)은 409만 발생, 5xx 기준 초과, 충돌이 많아도 5xx 기준 초과인 경우를 확인한다.
 - 대시보드: [서비스](dashboard-service.json), [예약](dashboard-reservation.json), [DB](dashboard-db.json), [이벤트](dashboard-events.json). DB 연결 수·복제 지연과 Mongo 연결 수는 exporter의 실제 지표 이름을 확인하기 전까지 안내 패널로 둔다.
-- MongoDB용 공식 Grafana 데이터 소스는 Grafana Enterprise 플러그인이므로 OSS 대시보드에 사용하지 않는다. 30일 `event_daily` 분석은 PM·DB가 CSV 표/그래프 또는 MariaDB 분석용 표 중 정한 방식을 별도로 준비한다.
+- MongoDB 원천은 `space_rental_analytics.events`, 일별 집계는 `event_daily`다. 기존 `db/aggregate/event_daily.py`의 CSV와 발표용 그래프를 우선한다. `crawl.crawl_raw`는 별도 DB의 크롤링 자료다. MongoDB 직접 Grafana 조회 경로는 미결정이다. MongoDB exporter 설치 여부와 실제 지표 이름은 DB 담당 확인 후 대시보드에 연결한다.
+- 이 저장소의 Prometheus service 예시는 15일, Loki 설정 예시는 14일이다. 109 시험 VM의 `infra/vm/lab/install-role.sh`에는 별도 2일/2GB Prometheus 설정과 로그 회전(3개)이 있다. 실제 실행 인자·Loki 설정·로그 회전 적용 여부와 디스크 여유는 VM 소유자가 확인해야 한다. 디스크 부족의 현재 직접 신호는 파일 실패의 `reason="disk_full"`이다. 새 디스크 임계값은 정하지 않았다.
 
 `alerts.yml`의 5xx는 `http_requests_total`에서 5xx를 세고 전체 요청에서 `reservation_total{result="conflict"}`를 뺀 비율이다. VM에서 HTTP 409 수와 conflict counter가 실제로 맞는지 확인해야 한다. 경보 시험은 승인된 시험 환경에서 정상 충돌만 발생할 때 경보가 울리지 않고, 5xx 비율이 기준을 넘을 때 울리는지 본다.
 

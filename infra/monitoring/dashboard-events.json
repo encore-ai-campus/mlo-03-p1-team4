@@ -1,7 +1,7 @@
 {
   "id": null,
   "uid": "spacecube-events",
-  "title": "이벤트 · 수신/쓰기 실패/읽기 대체",
+  "title": "이벤트 · 수집 단계와 장애",
   "tags": [
     "spacecube",
     "F-65"
@@ -17,18 +17,29 @@
   "panels": [
     {
       "id": 1,
-      "title": "이벤트 수신",
-      "type": "text",
+      "title": "이벤트 접수·파일 성공·Mongo 저장 (5분)",
+      "type": "timeseries",
       "gridPos": {
         "h": 8,
         "w": 12,
         "x": 0,
         "y": 0
       },
-      "options": {
-        "mode": "markdown",
-        "content": "### 이벤트 수신\nevents.log 실제 구조 또는 이벤트 수신 counter 확인 대기\n실제 /metrics 샘플 확인 후 쿼리를 연결합니다."
-      }
+      "datasource": {
+        "type": "prometheus",
+        "uid": "spacecube-prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "targets": [
+        {
+          "legendFormat": "{{vm}} {{stage}}",
+          "refId": "A",
+          "expr": "sum by (vm, stage) (label_replace(increase(event_accepted_total[5m]), \"stage\", \"accepted\", \"\", \"\") or label_replace(increase(event_file_written_total[5m]), \"stage\", \"file\", \"\", \"\") or label_replace(increase(mongo_event_written_total[5m]), \"stage\", \"mongo\", \"\", \"\"))"
+        }
+      ]
     },
     {
       "id": 2,
@@ -96,18 +107,211 @@
     },
     {
       "id": 4,
-      "title": "이벤트 로그 유입 상태",
-      "type": "text",
+      "title": "Loki events.log 유입 (5분)",
+      "type": "timeseries",
       "gridPos": {
         "h": 8,
         "w": 12,
         "x": 12,
         "y": 8
       },
-      "options": {
-        "mode": "markdown",
-        "content": "### 이벤트 로그 유입 상태\nLoki Explore에서 {source=\"events\"}를 VM별 확인\n실제 /metrics 샘플 확인 후 쿼리를 연결합니다."
-      }
+      "datasource": {
+        "type": "loki",
+        "uid": "spacecube-loki"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "targets": [
+        {
+          "legendFormat": "{{server}}",
+          "refId": "A",
+          "expr": "sum by (server) (count_over_time({source=\"events\"}[5m]))"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "파일 기록 실패 단계·원인 (5분)",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "spacecube-prometheus"
+      },
+      "gridPos": {
+        "y": 16,
+        "x": 0,
+        "h": 8,
+        "w": 12
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "targets": [
+        {
+          "legendFormat": "{{vm}} {{stage}} {{reason}} {{dependency}}",
+          "refId": "A",
+          "expr": "sum by (vm, stage, reason) (increase(event_file_write_failures_total[5m]))"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "파일 잠금 대기 p95·기록 p95 (5분)",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "spacecube-prometheus"
+      },
+      "gridPos": {
+        "y": 16,
+        "x": 12,
+        "h": 8,
+        "w": 12
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "targets": [
+        {
+          "legendFormat": "{{vm}} {{stage}} {{reason}} {{dependency}}",
+          "refId": "A",
+          "expr": "label_replace(histogram_quantile(0.95, sum by (vm, le) (rate(event_file_lock_wait_seconds_bucket[5m]))), \"stage\", \"lock_wait\", \"\", \"\") or label_replace(histogram_quantile(0.95, sum by (vm, le) (rate(event_file_write_duration_seconds_bucket[5m]))), \"stage\", \"write_total\", \"\", \"\")"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "title": "Mongo 새 저장·중복·실패 (5분)",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "spacecube-prometheus"
+      },
+      "gridPos": {
+        "y": 24,
+        "x": 0,
+        "h": 8,
+        "w": 12
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "targets": [
+        {
+          "legendFormat": "{{vm}} {{stage}} {{reason}} {{dependency}}",
+          "refId": "A",
+          "expr": "sum by (vm, stage) (label_replace(increase(mongo_event_written_total[5m]), \"stage\", \"written\", \"\", \"\") or label_replace(increase(mongo_event_duplicates_total[5m]), \"stage\", \"duplicate\", \"\", \"\") or label_replace(increase(mongo_event_write_failures_total[5m]), \"stage\", \"failed\", \"\", \"\"))"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "title": "writer 대기열",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "spacecube-prometheus"
+      },
+      "gridPos": {
+        "y": 24,
+        "x": 12,
+        "h": 8,
+        "w": 12
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "targets": [
+        {
+          "legendFormat": "{{vm}} {{stage}} {{reason}} {{dependency}}",
+          "refId": "A",
+          "expr": "sum by (vm) (event_writer_queue_size)"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "title": "/health 저장소 상태 (1 정상)",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "spacecube-prometheus"
+      },
+      "gridPos": {
+        "y": 32,
+        "x": 0,
+        "h": 8,
+        "w": 12
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "targets": [
+        {
+          "legendFormat": "{{vm}} {{stage}} {{reason}} {{dependency}}",
+          "refId": "A",
+          "expr": "min by (vm, dependency) (health_dependency_up)"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "title": "HTTP 5xx 비율",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "spacecube-prometheus"
+      },
+      "gridPos": {
+        "y": 32,
+        "x": 12,
+        "h": 8,
+        "w": 12
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "targets": [
+        {
+          "legendFormat": "{{vm}} {{stage}} {{reason}} {{dependency}}",
+          "refId": "A",
+          "expr": "sum by (vm) (rate(http_requests_total{status=~\"5..\"}[5m])) / clamp_min(sum by (vm) (rate(http_requests_total[5m])), 0.001)"
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "title": "HTTP p95 (초)",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "spacecube-prometheus"
+      },
+      "gridPos": {
+        "y": 40,
+        "x": 0,
+        "h": 8,
+        "w": 12
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "targets": [
+        {
+          "legendFormat": "{{vm}} {{stage}} {{reason}} {{dependency}}",
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by (vm, le) (rate(http_request_duration_seconds_bucket[5m])))"
+        }
+      ]
     }
   ]
 }

@@ -15,6 +15,20 @@ groups:
           severity: warning
         annotations:
           summary: "MongoDB 이벤트 쓰기 실패"
+      - alert: EventFileWriteFailure
+        expr: sum(increase(event_file_write_failures_total[5m])) > 0
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "events.log 기록 실패"
+      - alert: HealthDependencyDown
+        expr: min by (vm, dependency) (health_dependency_up) == 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.vm }} {{ $labels.dependency }} 저장소 확인 실패"
       - alert: HttpServerErrorRateHigh
         expr: (sum(rate(http_requests_total{status=~"5.."}[5m])) / clamp_min(sum(rate(http_requests_total[5m])) - (sum(rate(reservation_total{result="conflict"}[5m])) or vector(0)), 0.001)) > 0.05
         for: 5m
