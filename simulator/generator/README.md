@@ -76,9 +76,62 @@ DB 연결 없이 계획만 확인하려면 `--dry-run --snapshot <공간 JSON �
 
 ## DB·FE 후속 연결
 
-실행 후 `report.json`과 `manifest.json`을 DB 담당에게 전달합니다. `event_daily` 기간 재집계·CSV·정리 스크립트는 DB 담당 작업으로 남겨 둡니다. 원본 운영 이벤트를 삭제하거나 API 전달 성공률에 생성기 데이터를 포함하지 않습니다.
+실행 후 `report.json`과 `manifest.json`을 DB 담당에게 전달합니다. 원본 운영 이벤트를 삭제하거나 API 전달 성공률에 생성기 데이터를 포함하지 않습니다. 가상 데이터 정리는 별도 작업이며 운영 DB에서 자동 실행하지 않습니다.
 
 집계 키는 KST `occurred_at` 날짜, `event_type=event_name`, 공간별 문자열 `products[].product_id`(공간 없으면 null), `is_synthetic`입니다. CSV 컬럼은 #75 PM 댓글의 목록을 따릅니다. DB 산출물 이후 FE가 그래프를 확인합니다.
+
+### 일별 집계와 CSV (DB 담당)
+
+api1의 저장소 루트에서 별도 Python 프로세스로 실행합니다. `backend/.env`의 `MONGO_URL`·`MONGO_DB`를 읽으며, 동시 실행은 `logs/analytics/.event_daily.lock`으로 막습니다. 기간은 `[기준일-일수, 기준일)`의 KST 달력 날짜이며 기본값은 오늘 기준 직전 30일입니다.
+
+```powershell
+conda run -n pro_1 --no-capture-output python -m simulator.generator.analytics --base-date 2026-11-07 --days 30 --output-root logs/analytics
+```
+
+같은 기간을 다시 실행하면 `db/aggregate/event_daily.py`의 기존 집계기를 호출해 `event_daily`를 원천 `events`에서 재계산합니다. 집계기와 CSV 래퍼 모두 컬렉션·인덱스를 만들지 않습니다. 공식 `mongo_init.js`의 `event_daily` 복합 UNIQUE 인덱스가 없으면 쓰기 전에 중단합니다. 같은 기간의 중복 실행은 이 래퍼의 파일 잠금으로 막고, 실패 시 같은 명령을 재실행합니다.
+
+109 api1의 100명·30일 파일럿과 `event_daily` 재집계는 11-07 이미 실행·기록됐습니다(`STATE.md` #19·#75 행). 위 명령은 해당 결과의 원천 이벤트 CSV가 필요할 때 사용합니다. 최종 배치의 일별 스케줄은 현재 109 api1에 등록된 집계 타이머와 중복되지 않도록 A가 실제 구성을 먼저 확인합니다.
+
+실행 결과는 다음 두 CSV를 원자적으로 교체합니다.
+
+- `events-<시작일>-<기준일>-synthetic.csv`: 가상 원천 이벤트. CSV 한 행은 이벤트와 각 `products[]` 상품 ID 조합이며 상품이 없는 이벤트도 한 행을 냅니다. 같은 이벤트에 상품이 여러 개면 `event_id`가 여러 행에 나타납니다.
+- `events-<시작일>-<기준일>-event-daily.csv`: `date,event_type,venue_id,is_synthetic,count` 집계. 발표 그래프는 이벤트 건수로 표시합니다.
+
+최종 api1의 일별 스케줄 등록은 A 담당입니다. 아래 형태는 후보 명령이며, 109 api1에는 `event_daily` :20 타이머가 이미 있다는 진행 기록을 확인하고 **동일 작업을 두 번 등록하지 않습니다**. A가 실제 서비스 계정, exit code, 로그 회전을 연결합니다.
+
+```text
+python -m simulator.generator.analytics --days 1 --output-root /var/lib/spacecube/analytics
+```
+
+세션 전환율·이탈률 CSV는 전환 이벤트·세션 판정 기준이 정해진 뒤 추가합니다.
+
+### 부족한 공간 요청 만들기 (DB 담당)
+
+검증된 원천 공간만 담은 JSON 스냅샷을 준비합니다. `venues` 배열의 각 행에는 `category_code`, `source_site`, `source_id`, `is_active`, `verified`, `sido`, `sigungu`, `capacity_max`, `price_per_hour`, `min_hours`, `open_hour`, `close_hour`, `facilities`가 필요합니다. `verified`는 DB 담당이 속성·요금 단위를 확인한 공간에만 `true`로 지정합니다. 전체 활성 공간도 포함해야 유형별 부족 수가 정확합니다. 업체명·원문·사진·주소 상세는 넣지 않습니다.
+
+```powershell
+conda run -n pro_1 --no-capture-output python -m simulator.generator.topup --snapshot vetted_venues.json --output logs/topup-requests.json --seed 75
+```
+
+출력의 `requests` 배열은 B의 `POST /internal/venues` 본문으로 검증됩니다. 기존 활성 공간이 6개 이상인 유형은 생성하지 않습니다. `source_id`는 시드·유형·번호에서 고정되며, 부분 등록 뒤 새 스냅샷으로 다시 생성할 때 이미 등록된 ID는 건너뜁니다. 결과를 검토한 뒤 api1의 내부 API로 등록합니다. 이 도구는 HTTP 요청이나 DB 쓰기를 하지 않습니다. `verified` 원천이 없는 유형은 임의 가격을 만들지 않고 중단합니다.
+
+### 파일럿 결과 오프라인 점검 (DB 담당)
+
+생성기 `report.json`과 위 두 CSV를 받으면 다음 명령으로 이벤트 고유 ID 수, 세션 수, 집계 수, 기간을 비교합니다. 종료 코드 0은 모든 파일 비교 통과, 1은 불일치입니다. 이 검사는 MariaDB 예약·결제 행 및 슬롯 중복을 조회하지 않으므로 파일럿 완료 판정 전에 DB 담당이 해당 수량을 별도 확인해야 합니다.
+
+```powershell
+conda run -n pro_1 --no-capture-output python -m simulator.generator.audit --report logs/generator-<run_id>/report.json --events-csv logs/analytics/events-2026-10-08-2026-11-07-synthetic.csv --daily-csv logs/analytics/events-2026-10-08-2026-11-07-event-daily.csv
+```
+
+### api1 일별 스케줄 인계 (A 담당)
+
+api1에서 `timedatectl`로 OS 시간이 Asia/Seoul인지 확인합니다. 서비스 계정에 저장소 읽기, `backend/.env` 읽기, 분석 출력 폴더 쓰기 권한을 부여합니다. `pro_1`을 활성화해 `command -v python`으로 절대 경로를 기록한 뒤 `crontab -e`에서 다음 한 줄의 경로를 실제 값으로 바꿉니다. `.env` 비밀값은 crontab이나 로그에 적지 않습니다.
+
+```cron
+0 4 * * * cd /실제/저장소/경로 && /pro_1/python/절대경로 -m simulator.generator.analytics --days 1 --output-root /실제/분석/출력경로 >> /실제/로그/경로/event-daily.log 2>&1
+```
+
+등록 후 `crontab -l` 또는 기존 systemd timer 목록으로 중복 여부를 확인하고, 같은 서비스 계정에서 `--base-date YYYY-MM-DD --days 1`을 수동 실행해 종료 코드 0과 CSV 두 파일을 확인합니다. 같은 날짜 재실행 결과가 같아야 합니다. 실행 실패나 종료 코드가 0이 아니면 해당 날짜를 수동 재실행하고 로그를 확인합니다. 로그 파일 회전과 실행 감시는 A 운영 설정에서 연결합니다.
 
 ## 검증
 
