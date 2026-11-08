@@ -15,7 +15,7 @@
 | 프론트 | 노진산(FE·PM) | FE-1~9 확정안 반영, Claude 시안 대조·FE 오류/모바일 결제/가입 UX 재검토 및 목업·화면 검증. 11-06 C안 화풍(흰 바탕·검은 글자·주칠)과 유형별 일러스트 5장 유지. CCL 분위기 참고 사진 40장(유형별 8장)을 정적 경로로 연결하고 유형·venue ID 해시로 안정 선택, 사진 표시·크레딧 추가(API `art:` 계약 그대로) | A·B 구현 후 실제 API 연결·오류·예약 동시성 통합 검증 | 실제 API 미구현 |
 | FastAPI A | [이름] | 회원·후기 및 F-60 이벤트 구현. #75에서 `override_business_time()`과 실제 `received_at` 분리, 생성기 `HistoricalRuntime`과 가입·후기·이벤트 시각 비교 테스트 24건 통과. 실험 VM MariaDB 10.11.14 전체 406건 통과 | PR #86의 공식 MariaDB 11.4 CI 확인, 이후 api1 파일럿의 이벤트 시각·중복 여부 확인 | Windows MariaDB 13.0.2에서 동시성 4건 실패 이력. 10.11.14 결과는 실험 환경 호환 확인이며 공식 11.4 결과는 PR CI 대기 |
 | FastAPI B | 이세훈 | #67 `feat/B-nginx`에 최신 develop `e7db36f` 통합, 자체 구성한 api1(.232)·api2(.233) 테스트 VM에서 Nginx/FastAPI 동배치·캐시·WebP·loopback keepalive 검증. #66 HAProxy 정문 설정(gw:80 라운드로빈·/api/health 능동 확인·내부 경로 차단·retries 0·8404 지표) 머지, 장애 제외/복귀 시험은 별도. #74·#76 develop 병합: 예약 결과 이벤트 새 형식, 커밋 후 이벤트 문맥·상품 생성·기록 실패에도 업무 응답 유지. 후속 수정은 `fix/B-issue5-product-factory`에서 검증 대기. #77 `feat/B-F-62-generator`에서 #75 생성기 본체·서비스 연결·재개 구현, 실제 MongoDB 100명/30일 검증 완료 | #76 PM 상품 팩토리 후속 리뷰·병합. #75 A 연결 확인·DB 공간 보충/집계/CSV·api1 수동 파일럿. #79 공유 테스트 DB 경합 방지. #8 api1 cron | 원격 MongoDB 서버 문맥 null validator 동기화 필요. 실제 api1·replica·브라우저 E2E 미검증 |
-| DB | [이름] | `0001_init.sql`·`mongo_init.js` 검증(설치형 11.8·compose 11.4 둘 다 29건 통과), seed(유형 5·시설 20·지역 230 → `seed.sql`), `infra/local` compose. F-61 두 수집원 파서·매핑·적재 코드와 오프라인 테스트 작성. API 제외 운영 저장 검증에서 MongoDB `crawl.crawl_raw`와 MariaDB `spacecube.crawl_jobs` 각 1건 삽입·재조회·해당 건 정리 성공. `environment.yml`로 `pro_1`(Python 3.12.16) 설치, 크롤러 오프라인 pytest 17건·Ruff 전체 린트·포맷 통과. FE verify(단위 67건·빌드) 통과. 별도 Compass DB의 events·event_daily 속성 정리 v1을 docs/db에 공유 | 실제 단건 파서 확인 → 시연용 공간 선별·API 등록(B와) → 부족분·과거 30일 행동 데이터 생성기 | 운영 저장소 쓰기 경로는 확인했으나 실제 외부 수집·`venues` 등록은 접속 URL·내부 키가 빈 `backend/.env`와 내부 API 미기동으로 미실행 |
+| DB | [이름] | `0001_init.sql`·`mongo_init.js`와 seed 검증, F-61 파서·매핑·적재. #19용 KST 일별 집계·CSV, 부족 공간 요청 JSON, 파일럿 보고서 대조 CLI 작성. 오프라인 3건·Ruff 통과 | api1에서 공간 등록·100명 파일럿·실제 MongoDB 집계 검증, A cron 연결·FE 그래프 확인 | api1 접근 불가·실제 DB 접속 정보 없음. 세션 전환·이탈 기준 미결 |
 
 ## 기능 진행표
 
@@ -44,7 +44,7 @@
 | F-60 B 지원 (#60·#72) | 예약 결과 3종·상품 스냅샷·선택적 브라우저 문맥 | B / A·DB 연계 | B 구현·A d75deea 임시 통합 검증: 관련 pytest 77건·전체 375건, Postman 7요청/15검증, 지정 MongoDB에서 결과 3종 실저장·동일 ID 중복 제외·가상 데이터 정리. A의 server-요청 ID 보완 및 원격 validator null 허용 반영 전 최종 완료 아님 |
 | #20·#69 | 일일 네 페르소나·안전 실행·실험 기록 | B | PM 댓글의 새 이벤트 문맥·사용자별 `X-Session-Id`·예약 날짜/공간/시간 분산·실행별 `logs/` CSV·HTML 반영. 전용 pytest 32건, Ruff·Locust 클래스 목록 통과. 실제 Write·보고서 생성·Loki 적재 및 고정 Locust 2.47.0 미검증 |
 | F-61 | 크롤링 신규 등록 | DB / B | 진행: B POST /internal/venues 구현·로컬 검증 완료(35건·같은 출처 동시 8건·HTTP 6요청/12검증). DB 두 파서·유형/지역 매핑·crawl_raw·crawl_jobs·API 재시도와 오프라인 테스트 작성. API 제외 운영 저장 검증에서 MongoDB `crawl_raw`·MariaDB `crawl_jobs` 각 1건 삽입·재조회·정리 성공. `pro_1` 크롤러 오프라인 pytest 17건·Ruff·FE verify 통과. `venues` 등록·실제 외부 수집은 별도 미검증; `backend/.env` 접속 값·키 미설정 |
-| #19·#75 생성기 | 과거 30일 회원·예약·결제·후기·이벤트 백필 | B 본체·A 연결 확인·DB 공간/집계/CSV | 구현·검증: CLI·고정 세션·서비스 호출·과거 업무 시각/실제 received_at·관측 억제·manifest/state 재개. 최종 verify.ps1 통과(pytest 399건·FE 67건·린트/빌드), 생성기 21건(실제 MariaDB 및 지정 MongoDB) 통과. 100명·1,260세션·예약 912·취소 91·완료 821·후기 205·이벤트 10,089건, 재개 추가 적재 0건·validator 121 거절 확인. 운영 api1 파일럿·DB 후속 산출물은 별도 |
+| #19·#75 생성기 | 과거 30일 회원·예약·결제·후기·이벤트 백필 | B 본체·A 연결 확인·DB 공간/집계/CSV | B 생성기 본체는 기존 검증 완료. DB의 집계·CSV, 공간 요청, 오프라인 대조 CLI 작성 및 새 집중 테스트 3건·Ruff 통과. 실제 공간 등록·api1 파일럿·MongoDB 집계·cron·FE 그래프는 미완료 |
 | #54 | HAProxy 정문·서버별 Nginx | B / A / DB | #67 자체 구성한 테스트 환경의 api1(.232)·api2(.233)에 Nginx/FastAPI 동배치 적용. Nginx 1.24 nginx -t·캐시/MIME·404/internal 차단·loopback API keepalive 확인. primary health와 GET categories 200(읽기 전용), MongoDB 주소 미제공으로 degraded. 테스트 VM의 배포·설정·백업 경로는 infra/nginx/README.md. HAProxy 장애 제외/복귀는 #66 별도 |
 | F-70 | 헬스체크 3단계 | A | 설계 확정 |
 | #78 공통 검증 | 공유 테스트 DB 병렬 실행의 회원 재가입 500 방지 | 공동(B 구현) | 최신 develop f387df2에서 독립 브랜치로 구현. 루트 conftest의 session 잠금·테스트 전 소유권 확인·대기 600초/조정·종료 해제. 실제 DB 잠금 회귀 29건, 기존 실패 재현 두 프로세스 각각 5건 통과(대기 후 진행), 최종 verify.ps1 pytest 407건·FE 67건·린트/빌드 통과. API·DDL·업무 트랜잭션·기존 동시성 검증은 유지. 11-07 ef39125에서 회귀 29건·병렬 재가입 5+5회·전체 verify(Python 407건·FE 67건) 및 하위 폴더 실행 1건 재통과. PR #79(develop) 생성·리뷰 대기. 잠금 미적용 checkout 및 pytest 외 DDL 작업은 별도 순차 실행 필요 |
@@ -180,6 +180,10 @@ A1~A4는 11-03에 확정했고, **A5~A8은 추후 확정**으로 미뤘다(11-03
 - 개인 기억(Claude 자동 메모리 등)은 팀에 공유되지 않는다. 팀이 알아야 할 것은 이 파일과 `docs/`에 쓴다.
 
 ## 최근 변경 (최신이 위)
+
+- 11-08 · DB · #19 서버 접속 전 작업: `origin/develop` 재조회(현재 브랜치와 같은 97b533a), KST 경계·CSV·파일럿 대조 및 공간 보충 요청 생성 구현. 고정 seed/source_id와 부분 등록 재개, B 내부 API 스키마 검증, cron 인계 절차를 생성기 README에 정리. `test_db_followup.py` 3건, 전체 Ruff 122파일, FE verify(단위 71건·빌드) 통과. 전체 pytest는 이 워크트리에 `CHECK_DB_URL`이 없어 137건 통과·9건 건너뜀·4건 실패·310건 설정 오류로 미통과. 실제 MongoDB·api1 접속 검증 및 cron 등록은 미실행.
+
+- 11-07 · DB · #19/#75 후속으로 `simulator/generator/analytics.py` 추가: 공식 `events`에서 KST 30일 범위 `event_daily` 재집계, 가상 이벤트 상세 CSV와 일별 집계 CSV 출력, 동시 실행 파일 잠금·원자적 CSV 교체·같은 기간 재실행 규칙 문서화. 실행·DB 연결·cron 등록은 아직 안 함. #19 코멘트는 수동 100명 파일럿(api1), #75 PM 결정은 날짜/키/CSV 열을 고정. api1 cron은 A 담당이므로 연결 인수인계, 세션 전환율/이탈률 이벤트 기준은 협의 대기. 새 워크트리 `C:\mlo-03-p1-team4-issue19`, 브랜치 `feat/DB-issue19-backfill`.
 
 - 11-07 · A · #75 생성기의 `HistoricalRuntime`과 A `override_business_time()`을 직접 비교하는 회귀 테스트 추가. 과거 날짜 가입 스키마 검증, `auth_service.signup()`의 가입·동의 시각, `review_service.create_review()` 저장 시각, 생성기 `documents()`와 A `build_document()`의 `occurred_at` 및 나머지 문서 필드 일치를 확인하고 실제 `received_at`은 현재 시각으로 유지되는지 검사. A 기준 문서의 생성기 시각 적용·이벤트/지표 억제 설명을 현행 `HistoricalRuntime`에 맞춤. `backend/tests/test_backfill_clock.py`와 `simulator/generator/tests/test_generator.py` 24건 통과, Ruff 린트·포맷 통과. 기본 pytest 임시 폴더 권한 오류가 있어 사용자 Temp 아래 별도 `--basetemp`로 재실행함. DB 저장은 이 비교 테스트에서 mock 처리했고, MariaDB 10.11.14 전체 406건 결과는 이전 VM 실행; 11.4 검증은 남음.
 

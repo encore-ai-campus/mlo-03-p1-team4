@@ -107,7 +107,10 @@ Pro_1/
 │  └─ data/                   기준선·표본 (지우지 않음)
 │
 ├─ simulator/
-│  ├─ generator/              [B 본체·A 연결 확인·DB 후속] #75 서비스 호출 기반 과거 백필 CLI
+│  ├─ generator/              [B 본체·A 연결 확인·DB 후속] #75 과거 백필·event_daily 집계·CSV CLI
+│  │  ├─ analytics.py         [DB] KST 일별 재집계·가상 이벤트 CSV (api1 cron 연결용)
+│  │  ├─ topup.py             [DB] 유형별 부족 공간의 내부 등록 요청 JSON 준비
+│  │  ├─ audit.py             [DB] 생성기 보고서·CSV 수량 오프라인 대조
 │  │  └─ tests/              고정 방문량·시각·부분 실패·실제 MariaDB 서비스/재개 검증
 │  └─ locust/                 [B] 부하·동시성 (예정)
 │     ├─ daily_locustfile.py   [B] 네 페르소나 일일 조회·명시적 쓰기 시나리오
