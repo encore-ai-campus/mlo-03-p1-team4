@@ -390,7 +390,13 @@ def parser():
     command.add_argument("--crawler-result", type=Path)
     command.add_argument("--run-id")
     command.add_argument("--seed", type=int)
-    command.add_argument("--crawl-mode", choices=("weekly", "bootstrap"), default="weekly")
+    command.add_argument(
+        "--crawler-mode",
+        "--crawl-mode",
+        dest="crawl_mode",
+        choices=("weekly", "bootstrap"),
+        default="weekly",
+    )
     command.add_argument("--save-plan", action="store_true")
     command.add_argument(
         "--confirm-shareit-terms",

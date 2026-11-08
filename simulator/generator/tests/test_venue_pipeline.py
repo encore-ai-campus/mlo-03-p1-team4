@@ -34,6 +34,17 @@ def crawler_result(**changes):
     }
 
 
+@pytest.mark.parametrize("option", ["--crawler-mode", "--crawl-mode"])
+def test_crawler_mode_option_accepts_pm_name_and_legacy_alias(option):
+    args = pipeline.parser().parse_args(["--mode", "apply", option, "bootstrap"])
+    assert args.crawl_mode == "bootstrap"
+
+
+def test_crawler_mode_defaults_to_weekly():
+    args = pipeline.parser().parse_args(["--mode", "dry-run", "--crawler-result", "counts.json"])
+    assert args.crawl_mode == "weekly"
+
+
 @pytest.fixture
 def runtime(monkeypatch):
     profiles, _, _ = supplement._read_profiles(supplement.DEFAULT_PROFILES)

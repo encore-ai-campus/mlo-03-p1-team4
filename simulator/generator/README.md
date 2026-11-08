@@ -90,12 +90,12 @@ conda run -n pro_1 --no-capture-output python -m simulator.generator.run_pipelin
 # 입력·계획을 기록하되 업무 데이터와 크롤러 상태는 변경하지 않습니다.
 conda run -n pro_1 --no-capture-output python -m simulator.generator.run_pipeline --mode dry-run --crawler-result counts.json --save-plan --seed 10001
 # 실행 직전 쉐어잇 약관을 확인한 뒤 실제 크롤링부터 보충까지 자동 진행합니다.
-conda run -n pro_1 --no-capture-output python -m simulator.generator.run_pipeline --mode apply --crawl-mode bootstrap --confirm-shareit-terms
+conda run -n pro_1 --no-capture-output python -m simulator.generator.run_pipeline --mode apply --crawler-mode bootstrap --confirm-shareit-terms
 # 저장된 실제 실행의 크롤러 결과·seed·계획으로 재개하며 크롤러는 반복하지 않습니다.
 conda run -n pro_1 --no-capture-output python -m simulator.generator.run_pipeline --mode resume --run-id <통합 실행 UUID>
 ```
 
-`--crawl-mode weekly`가 기본이며 두 출처의 baseline이 먼저 필요합니다. 첫 준비와 발표일 정기 실행은 기존 배포 계획대로 `bootstrap`을 명시합니다. 두 모드 모두 상세 조회 합계 20건 상한을 유지합니다. 크롤러 기존 등록 상한은 bootstrap 20건, weekly 5건(유형별 최대 1건)입니다. 보충량은 실제 HTTP 201 신규 수로 계산하므로 갱신 200은 제외합니다.
+`--crawler-mode weekly`가 기본이며 두 출처의 baseline이 먼저 필요합니다. 기존 `--crawl-mode`도 같은 옵션의 별칭으로 지원합니다. 첫 준비와 발표일 정기 실행은 기존 배포 계획대로 `bootstrap`을 명시합니다. 두 모드 모두 상세 조회 합계 20건 상한을 유지합니다. 크롤러 기존 등록 상한은 bootstrap 20건, weekly 5건(유형별 최대 1건)입니다. 보충량은 실제 HTTP 201 신규 수로 계산하므로 갱신 200은 제외합니다.
 
 `--seed`, `--profiles`, `--api-url`, `--output-root`를 지정할 수 있습니다. 새 저장 실행에는 새 seed를 사용합니다. dry-run 저장 기록은 실제 크롤러 실적이 아니므로 통합 resume으로 적용하지 않습니다. dry-run 정상 종료 코드는 0이며, 계획 검증 실패·미완료는 1, 설정·잠금·입력 오류는 2입니다.
 

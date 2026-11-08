@@ -80,7 +80,7 @@ if ! /usr/bin/flock -n 9; then
 fi
 test -x /opt/spacecube/ops/check-shareit-terms.sh
 /opt/spacecube/ops/check-shareit-terms.sh
-exec /opt/spacecube/venv/bin/python -m simulator.generator.run_pipeline --mode apply --crawl-mode bootstrap --confirm-shareit-terms
+exec /opt/spacecube/venv/bin/python -m simulator.generator.run_pipeline --mode apply --crawler-mode bootstrap --confirm-shareit-terms
 ```
 
 ```bash
