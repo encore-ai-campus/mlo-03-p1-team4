@@ -8,7 +8,6 @@ from __future__ import annotations
 import argparse
 import json
 from collections import deque
-from contextlib import suppress
 from pathlib import Path
 
 import httpx
@@ -36,6 +35,63 @@ SITEMAP_STATE = DATA_DIR / "sitemap_ids.json"
 SITES = ("spacecloud", "shareit")
 CATEGORIES = ("studyroom", "studio", "cafe", "lectureroom", "partyroom")
 API_URL = "http://127.0.0.1:8000/internal/venues"
+
+
+class CrawlerStageError(RuntimeError):
+    """실패 단계와 외부·내부 경계를 안전한 요약으로 보존한다."""
+
+    def __init__(self, stage: str, kind: str, summary: str, cause: Exception):
+        self.failure = {
+            "stage": stage,
+            "kind": kind,
+            "error_type": type(cause).__name__,
+            "summary": summary,
+        }
+        super().__init__(summary)
+
+
+class CrawlerRunError(RuntimeError):
+    """실패하더라도 통합 실행기가 확인된 부분 결과를 읽게 한다."""
+
+    def __init__(self, result: dict):
+        self.result = result
+        summary = (result.get("failure") or {}).get("summary", "크롤러 실행에 실패했습니다.")
+        super().__init__(summary)
+
+
+def _empty_category_counts() -> dict[str, int]:
+    return dict.fromkeys(CATEGORIES, 0)
+
+
+def _empty_registration_result() -> dict:
+    return {
+        "registered_by_category": _empty_category_counts(),
+        "newly_registered_by_category": _empty_category_counts(),
+        "confirmed_registrations": [],
+        "uncertain_registrations": [],
+    }
+
+
+def _empty_run_result(sites: tuple[str, ...]) -> dict:
+    return {
+        "ok": True,
+        "job_ids": {},
+        "jobs": {site: {"new_ids": 0, "fetched": 0, "registered": 0} for site in sites},
+        **_empty_registration_result(),
+        "failure": None,
+    }
+
+
+def _stage_call(stage: str, kind: str, summary: str, operation, context: dict | None = None):
+    try:
+        return operation()
+    except CrawlerStageError:
+        raise
+    except Exception as error:
+        failure = CrawlerStageError(stage, kind, summary, error)
+        if context:
+            failure.failure.update(context)
+        raise failure from error
 
 
 def read_state(path: Path = SITEMAP_STATE) -> dict[str, set[str]]:
@@ -130,39 +186,171 @@ def register_pending(
     limit: int,
     per_category: bool,
     sites: tuple[str, ...],
+    outcome: dict | None = None,
 ) -> dict[str, int]:
-    """저장된 후보를 보내며 실패 시 ok 상태를 유지해 다음 실행에 재시도한다."""
+    """후보를 등록하고 선택적으로 통합 실행기용 부분 결과를 갱신한다."""
     registered = dict.fromkeys(CATEGORIES, 0)
-    cursor = raw.find(
-        {"source_site": {"$in": list(sites)}, "status": "ok", "mapped": {"$ne": None}}
-    ).sort([("crawled_at", 1), ("source_site", 1), ("source_id", 1)])
-    for document in cursor:
-        if sum(registered.values()) >= limit:
-            break
-        category = document["mapped"]["category"]
-        if per_category and registered[category]:
-            continue
-        payload = venue_payload(document["source_site"], document["source_id"], document["mapped"])
-        response = api.post(api_url, headers={"X-Internal-Key": key}, json=payload, timeout=30)
-        if response.status_code == 400:
-            code = response.json().get("code")
-            if code in {"UNKNOWN_REGION", "UNKNOWN_CATEGORY"}:
-                raw.update_one(
-                    {"_id": document["_id"]},
-                    {"$set": {"status": "excluded", "exclude_reason": code}},
-                )
+    cursor = _stage_call(
+        "pending_read",
+        "internal",
+        "등록 대기 후보를 읽지 못했습니다.",
+        lambda: raw.find(
+            {"source_site": {"$in": list(sites)}, "status": "ok", "mapped": {"$ne": None}}
+        ).sort([("crawled_at", 1), ("source_site", 1), ("source_id", 1)]),
+    )
+    try:
+        for document in cursor:
+            if sum(registered.values()) >= limit:
+                break
+            site, source_id = document["source_site"], document["source_id"]
+            category = document["mapped"]["category"]
+            if per_category and registered[category]:
                 continue
-        response.raise_for_status()
-        if response.status_code not in {200, 201}:
-            raise ValueError("등록 API가 예상하지 않은 상태를 반환했습니다.")
-        venue_id = response.json().get("venue_id")
-        if not isinstance(venue_id, int) or venue_id <= 0:
-            raise ValueError("등록 API 응답에 venue_id가 없습니다.")
-        raw.update_one(
-            {"_id": document["_id"]},
-            {"$set": {"status": "registered", "venue_id": venue_id}},
-        )
-        registered[category] += 1
+            context = {"source_site": site, "source_id": source_id}
+            payload = _stage_call(
+                "venue_api_payload",
+                "internal",
+                "내부 공간 등록 요청을 구성하지 못했습니다.",
+                lambda site=site, source_id=source_id, mapped=document["mapped"]: venue_payload(
+                    site, source_id, mapped
+                ),
+                context,
+            )
+            try:
+                response = api.post(
+                    api_url, headers={"X-Internal-Key": key}, json=payload, timeout=30
+                )
+            except Exception as error:
+                if outcome is not None:
+                    outcome["uncertain_registrations"].append(
+                        {
+                            "source_site": site,
+                            "source_id": source_id,
+                            "category": category,
+                            "reason": "no_response",
+                        }
+                    )
+                failure = CrawlerStageError(
+                    "venue_api", "internal", "내부 공간 등록 API에서 응답을 받지 못했습니다.", error
+                )
+                failure.failure.update(context)
+                raise failure from error
+
+            if response.status_code >= 500:
+                if outcome is not None:
+                    outcome["uncertain_registrations"].append(
+                        {
+                            "source_site": site,
+                            "source_id": source_id,
+                            "category": category,
+                            "reason": "server_error_response",
+                        }
+                    )
+                error = ValueError("registration server error")
+                failure = CrawlerStageError(
+                    "venue_api", "internal", "내부 공간 등록 API가 서버 오류를 반환했습니다.", error
+                )
+                failure.failure.update(context)
+                raise failure from error
+
+            if response.status_code == 400:
+                code = _stage_call(
+                    "venue_api_response",
+                    "internal",
+                    "내부 공간 등록 API 응답을 해석하지 못했습니다.",
+                    lambda response=response: response.json().get("code"),
+                    context,
+                )
+                if code in {"UNKNOWN_REGION", "UNKNOWN_CATEGORY"}:
+                    _stage_call(
+                        "registration_state_write",
+                        "internal",
+                        "제외된 후보 상태를 MongoDB에 기록하지 못했습니다.",
+                        lambda document=document, code=code: raw.update_one(
+                            {"_id": document["_id"]},
+                            {"$set": {"status": "excluded", "exclude_reason": code}},
+                        ),
+                        context,
+                    )
+                    continue
+
+            if response.status_code not in {200, 201}:
+                error = ValueError("registration request failed")
+                failure = CrawlerStageError(
+                    "venue_api",
+                    "internal",
+                    "내부 공간 등록 API가 등록을 완료하지 못했습니다.",
+                    error,
+                )
+                failure.failure.update(context)
+                raise failure from error
+
+            if response.status_code == 201:
+                if outcome is not None:
+                    outcome["newly_registered_by_category"][category] += 1
+                    outcome["confirmed_registrations"].append(
+                        {
+                            "source_site": site,
+                            "source_id": source_id,
+                            "category": category,
+                            "venue_id": None,
+                            "status_code": 201,
+                        }
+                    )
+                confirmed = outcome["confirmed_registrations"][-1] if outcome is not None else None
+            else:
+                confirmed = None
+
+            body = _stage_call(
+                "venue_api_response",
+                "internal",
+                "내부 공간 등록 API 응답을 해석하지 못했습니다.",
+                response.json,
+                context,
+            )
+            venue_id = body.get("venue_id") if isinstance(body, dict) else None
+            if not isinstance(venue_id, int) or isinstance(venue_id, bool) or venue_id <= 0:
+                error = ValueError("venue_id missing")
+                failure = CrawlerStageError(
+                    "venue_api_response",
+                    "internal",
+                    "내부 공간 등록 API 응답에 유효한 공간 ID가 없습니다.",
+                    error,
+                )
+                failure.failure.update(context)
+                raise failure from error
+            if confirmed is not None:
+                confirmed["venue_id"] = venue_id
+            elif outcome is not None:
+                outcome["confirmed_registrations"].append(
+                    {
+                        "source_site": site,
+                        "source_id": source_id,
+                        "category": category,
+                        "venue_id": venue_id,
+                        "status_code": 200,
+                    }
+                )
+
+            _stage_call(
+                "registration_state_write",
+                "internal",
+                "등록 결과를 MongoDB에 기록하지 못했습니다.",
+                lambda document=document, venue_id=venue_id: raw.update_one(
+                    {"_id": document["_id"]},
+                    {"$set": {"status": "registered", "venue_id": venue_id}},
+                ),
+                context,
+            )
+            registered[category] += 1
+            if outcome is not None:
+                outcome["registered_by_category"][category] += 1
+    except CrawlerStageError:
+        raise
+    except Exception as error:
+        raise CrawlerStageError(
+            "pending_read", "internal", "등록 대기 후보를 처리하지 못했습니다.", error
+        ) from error
     return registered
 
 
@@ -198,30 +386,93 @@ def crawl_details(
             if not candidates[site] or sum(fetched.values()) >= max_detail:
                 continue
             source_id = candidates[site].popleft()
-            existing = raw.find_one({"source_site": site, "source_id": source_id}, {"status": 1})
+            context = {"source_site": site, "source_id": source_id}
+            existing = _stage_call(
+                "crawl_raw_read",
+                "internal",
+                "기존 크롤링 기록을 읽지 못했습니다.",
+                lambda site=site, source_id=source_id: raw.find_one(
+                    {"source_site": site, "source_id": source_id}, {"status": 1}
+                ),
+                context,
+            )
             if existing:
                 state.setdefault(site, set()).add(source_id)
-                write_state(state, state_path)
+                _stage_call(
+                    "state_write",
+                    "internal",
+                    "사이트맵 처리 상태를 저장하지 못했습니다.",
+                    lambda: write_state(state, state_path),
+                    context,
+                )
                 continue
-            try:
-                html = client.get(detail_url(site, source_id))
-            except httpx.HTTPStatusError as error:
-                if error.response.status_code != 404:
+
+            def fetch_detail(site: str = site, source_id: str = source_id):
+                try:
+                    return client.get(detail_url(site, source_id))
+                except httpx.HTTPStatusError as error:
+                    if error.response.status_code == 404:
+                        return None
                     raise
+
+            html = _stage_call(
+                "detail_fetch",
+                "external",
+                "외부 상세 페이지를 가져오지 못했습니다.",
+                fetch_detail,
+                context,
+            )
+            if html is None:
                 fetched[site] += 1
                 space = SpaceInfo(source_id, [], None, None, [], [], None, None)
             else:
                 fetched[site] += 1
-                space = parse_detail(site, source_id, html)
-            mapped, reason = map_space(site, space, maps) if space.space_types else (None, None)
-            document = raw_document(site, space, job_ids[site], mapped, reason)
-            raw.update_one(
-                {"source_site": site, "source_id": source_id},
-                {"$set": document},
-                upsert=True,
+                space = _stage_call(
+                    "detail_parse",
+                    "external",
+                    "외부 상세 페이지를 해석하지 못했습니다.",
+                    lambda site=site, source_id=source_id, html=html: parse_detail(
+                        site, source_id, html
+                    ),
+                    context,
+                )
+            mapped, reason = _stage_call(
+                "detail_preprocess",
+                "external",
+                "외부 공간 속성을 정규화하지 못했습니다.",
+                lambda site=site, space=space: (
+                    map_space(site, space, maps) if space.space_types else (None, None)
+                ),
+                context,
+            )
+            document = _stage_call(
+                "detail_prepare",
+                "internal",
+                "정규화한 크롤링 기록을 구성하지 못했습니다.",
+                lambda site=site, space=space, mapped=mapped, reason=reason: raw_document(
+                    site, space, job_ids[site], mapped, reason
+                ),
+                context,
+            )
+            _stage_call(
+                "crawl_raw_write",
+                "internal",
+                "정규화한 크롤링 결과를 MongoDB에 저장하지 못했습니다.",
+                lambda site=site, source_id=source_id, document=document: raw.update_one(
+                    {"source_site": site, "source_id": source_id},
+                    {"$set": document},
+                    upsert=True,
+                ),
+                context,
             )
             state.setdefault(site, set()).add(source_id)
-            write_state(state, state_path)
+            _stage_call(
+                "state_write",
+                "internal",
+                "사이트맵 처리 상태를 저장하지 못했습니다.",
+                lambda: write_state(state, state_path),
+                context,
+            )
     return fetched
 
 
@@ -239,62 +490,260 @@ def run(
     api_url: str = API_URL,
     state_path: Path = SITEMAP_STATE,
 ) -> dict:
-    if not 0 <= max_detail <= MAX_DETAIL_PER_RUN:
-        raise ValueError("상세 조회는 실행당 0~20건이어야 합니다.")
-    if not 0 <= max_register <= (5 if mode == "weekly" else 20):
-        raise ValueError("등록 상한이 모드 범위를 넘었습니다.")
-    state = read_state(state_path)
-    if mode == "weekly" and any(site not in state for site in sites):
-        raise ValueError("먼저 baseline 명령으로 사이트맵 기준선을 만드세요.")
-    maps = SeedMaps.load()
-    job_ids, counts, before = {}, {}, {}
+    result = _empty_run_result(sites)
     fetched = dict.fromkeys(sites, 0)
+    before = {}
     try:
+        if not sites or any(site not in SITES for site in sites):
+            raise CrawlerStageError(
+                "input_validation", "internal", "수집원 설정을 확인해 주세요.", ValueError()
+            )
+        if mode not in {"bootstrap", "weekly"}:
+            raise CrawlerStageError(
+                "input_validation", "internal", "크롤링 모드를 확인해 주세요.", ValueError()
+            )
+        if not 0 <= max_detail <= MAX_DETAIL_PER_RUN:
+            raise CrawlerStageError(
+                "input_validation",
+                "internal",
+                "상세 조회는 실행당 0~20건이어야 합니다.",
+                ValueError(),
+            )
+        if not 0 <= max_register <= (5 if mode == "weekly" else 20):
+            raise CrawlerStageError(
+                "input_validation", "internal", "등록 상한이 모드 범위를 넘었습니다.", ValueError()
+            )
+        state = _stage_call(
+            "state_read",
+            "internal",
+            "사이트맵 처리 상태를 읽지 못했습니다.",
+            lambda: read_state(state_path),
+        )
+        if mode == "weekly" and any(site not in state for site in sites):
+            raise CrawlerStageError(
+                "baseline_required",
+                "internal",
+                "먼저 baseline 명령으로 사이트맵 기준선을 만드세요.",
+                ValueError(),
+            )
+        maps = _stage_call(
+            "seed_load", "internal", "공간 매핑 기준표를 읽지 못했습니다.", SeedMaps.load
+        )
         site_ids = {}
         for site in sites:
-            job_ids[site] = start_job(engine, site)
-            counts[site] = {"new_ids": 0, "fetched": 0, "registered": 0}
-            site_ids[site] = fetch_sitemap_ids(client, site)
+            result["job_ids"][site] = _stage_call(
+                "job_start",
+                "internal",
+                "크롤링 작업을 시작하지 못했습니다.",
+                lambda site=site: start_job(engine, site),
+                {"source_site": site},
+            )
+            site_ids[site] = _stage_call(
+                "sitemap_fetch",
+                "external",
+                "외부 사이트맵을 가져오지 못했습니다.",
+                lambda site=site: fetch_sitemap_ids(client, site),
+                {"source_site": site},
+            )
+            if mode == "weekly":
+                result["jobs"][site]["new_ids"] = len(set(site_ids[site]) - state.get(site, set()))
         candidates, new_counts = candidate_ids(site_ids, state, mode)
         for site in sites:
-            counts[site]["new_ids"] = new_counts[site]
+            result["jobs"][site]["new_ids"] = new_counts[site]
         crawl_details(
             client,
             raw,
             maps,
             candidates,
             state,
-            job_ids,
+            result["job_ids"],
             max_detail,
             state_path,
             fetched,
         )
         for site in sites:
-            counts[site]["fetched"] = fetched[site]
+            result["jobs"][site]["fetched"] = fetched[site]
         before = {
-            site: raw.count_documents({"source_site": site, "status": "registered"})
+            site: _stage_call(
+                "registration_count",
+                "internal",
+                "등록된 공간 수를 조회하지 못했습니다.",
+                lambda site=site: raw.count_documents(
+                    {"source_site": site, "status": "registered"}
+                ),
+                {"source_site": site},
+            )
             for site in sites
         }
-        registered = register_pending(raw, api, key, api_url, max_register, mode == "weekly", sites)
+        registration = _empty_registration_result()
+        result.update(registration)
+        register_pending(
+            raw,
+            api,
+            key,
+            api_url,
+            max_register,
+            mode == "weekly",
+            sites,
+            outcome=registration,
+        )
         for site in sites:
-            after = raw.count_documents({"source_site": site, "status": "registered"})
-            counts[site]["registered"] = after - before[site]
-        for site, job_id in job_ids.items():
-            finish_job(engine, job_id, counts[site], "done")
-        return {"jobs": counts, "registered_by_category": registered}
-    except Exception:
-        for site, job_id in job_ids.items():
-            counts[site]["fetched"] = fetched[site]
+            after = _stage_call(
+                "registration_count",
+                "internal",
+                "등록된 공간 수를 조회하지 못했습니다.",
+                lambda site=site: raw.count_documents(
+                    {"source_site": site, "status": "registered"}
+                ),
+                {"source_site": site},
+            )
+            result["jobs"][site]["registered"] = after - before[site]
+        for site, job_id in result["job_ids"].items():
+            _stage_call(
+                "job_finish",
+                "internal",
+                "크롤링 작업 결과를 저장하지 못했습니다.",
+                lambda site=site, job_id=job_id: finish_job(
+                    engine, job_id, result["jobs"][site], "done"
+                ),
+                {"source_site": site},
+            )
+        return result
+    except Exception as error:
+        if isinstance(error, CrawlerStageError):
+            failure = dict(error.failure)
+        else:
+            failure = {
+                "stage": "run",
+                "kind": "internal",
+                "error_type": type(error).__name__,
+                "summary": "크롤러 실행 중 내부 오류가 발생했습니다.",
+            }
+        result["ok"] = False
+        result["failure"] = failure
+        cleanup_failures = []
+        for site in sites:
+            result["jobs"][site]["fetched"] = fetched.get(site, 0)
             if site in before:
-                with suppress(Exception):
-                    counts[site]["registered"] = max(
-                        0,
-                        raw.count_documents({"source_site": site, "status": "registered"})
-                        - before[site],
+                try:
+                    count = raw.count_documents({"source_site": site, "status": "registered"})
+                    result["jobs"][site]["registered"] = max(0, count - before[site])
+                except Exception as count_error:
+                    cleanup_failures.append(
+                        {
+                            "stage": "registration_count",
+                            "kind": "internal",
+                            "source_site": site,
+                            "error_type": type(count_error).__name__,
+                            "summary": "부분 등록 건수를 조회하지 못했습니다.",
+                        }
                     )
-            with suppress(Exception):
-                finish_job(engine, job_id, counts[site], "failed")
-        raise
+        for site, job_id in result["job_ids"].items():
+            try:
+                finish_job(engine, job_id, result["jobs"][site], "failed")
+            except Exception as cleanup_error:
+                cleanup_failures.append(
+                    {
+                        "stage": "job_finish",
+                        "kind": "internal",
+                        "source_site": site,
+                        "error_type": type(cleanup_error).__name__,
+                        "summary": "실패한 크롤링 작업 상태를 저장하지 못했습니다.",
+                    }
+                )
+        if cleanup_failures:
+            result["secondary_failures"] = cleanup_failures
+            if failure["kind"] != "internal":
+                result["original_failure"] = failure
+                result["failure"] = cleanup_failures[0]
+        raise CrawlerRunError(result) from error
+
+
+def run_configured(
+    *,
+    sites: tuple[str, ...] = SITES,
+    mode: str = "weekly",
+    max_detail: int = MAX_DETAIL_PER_RUN,
+    max_register: int | None = None,
+    api_url: str = API_URL,
+    state_path: Path = SITEMAP_STATE,
+) -> dict:
+    """통합 실행기에서 import해 호출하는 공개 F-61 실행 진입점."""
+    if max_register is None:
+        max_register = 5 if mode == "weekly" else 20
+    try:
+        engine, mongo, raw, key = _runtime()
+    except Exception as error:
+        result = _empty_run_result(sites)
+        result["ok"] = False
+        result["failure"] = {
+            "stage": "runtime_init",
+            "kind": "internal",
+            "error_type": type(error).__name__,
+            "summary": "크롤러 설정 또는 DB 연결을 초기화하지 못했습니다.",
+        }
+        raise CrawlerRunError(result) from error
+
+    result = None
+    run_error = None
+    try:
+        with PoliteClient() as client, httpx.Client() as api:
+            result = run(
+                sites=sites,
+                mode=mode,
+                max_detail=max_detail,
+                max_register=max_register,
+                client=client,
+                raw=raw,
+                engine=engine,
+                api=api,
+                key=key,
+                api_url=api_url,
+                state_path=state_path,
+            )
+    except CrawlerRunError as error:
+        run_error = error
+    except Exception as error:
+        result = _empty_run_result(sites)
+        result["ok"] = False
+        result["failure"] = {
+            "stage": "client_init",
+            "kind": "internal",
+            "error_type": type(error).__name__,
+            "summary": "크롤러 HTTP 클라이언트를 초기화하지 못했습니다.",
+        }
+        run_error = CrawlerRunError(result)
+
+    cleanup_failures = []
+    for close in (mongo.close, engine.dispose):
+        try:
+            close()
+        except Exception as error:
+            cleanup_failures.append(
+                {
+                    "stage": "runtime_cleanup",
+                    "kind": "internal",
+                    "error_type": type(error).__name__,
+                    "summary": "크롤러 DB 연결을 정리하지 못했습니다.",
+                }
+            )
+    if cleanup_failures:
+        if run_error is not None:
+            result = run_error.result
+            result.setdefault("original_failure", result.get("failure"))
+        elif result is None:
+            result = _empty_run_result(sites)
+        result["ok"] = False
+        result["failure"] = cleanup_failures[0]
+        if cleanup_failures[1:]:
+            result["secondary_failures"] = [
+                *result.get("secondary_failures", []),
+                *cleanup_failures[1:],
+            ]
+        run_error = CrawlerRunError(result)
+    if run_error is not None:
+        raise run_error
+    return result
 
 
 def _runtime():
@@ -339,24 +788,17 @@ def main() -> None:
             parser.error("--max-detail은 0~20이어야 합니다.")
         if not 0 <= max_register <= (5 if args.mode == "weekly" else 20):
             parser.error("--max-register 값이 모드 상한을 넘었습니다.")
-        engine, mongo, raw, key = _runtime()
         try:
-            with PoliteClient() as client, httpx.Client() as api:
-                result = run(
-                    sites=sites,
-                    mode=args.mode,
-                    max_detail=args.max_detail,
-                    max_register=max_register,
-                    client=client,
-                    raw=raw,
-                    engine=engine,
-                    api=api,
-                    key=key,
-                )
-            print(json.dumps(result, ensure_ascii=False))
-        finally:
-            mongo.close()
-            engine.dispose()
+            result = run_configured(
+                sites=sites,
+                mode=args.mode,
+                max_detail=args.max_detail,
+                max_register=max_register,
+            )
+        except CrawlerRunError as error:
+            print(json.dumps(error.result, ensure_ascii=False))
+            raise SystemExit(1) from error
+        print(json.dumps(result, ensure_ascii=False))
         return
     with PoliteClient() as client:
         if args.command == "baseline":
