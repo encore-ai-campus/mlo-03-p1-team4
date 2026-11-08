@@ -1,14 +1,14 @@
-# generator — 과거 행동 데이터 백필
+# generator — 행동 데이터 백필·공간 보충
 
-기준은 [#75 PM 결정](https://github.com/encore-ai-campus/mlo-03-p1-team4/issues/75#issuecomment-6684120999)입니다. B가 본체·세션·예약을 구현하고, A가 회원·후기 서비스와 이벤트 빌더 사용을 확인하며, DB가 공간 보충·집계·정리·CSV를 담당합니다.
+과거 행동 데이터 생성 기준은 [#75 PM 결정](https://github.com/encore-ai-campus/mlo-03-p1-team4/issues/75#issuecomment-6684120999), 공간 보충 기준은 [#99](https://github.com/encore-ai-campus/mlo-03-p1-team4/issues/99)입니다. B가 예약 흐름과 공간 보충기를 구현하고, A가 회원·후기 서비스와 이벤트 빌더 사용을 확인하며, DB가 기초 프로필 검수·집계·정리·CSV를 담당합니다.
 
 ## 실행 조건
 
 - api1의 **별도 Python 프로세스**에서 저장소 루트를 작업 폴더로 실행합니다. API 서버 프로세스 안에 import해 실행하지 않습니다.
 - 기존 `pro_1` 환경만 사용합니다. 새 패키지·DDL·HTTP API 변경은 없습니다.
-- `backend/.env` 또는 기존 환경변수의 `DB_WRITE_URL`, `MONGO_URL`, `MONGO_DB`를 사용합니다. 실제 비밀값은 실행 기록에 저장하지 않습니다.
-- DB 담당이 크롤링 공간을 등록한 뒤 부족한 유형을 `/internal/venues`로 보충합니다. 실제 적재는 **유형별 최소 6개**가 있어야 시작합니다. 이미 목표 이상인 공간은 삭제하지 않습니다.
-- MongoDB `events`에는 공식 `docs/db/mongo_init.js`의 strict/error validator, `uq_event_id`, `received_at` 기준 365일 TTL이 먼저 적용돼 있어야 합니다. 생성기는 스키마·인덱스를 만들지 않습니다.
+- 과거 행동 백필은 `backend/.env` 또는 기존 환경변수의 `DB_WRITE_URL`, `MONGO_URL`, `MONGO_DB`를 사용합니다. 공간 보충은 `DB_WRITE_URL`·`INTERNAL_API_KEY`를 사용합니다. 실제 비밀값은 실행 기록에 저장하지 않습니다.
+- 크롤링이 끝난 뒤 B의 공간 보충기가 primary에서 활성 공간 수를 다시 세고, **유형별 최소 6개**까지 필요한 수만 `/internal/venues`로 등록합니다. 크롤러가 등록한 양은 부족분 계산에 쓰지 않습니다. 이미 목표 이상인 공간은 삭제하지 않습니다.
+- 과거 행동 백필 전에는 MongoDB `events`에 공식 `docs/db/mongo_init.js`의 strict/error validator, `uq_event_id`, `received_at` 기준 365일 TTL이 먼저 적용돼 있어야 합니다. 생성기는 스키마·인덱스를 만들지 않습니다.
 
 ## 명령
 
@@ -79,6 +79,38 @@ DB 연결 없이 계획만 확인하려면 `--dry-run --snapshot <공간 JSON �
 실행 후 `report.json`과 `manifest.json`을 DB 담당에게 전달합니다. `event_daily` 기간 재집계·CSV·정리 스크립트는 DB 담당 작업으로 남겨 둡니다. 원본 운영 이벤트를 삭제하거나 API 전달 성공률에 생성기 데이터를 포함하지 않습니다.
 
 집계 키는 KST `occurred_at` 날짜, `event_type=event_name`, 공간별 문자열 `products[].product_id`(공간 없으면 null), `is_synthetic`입니다. CSV 컬럼은 #75 PM 댓글의 목록을 따릅니다. DB 산출물 이후 FE가 그래프를 확인합니다.
+
+## 유형별 공간 보충 (#99)
+
+보충기는 회원·예약 백필 CLI와 분리된 `venue_supplement` 명령입니다. 기본 프로필은 버전 관리되는 `venue_profiles.json`이며, 기본 목표는 유형별 활성 6곳입니다. 같은 유형의 활성·검증된 크롤링 공간이 있으면 한 공간의 지역·가격·인원·시간·시설 속성을 함께 사용합니다. 사용할 공간이 없으면 해당 유형의 기본 프로필을 적용합니다. 이름·소개는 생성하고 이미지는 유형별 `art:` 코드를 씁니다.
+
+api1 또는 개발 환경의 저장소 루트에서 실행합니다. DB 연결은 `backend/.env` 또는 실행 환경의 `DB_WRITE_URL`·`INTERNAL_API_KEY`를 사용합니다. 비밀값은 명령 인자나 실행 기록에 넣지 않습니다.
+
+```powershell
+# primary 기준 미리보기: 기본은 화면에만 출력하고 DB·크롤러 상태를 쓰지 않음
+conda run -n pro_1 --no-capture-output python -m simulator.generator.venue_supplement --dry-run
+
+# 승인된 설정으로 계획을 보존한 뒤 검토
+conda run -n pro_1 --no-capture-output python -m simulator.generator.venue_supplement --dry-run --save-plan --seed 9901
+
+# 실제 등록: 새 작업은 매번 다른 seed를 사용
+conda run -n pro_1 --no-capture-output python -m simulator.generator.venue_supplement --apply --seed 9902
+
+# 중단된 작업: 출력된 run_id로 같은 계획을 재개
+conda run -n pro_1 --no-capture-output python -m simulator.generator.venue_supplement --apply --resume <run_id>
+```
+
+`--target`은 기본값 6을 덮어쓸 때, `--profiles`는 별도 JSON 프로필을 검토할 때 사용합니다. `--resume`은 저장된 seed·목표·프로필·코드·DB·API 대상을 확인하고, 기존 계획에 남은 요청만 처리합니다. 응답이 유실된 요청은 primary에서 출처 ID와 속성을 대조합니다. 이미 활성 바닥선을 채웠으면 남은 요청은 건너뜁니다.
+
+`logs/venue-supplement-<run_id>/`에 `manifest.json`, `plan.json`, `state.json`, `report.json`을 기록합니다. 계획에는 실행 시점의 유형별 활성 수와 부족분, 선택한 참고 속성, 실제 요청 JSON을 담고, 업체명·원문 소개·사진은 담지 않습니다. 기록은 재개를 위해 보존합니다. 보충 단독 실행과 #100 통합 실행은 `logs/.venue-pipeline.lock`을 공유합니다.
+
+기존 DB 스냅샷으로 요청만 만들 때는 아래 오프라인 명령을 쓸 수 있습니다. HTTP 요청이나 DB 변경은 하지 않습니다.
+
+```powershell
+conda run -n pro_1 --no-capture-output python -m simulator.generator.topup --snapshot vetted_venues.json --output logs/topup-requests.json --seed 9903 --target 6
+```
+
+사전 계획·검증은 끝났지만 운영 MariaDB 등록과 api1 재개 확인은 아직 수행하지 않았습니다.
 
 ## 검증
 
