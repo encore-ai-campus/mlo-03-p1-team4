@@ -190,7 +190,7 @@ A1~A4는 11-03에 확정했고, **A5~A8은 추후 확정**으로 미뤘다(11-03
 
 ## 최근 변경
 
-- 2026-11-08: #17 후속으로 `events.log` 실패를 serialize/thread lock/process lock/open/append 단계와 고정 reason으로 나누고, 스레드·프로세스 대기 및 전체 쓰기 시도 시간을 Prometheus 지표와 FastAPI 대시보드에 추가. 예약·취소 서버 이벤트는 파일 기록 실패 시 응답 후 MongoDB writer로 전달하고 프론트 이벤트 API의 503 계약은 유지. 관련 pytest 22건 통과, Ruff·포맷·대시보드 JSON 검사 통과. 예약 DB 통합 일부는 `CHECK_DB_URL` 미설정으로 실행 불가. 원격 이슈 #17 미수정(gh 인증 토큰 만료), 서버 미배포. 메트릭은 기존 Prometheus pull, Alloy는 Loki 로그 전송으로 유지.
+- 2026-11-08: 이벤트 파일 실패 단계·reason 지표, thread/process 잠금 대기·전체 기록 시간, 예약/취소 MongoDB fallback 보강. 관련 pytest 22건·Ruff·JSON 검증 및 PR #97 DB/백엔드 CI 통과. PR #97 `develop` 대상, CODEOWNERS 리뷰 2명 요청 중·미병합. 팀 공유 실험 결과와 500/600/800 확장 계획 작성. SSH `.102` TCP 22 응답은 확인했지만 host key SHA256 `/2gTGUxUbwxgy85aKzQn12NItpPSQhnlfg2PmLSU0a0`의 신뢰 확인 전이라 VM 접속·배포·부하는 미실행. 메트릭은 Prometheus pull, Alloy→Loki 로그 경로.
 
 - 2026-11-08: PR #94 리뷰에서 표본 JSONL의 동 단위 주소 잔존을 수정. 운영 경로와 같이 시·구로 정규화하고 모호/누락은 비움. 오프라인 회귀4개 추가.
 
