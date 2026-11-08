@@ -59,6 +59,7 @@
 
 | 날짜 | 결정 | 근거 |
 | --- | --- | --- |
+| 11-08 | 현재 7 VM·19 target 관측은 Prometheus 직접 pull을 유지하고 Alloy는 로그를 Loki로 전달한다. Alloy의 Prometheus scrape/remote_write 전환은 Prometheus receiver·방화벽·중복 수집을 별도 검증할 때 검토하고, Mimir 같은 Remote Write 저장소 도입 시 우선 고려한다 | Grafana Alloy 공식 문서 · Prometheus Remote Write Receiver 문서 · 현재 `infra/vm/lab/README.md` |
 | 11-07 | 현재 109 운영 설명은 219망 VM 7대·MariaDB 10.11.14·MongoDB 8.0.34 기준. 이전 .0망/11.4 compose/4대 Mongo 제외는 이력으로 구분. DB 연결 한도와 앱 사양은 고정하고 읽기/쓰기 50명까지 이번 단계 시험 | 사용자 요청 · 실제 SSH/VMX/exporter 검증 · DB_운영_모니터링_현황_2026-11-07.md |
 | 11-07 | 검토 보류 28장을 제외한 사용자 제공 사진 82장을 로컬 프론트에 유형별 참고 이미지로 연결한다. 출처·이용허락은 미확인으로 표시하고 기존 CCL 40장은 보관한다. 실제 공간 사진·DB ID 매핑으로 취급하지 않는다 | 사용자 요청 · `docs/데이터_수집_명세.md` |
 | 11-07 | 이 저장소에는 우리 팀 Spacecube의 문서·자동화·실험 결과만 기록한다. 다른 팀 서비스의 참고 자료·관측 결과는 포함하지 않는다 | 사용자 지시 |
@@ -188,6 +189,8 @@ A1~A4는 11-03에 확정했고, **A5~A8은 추후 확정**으로 미뤘다(11-03
 - 개인 기억(Claude 자동 메모리 등)은 팀에 공유되지 않는다. 팀이 알아야 할 것은 이 파일과 `docs/`에 쓴다.
 
 ## 최근 변경
+
+- 2026-11-08: #17 후속으로 `events.log` 실패를 serialize/thread lock/process lock/open/append 단계와 고정 reason으로 나누고, 스레드·프로세스 대기 및 전체 쓰기 시도 시간을 Prometheus 지표와 FastAPI 대시보드에 추가. 예약·취소 서버 이벤트는 파일 기록 실패 시 응답 후 MongoDB writer로 전달하고 프론트 이벤트 API의 503 계약은 유지. 관련 pytest 22건 통과, Ruff·포맷·대시보드 JSON 검사 통과. 예약 DB 통합 일부는 `CHECK_DB_URL` 미설정으로 실행 불가. 원격 이슈 #17 미수정(gh 인증 토큰 만료), 서버 미배포. 메트릭은 기존 Prometheus pull, Alloy는 Loki 로그 전송으로 유지.
 
 - 2026-11-08: PR #94 리뷰에서 표본 JSONL의 동 단위 주소 잔존을 수정. 운영 경로와 같이 시·구로 정규화하고 모호/누락은 비움. 오프라인 회귀4개 추가.
 

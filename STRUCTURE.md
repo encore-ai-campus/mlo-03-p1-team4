@@ -31,6 +31,7 @@ Pro_1/
 ├─ .gitignore                 [공동] .env·node_modules·글꼴 원본 등 제외
 │
 ├─ docs/                      설계 문서 (docs/README.md)
+│  ├─ superpowers/plans/       작업별 구현 계획 (실행 참고용, 기준 문서를 대체하지 않음)
 │  ├─ 산출물_01_요구사항명세서.md        F-ID, 예약 규칙, NFR
 │  ├─ 산출물_02_시스템아키텍처_흐름도.md  구성, primary/replica 경로, 네트워크, 포트
 │  ├─ 산출물_03_서비스흐름도.md          화면 지도, 시퀀스

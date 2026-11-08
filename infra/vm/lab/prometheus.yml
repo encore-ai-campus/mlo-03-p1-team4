@@ -1,6 +1,7 @@
 global:
   scrape_interval: 15s
   evaluation_interval: 15s
+# 메트릭은 Prometheus pull. Alloy는 로그를 Loki로 보내고 Alloy 자체 /metrics만 여기서 scrape한다.
 scrape_configs:
   - job_name: prometheus
     static_configs:
