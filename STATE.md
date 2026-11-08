@@ -192,6 +192,8 @@ A1~A4는 11-03에 확정했고, **A5~A8은 추후 확정**으로 미뤘다(11-03
 
 ## 최근 변경
 
+- 11-08 · A · 로컬 `mlo-03-p1-team4` 환경에 `requests==2.34.2`를 설치하고 `environment.yml`에 버전을 고정. 이전 `requests` 부재로 인한 pytest 수집 오류는 해소됐고, 해당 loadsuite 정리 테스트 2건 및 A 이벤트·헬스 23건 통과. 전체 verify의 Ruff·프론트 71건/빌드는 통과했으나 pytest는 DB 설정 등 별개 오류로 164 passed·4 failed·336 errors·9 skipped여서 전체 통과로 표시하지 않음.
+
 - 11-08 · A · #15/#90 이벤트 접수·파일 성공·Mongo 새 저장/중복·writer 대기열과 /health 저장소별 지표를 추가하고 기존 이벤트·파일 실패·HTTP 지표를 Grafana 패널과 경보에 연결. 이벤트·헬스 관련 pytest 23건 통과, Ruff lint/format 통과. 대시보드 JSON·PromQL 파싱, promtool 3.15.1 규칙 5개·경보 단위 테스트·Windows 경로 검사본의 설정 검증 통과. 전체 verify는 infra/vm/remote109 테스트 수집 중 requests 부재로 실패. backend·db 전체 pytest는 CHECK_DB_URL 미설정으로 132 passed·4 failed·310 errors. 실제 VM 수집은 미검증. 기존 작업 파일은 보존.
 
 - 2026-11-08: PM 확인 — PR #97(`36b5895`) develop 병합과 109 api1·api2 반영 완료. 쓰기 5/20/50명 대조(파일·MongoDB 1,386건 일치, 중복 0) 통과 후 100/200/400명 재시험 진행 중.
