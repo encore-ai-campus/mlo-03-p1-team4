@@ -8,6 +8,7 @@ from test_core_events import SESSION, frontend_event
 
 from app.core import events
 from app.core.event_document import FE_EVENTS, PRODUCT_EVENTS, SERVER_EVENTS, build_document
+from app.core.logging import EventFileLockTimeout
 from app.schemas.events import EventBatchCreate
 from app.services import event_service
 
@@ -132,6 +133,55 @@ def test_file_failure_rejects_api_and_never_queues_document(event_app, monkeypat
     assert response.status_code == 503
     assert response.json()["code"] == "SERVICE_UNAVAILABLE"
     assert submitted == []
+
+
+@pytest.mark.parametrize(
+    ("failure", "stage", "reason"),
+    [
+        (PermissionError("sensitive-path"), "write_event", "permission"),
+        (EventFileLockTimeout("thread"), "thread_lock", "lock_timeout"),
+        (EventFileLockTimeout("process"), "process_lock", "lock_timeout"),
+    ],
+)
+def test_server_event_file_failure_is_buffered_for_mongo_fallback(
+    event_app, monkeypatch, failure, stage, reason
+):
+    from app.core import events as event_module
+    from app.core import middleware
+
+    http, _log_dir = event_app
+    submitted = []
+    product = {
+        "product_id": "7",
+        "product_name": "테스트 공간",
+        "price": {"currency": "KRW", "displayed_amount_minor": 10000, "billing_unit": "hour"},
+        "rental_conditions": {
+            "start_at": "2026-11-07T14:00:00+09:00",
+            "end_at": "2026-11-07T15:00:00+09:00",
+            "guest_count": 2,
+            "option_ids": [],
+        },
+    }
+
+    def fail_file_write(_document):
+        raise failure
+
+    monkeypatch.setattr(event_module, "write_event", fail_file_write)
+    monkeypatch.setattr(middleware, "submit_events", lambda docs: submitted.extend(docs))
+
+    @http.app.post("/_test/server-event-file-failure")
+    def log_server_event():
+        event_module.log_event(None, 4, "reservation_complete", products=[product])
+        return {"ok": True}
+
+    response = http.post("/_test/server-event-file-failure")
+
+    assert response.status_code == 200
+    assert len(submitted) == 1
+    assert submitted[0]["event_name"] == "reservation_complete"
+    metrics = http.get("/metrics").text
+    assert f'event_file_write_failures_total{{reason="{reason}",stage="{stage}"}}' in metrics
+    assert "sensitive-path" not in (_log_dir / "app.log").read_text(encoding="utf-8")
 
 
 def test_all_fifteen_names_build_with_correct_product_requirement():

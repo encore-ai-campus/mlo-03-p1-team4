@@ -23,8 +23,13 @@ from app.core.event_document import (
     SERVER_EVENTS,
     build_document,
 )
-from app.core.logging import request_id_context, write_event
-from app.core.metrics import mongo_event_write_failures_counter
+from app.core.logging import (
+    EventFileWriteError,
+    event_file_failure_reason,
+    request_id_context,
+    write_event,
+)
+from app.core.metrics import event_file_write_failures_counter, mongo_event_write_failures_counter
 from app.core.mongo import get_event_collection
 
 FRONTEND_EVENTS = FE_EVENTS
@@ -273,12 +278,25 @@ def _log_event(
     buffer = event_buffer.get()
     try:
         write_event(document)
-    except Exception:
+    except Exception as error:
         if buffer is not None:
             buffer.file_failures += 1
-        logging.getLogger("spacecube.app").error(
-            "이벤트 파일 기록 실패. 디스크 공간·권한을 확인하세요.",
+        stage = error.stage if isinstance(error, EventFileWriteError) else "write_event"
+        reason = event_file_failure_reason(error)
+        error_type = (
+            error.error_type if isinstance(error, EventFileWriteError) else type(error).__name__
         )
+        event_file_write_failures_counter.labels(stage=stage, reason=reason).inc()
+        logging.getLogger("spacecube.app").error(
+            "이벤트 파일 기록 실패",
+            extra={"failure_reason": reason, "error_location": stage, "error_type": error_type},
+        )
+        if event_type in SERVER_EVENTS:
+            if buffer is None:
+                submit_events([document])
+            else:
+                # 예약은 이미 커밋됐으므로 관측 로그 파일이 실패해도 MongoDB 전달은 시도한다.
+                buffer.documents.append(document)
         return
     # 관측 실패가 이미 커밋한 예약을 사용자에게 실패로 보이게 해서는 안 된다.
     if buffer is None:

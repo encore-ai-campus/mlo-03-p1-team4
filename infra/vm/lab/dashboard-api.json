@@ -2,7 +2,7 @@
   "uid": "spacecube-api",
   "title": "Spacecube / FastAPI",
   "schemaVersion": 39,
-  "version": 103,
+  "version": 104,
   "refresh": "15s",
   "panels": [
     {
@@ -474,6 +474,153 @@
       }
     },
     {
+      "id": 10,
+      "title": "events.log 기록 실패",
+      "description": "고정된 원인 코드별 이벤트 로그 파일 기록 실패율입니다. reason은 thread/process 잠금 timeout 또는 일반 I/O 오류입니다.",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by(server,stage,reason)(rate(event_file_write_failures_total{job=\"api\"}[2m]))",
+          "legendFormat": "{{server}} · {{stage}} · {{reason}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "min": 0,
+          "decimals": 2,
+          "noValue": "수집 없음",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 6,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "calcs": []
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 39,
+        "w": 12,
+        "h": 7
+      }
+    },
+    {
+      "id": 11,
+      "title": "이벤트 파일 잠금 대기 p95",
+      "description": "events.log 파일의 스레드·OS 잠금 획득 대기시간 p95입니다. 0.1초 한도 변경 근거를 모을 때 사용합니다.",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95,sum by(le,server,scope)(rate(event_file_lock_wait_seconds_bucket{job=\"api\"}[2m])))",
+          "legendFormat": "{{server}} · {{scope}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "min": 0,
+          "decimals": 3,
+          "noValue": "수집 없음",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 6,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "calcs": []
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 39,
+        "w": 12,
+        "h": 7
+      }
+    },
+    {
+      "id": 12,
+      "title": "이벤트 파일 기록 시도 p95",
+      "description": "이벤트 JSON 직렬화부터 events.log append 시도까지 걸린 시간의 p95입니다. 파일 쓰기 자체만 분리한 값은 아닙니다.",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95,sum by(le,server)(rate(event_file_write_duration_seconds_bucket{job=\"api\"}[2m])))",
+          "legendFormat": "{{server}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "min": 0,
+          "decimals": 3,
+          "noValue": "수집 없음",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 6,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "calcs": []
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 46,
+        "w": 12,
+        "h": 7
+      }
+    },
+    {
       "id": 100,
       "title": "관련 로그 · Loki",
       "type": "logs",
@@ -496,7 +643,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 39,
+        "y": 53,
         "w": 24,
         "h": 9
       },
