@@ -13,8 +13,8 @@ B가 1일차부터 쓰므로 A가 가장 먼저 만듭니다. 바꿀 때는 B에
 | `errors.py` | `AppError(code, message, status, detail=None)`와 예외 처리기 (Pydantic 오류도 `VALIDATION`으로) | 전체 |
 | `pagination.py` | `?page=&size=`(size 최대 50), `{"items","page","size","total"}` | 전체 |
 | `events.py` | `log_event(session_id, user_id, event_type, venue_id=None, category=None, payload=None, is_synthetic=False, *, products=None)`: `events.log`에 바로 한 줄, MongoDB는 내부 스레드 풀(2개, 대기열 1,000건) | A, B, 배치 |
-| `metrics.py` | `/metrics`, `reservation_counter`(`reservation_total{result}`), `event_file_write_failures_total`, `mongo_event_write_failures_total`, `db_read_fallback_total` | A, B |
-| `logging.py` | `app.log`·`events.log` (JSON 한 줄), 파일 잠금 최대 대기 0.5초 | 전체 |
+| `metrics.py` | `/metrics`, `reservation_counter`(`reservation_total{result}`), `event_file_write_failures_total{stage,reason}`, `event_file_lock_wait_seconds{scope}`, `event_file_write_duration_seconds`, `mongo_event_write_failures_total`, `db_read_fallback_total` | A, B |
+| `logging.py` | `app.log`·`events.log` (JSON 한 줄), 파일 잠금 timeout 원인 구분 | 전체 |
 | `clock.py` | `get_today()`, `get_now()`(시간대 없는 한국 시각), `override_business_time()`(백필 서비스 시각 한정), `get_event_time()`(실제 적재 시각). `SERVER_NAME=generator`는 생성 프로세스 환경에만 지정하고 공용 `.env`는 바꾸지 않음 | 전체·생성기 |
 | `synthetic.py` | `is_synthetic_request(request)` (헤더 `X-Synthetic: 1` + `X-Synthetic-Key`(= `.env` `SYNTHETIC_API_KEY`), 키 틀리면 401) | 전체 |
 
