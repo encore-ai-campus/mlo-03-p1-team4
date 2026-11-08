@@ -1,0 +1,61 @@
+- name: Grafana 대시보드만 갱신
+  hosts: mon
+  become: true
+  gather_facts: false
+  tasks:
+    - name: 생성된 관측 설정 묶음 전달
+      ansible.builtin.copy:
+        src: /home/playdata/spacecube109/config.tar.gz
+        dest: /tmp/spacecube-grafana-config.tar.gz
+        mode: "0644"
+    - name: 대시보드 임시 폴더 준비
+      ansible.builtin.file:
+        path: /tmp/spacecube-grafana-config
+        state: directory
+        mode: "0755"
+    - name: 대시보드 설정 풀기
+      ansible.builtin.unarchive:
+        src: /tmp/spacecube-grafana-config.tar.gz
+        dest: /tmp/spacecube-grafana-config
+        remote_src: true
+    - name: 대시보드 JSON 찾기
+      ansible.builtin.find:
+        paths: /tmp/spacecube-grafana-config
+        patterns: "dashboard-*.json"
+        file_type: file
+      register: dashboards
+    - name: 대시보드 파일 수 확인
+      ansible.builtin.assert:
+        that:
+          - dashboards.matched == 11
+        fail_msg: "기대 대시보드 11개를 찾지 못했습니다. Grafana 파일을 바꾸지 않았습니다."
+    - name: Grafana에 대시보드 파일 설치
+      ansible.builtin.copy:
+        src: "{{ item.path }}"
+        dest: "/var/lib/grafana/dashboards/{{ item.path | basename }}"
+        remote_src: true
+        owner: grafana
+        group: grafana
+        mode: "0644"
+      loop: "{{ dashboards.files }}"
+      register: dashboard_copy
+    - name: 대시보드 변경 반영
+      ansible.builtin.service:
+        name: grafana-server
+        state: restarted
+      when: dashboard_copy.changed
+    - name: Grafana 상태 확인
+      ansible.builtin.uri:
+        url: http://127.0.0.1:3000/api/health
+        method: GET
+        status_code: 200
+      register: grafana_health
+      retries: 20
+      delay: 2
+      until: grafana_health.status == 200
+    - name: 모든 대시보드 PromQL·LogQL 검증
+      ansible.builtin.script: ../lab/verify-dashboard-queries.py
+      register: dashboard_query_check
+    - name: 검증 요약 표시
+      ansible.builtin.debug:
+        msg: "{{ dashboard_query_check.stdout }}"

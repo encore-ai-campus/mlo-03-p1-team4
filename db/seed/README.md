@@ -8,6 +8,11 @@ conda run -n pro_1 --no-capture-output python db/loaders/load_seed.py --check
 
 - `seed.sql`은 저장소에 같이 둡니다. 로컬 compose는 첫 실행 때 자동으로 넣고, RDS에는 `mariadb … spacecube < db/seed/seed.sql`로 넣습니다. `INSERT IGNORE`라 여러 번 넣어도 같습니다.
 - CSV를 고치면 위 명령을 다시 돌려 `seed.sql`을 새로 만듭니다. `--check`는 크롤링 표본 주소가 지역 표로 풀리는지 봅니다(11-04: 200건 중 197건, 나머지 3건은 아래 '나뉜 구').
+- `legal_dong.csv`를 다시 만들 때는 행정안전부의 현행 법정동코드 전체자료 ZIP을 받아 압축을 풀고, `KIKcd_B` 텍스트 파일을 아래 도구에 전달합니다. 원본 ZIP·전체 코드는 저장소에 넣지 않습니다.
+
+```bash
+conda run -n pro_1 --no-capture-output python db/loaders/build_legal_dong_seed.py "<KIKcd_B 파일 경로>"
+```
 
 | 파일 | 표 | 내용 |
 | --- | --- | --- |
@@ -16,6 +21,8 @@ conda run -n pro_1 --no-capture-output python db/loaders/load_seed.py --check
 | `regions.csv` | regions | **230행 = 시·도 16 + 기초자치단체 단위**(자치구·시·군, 세종 1, 제주 행정시 2). 일반구(수원시 장안구 등)는 넣지 않음 — 크롤링 주소가 '경기 수원시'처럼 시 단위까지만 옴. 2026-11-04 기준(아래 '2026 변경') |
 | `sido_alias.csv` | — | 긴 이름·옛 이름 → 짧은 이름(서울특별시 → 서울, 강원특별자치도 → 강원, 광주광역시·전라남도 → 전남광주통합특별시 …). 크롤러 전처리가 읽음 |
 | `sigungu_alias.csv` | — | 바뀐 시·군·구 이름(인천 동구 → 제물포구). 둘로 나뉜 옛 구(인천 중구·서구)는 빈칸 = 구만으로는 못 정해 제외 |
+| `legal_dong.csv` | — | 공식 현행 법정 읍·면·동·리 이름을 `(시·도, 이름)` 및 `(시, 이름)` 키로 시·군·구에 연결. `status=ambiguous`는 후보가 여러 지역이라 제외하고, `unique`도 `regions.csv`에 있을 때만 사용 |
+| `loaders/build_legal_dong_seed.py` | — | 공식 `KIKcd_B` 텍스트의 말소 코드를 제외하고 `legal_dong.csv`를 재생성. 동일 시·도 안에서 이름이 여러 시·군·구에 걸리면 `ambiguous`로 기록 |
 | `category_map.csv` | — | 사이트별 공간유형 → 우리 유형(`source_site, source_type, category_code`). `category_code`가 빈 줄은 제외 유형. 스페이스클라우드·쉐어잇 1차 수집원 대응표(F-61) |
 | `seed.sql` | categories, facilities, regions | 위 CSV로 만든 실행 파일(자동 생성, 손으로 고치지 않음) |
 
@@ -28,7 +35,7 @@ conda run -n pro_1 --no-capture-output python db/loaders/load_seed.py --check
 | 2026-02-01 | 화성시 일반구 4개(만세·효행·병점·동탄) | 일반구라 넣지 않음(화성시 1행) |
 | — | 대전·충남, 대구·경북 통합 | 출범하지 않음(그대로) |
 
-행정구역이 또 바뀌면 `regions.csv`·별칭을 고치고 `seed.sql`을 다시 만듭니다. 이미 쓰인 `region_id`가 바뀌지 않게 지역은 지우지 말고 더하기만 합니다(이름이 바뀌면 별칭으로 받음).
+법정동 코드 스냅샷은 행정안전부 [2026-07-01 전체자료·변경내역](https://www.mois.go.kr/frt/bbs/type001/commonSelectBoardArticle.do?bbsId=BBSMSTR_000000000052&nttId=127039)을 기준으로 만들었습니다. [2026-10-30 변경 알림](https://www.mois.go.kr/frt/bbs/type001/commonSelectBoardArticle.do?bbsId=BBSMSTR_000000000052&nttId=130674)은 법정동 코드 변동이 없다고 밝혔습니다. 코드 자료가 갱신되면 `legal_dong.csv`를 다시 만들고, 시·군·구가 추가·변경됐으면 `regions.csv`·별칭도 함께 확인합니다. 이미 쓰인 `region_id`가 바뀌지 않게 지역은 지우지 말고 더하기만 합니다(이름이 바뀌면 별칭으로 받음).
 
 관리자 계정은 없습니다(11-03, `users.role` 삭제).
 
@@ -49,8 +56,15 @@ conda run -n pro_1 --no-capture-output python db/loaders/load_seed.py --check
 
 ## 지역 표기
 
-- 표본에 '서울'·'서울특별시', '경기'·'경기도'가 섞여 있습니다. 크롤러는 `sido_alias.csv`(시·도)와 `sigungu_alias.csv`(바뀐 구)로 바꾼 뒤 `/internal/venues`에 보냅니다. 표에 없는 지역이면 B가 400 `UNKNOWN_REGION`을 돌려주고 크롤러는 `crawl_raw.exclude_reason`에 남깁니다.
+- 스페이스클라우드 주소의 `addressRegion`에는 시·도 또는 천안·고양 같은 시 이름, `addressLocality`에는 봉천동·양평동1가 같은 법정동 이름이 옵니다. 크롤러는 `legal_dong.csv`에서 먼저 시·군·구를 찾고 `regions.csv`에 있는지 확인합니다. 후보가 겹치면 `동 이름 겹침`, 표에 없으면 `동 대응 없음`으로 제외하며, 시·군·구 직접 주소는 기존 별칭표를 사용합니다.
 - 화면의 지역 드롭다운은 **공간이 있는 지역만** 보입니다(`GET /regions`가 활성 공간이 있는 시·도·시·군·구만 반환, 힉의 법칙). 전체 목록은 seed에만 있습니다.
 
 이 표는 `category_map.csv` 한 곳에 두고 크롤러 전처리가 읽습니다. 백엔드 `/internal/venues`는 이미 우리 유형 코드(`category_code`)로 받습니다.
 
+
+## dong_sigungu.csv (11-07, #10)
+
+- 스페이스클라우드 상세가 `시·도(또는 시 이름) + 법정동`만 주게 바뀌어, 크롤러가 시·군·구를 구할 때 쓰는 대응표다.
+- 원본: 공공데이터포털 `국토교통부_전국 법정동`(데이터 15063424, 2026-06-30판, 이용허락범위 제한 없음). 원본 파일은 저장소에 두지 않는다.
+- 생성: `python db/loaders/build_dong_map.py <원본.csv>`. `regions.csv` 기준으로 일반구는 시로 줄이고(천안시서북구 → 천안시), regions에 없는 행은 버리고, 리(里)는 리 이름으로 넣는다(김포 석모리).
+- 같은 시·도 안에 같은 동 이름이 여러 시·군·구에 있으면(서울 신사동 등) 크롤러가 고르지 않고 `동 이름 겹침`으로 제외한다.
