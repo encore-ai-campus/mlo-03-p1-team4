@@ -21,7 +21,7 @@
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
-        "uid": "spacecube-prometheus"
+        "uid": "prometheus"
       },
       "gridPos": {
         "h": 8,
@@ -42,8 +42,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (vm) (rate(reservation_total{result=\"ok\"}[5m]))",
-          "legendFormat": "{{vm}}"
+          "expr": "sum by (server) (rate(reservation_total{result=\"ok\"}[5m]))",
+          "legendFormat": "{{server}}"
         }
       ]
     },
@@ -53,7 +53,7 @@
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
-        "uid": "spacecube-prometheus"
+        "uid": "prometheus"
       },
       "gridPos": {
         "h": 8,
@@ -74,8 +74,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (vm) (rate(reservation_total{result=\"conflict\"}[5m]))",
-          "legendFormat": "{{vm}}"
+          "expr": "sum by (server) (rate(reservation_total{result=\"conflict\"}[5m]))",
+          "legendFormat": "{{server}}"
         }
       ]
     },
@@ -85,7 +85,7 @@
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
-        "uid": "spacecube-prometheus"
+        "uid": "prometheus"
       },
       "gridPos": {
         "h": 8,
@@ -106,8 +106,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (vm) (rate(reservation_total{result=\"cancel\"}[5m]))",
-          "legendFormat": "{{vm}}"
+          "expr": "sum by (server) (rate(reservation_total{result=\"cancel\"}[5m]))",
+          "legendFormat": "{{server}}"
         }
       ]
     }

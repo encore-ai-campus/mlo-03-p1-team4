@@ -27,7 +27,7 @@
       },
       "datasource": {
         "type": "prometheus",
-        "uid": "spacecube-prometheus"
+        "uid": "prometheus"
       },
       "fieldConfig": {
         "defaults": {},
@@ -35,9 +35,9 @@
       },
       "targets": [
         {
-          "legendFormat": "{{vm}} {{stage}}",
+          "legendFormat": "{{server}} {{stage}}",
           "refId": "A",
-          "expr": "sum by (vm, stage) (label_replace(increase(event_accepted_total[5m]), \"stage\", \"accepted\", \"\", \"\") or label_replace(increase(event_file_written_total[5m]), \"stage\", \"file\", \"\", \"\") or label_replace(increase(mongo_event_written_total[5m]), \"stage\", \"mongo\", \"\", \"\"))"
+          "expr": "sum by (server, stage) (label_replace(increase(event_accepted_total[5m]), \"stage\", \"accepted\", \"\", \"\") or label_replace(increase(event_file_written_total[5m]), \"stage\", \"file\", \"\", \"\") or label_replace(increase(mongo_event_written_total[5m]), \"stage\", \"mongo\", \"\", \"\"))"
         }
       ]
     },
@@ -47,7 +47,7 @@
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
-        "uid": "spacecube-prometheus"
+        "uid": "prometheus"
       },
       "gridPos": {
         "h": 8,
@@ -68,8 +68,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (vm) (increase(mongo_event_write_failures_total[5m]))",
-          "legendFormat": "{{vm}}"
+          "expr": "sum by (server) (increase(mongo_event_write_failures_total[5m]))",
+          "legendFormat": "{{server}}"
         }
       ]
     },
@@ -79,7 +79,7 @@
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
-        "uid": "spacecube-prometheus"
+        "uid": "prometheus"
       },
       "gridPos": {
         "h": 8,
@@ -100,8 +100,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (vm) (increase(db_read_fallback_total[5m]))",
-          "legendFormat": "{{vm}}"
+          "expr": "sum by (server) (increase(db_read_fallback_total[5m]))",
+          "legendFormat": "{{server}}"
         }
       ]
     },
@@ -117,7 +117,7 @@
       },
       "datasource": {
         "type": "loki",
-        "uid": "spacecube-loki"
+        "uid": "loki"
       },
       "fieldConfig": {
         "defaults": {},
@@ -137,7 +137,7 @@
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
-        "uid": "spacecube-prometheus"
+        "uid": "prometheus"
       },
       "gridPos": {
         "y": 16,
@@ -151,9 +151,9 @@
       },
       "targets": [
         {
-          "legendFormat": "{{vm}} {{stage}} {{reason}} {{dependency}}",
+          "legendFormat": "{{server}} {{stage}} {{reason}} {{dependency}}",
           "refId": "A",
-          "expr": "sum by (vm, stage, reason) (increase(event_file_write_failures_total[5m]))"
+          "expr": "sum by (server, stage, reason) (increase(event_file_write_failures_total[5m]))"
         }
       ]
     },
@@ -163,7 +163,7 @@
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
-        "uid": "spacecube-prometheus"
+        "uid": "prometheus"
       },
       "gridPos": {
         "y": 16,
@@ -177,9 +177,9 @@
       },
       "targets": [
         {
-          "legendFormat": "{{vm}} {{stage}} {{reason}} {{dependency}}",
+          "legendFormat": "{{server}} {{stage}} {{reason}} {{dependency}}",
           "refId": "A",
-          "expr": "label_replace(histogram_quantile(0.95, sum by (vm, le) (rate(event_file_lock_wait_seconds_bucket[5m]))), \"stage\", \"lock_wait\", \"\", \"\") or label_replace(histogram_quantile(0.95, sum by (vm, le) (rate(event_file_write_duration_seconds_bucket[5m]))), \"stage\", \"write_total\", \"\", \"\")"
+          "expr": "label_replace(histogram_quantile(0.95, sum by (server, le) (rate(event_file_lock_wait_seconds_bucket[5m]))), \"stage\", \"lock_wait\", \"\", \"\") or label_replace(histogram_quantile(0.95, sum by (server, le) (rate(event_file_write_duration_seconds_bucket[5m]))), \"stage\", \"write_total\", \"\", \"\")"
         }
       ]
     },
@@ -189,7 +189,7 @@
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
-        "uid": "spacecube-prometheus"
+        "uid": "prometheus"
       },
       "gridPos": {
         "y": 24,
@@ -203,9 +203,9 @@
       },
       "targets": [
         {
-          "legendFormat": "{{vm}} {{stage}} {{reason}} {{dependency}}",
+          "legendFormat": "{{server}} {{stage}} {{reason}} {{dependency}}",
           "refId": "A",
-          "expr": "sum by (vm, stage) (label_replace(increase(mongo_event_written_total[5m]), \"stage\", \"written\", \"\", \"\") or label_replace(increase(mongo_event_duplicates_total[5m]), \"stage\", \"duplicate\", \"\", \"\") or label_replace(increase(mongo_event_write_failures_total[5m]), \"stage\", \"failed\", \"\", \"\"))"
+          "expr": "sum by (server, stage) (label_replace(increase(mongo_event_written_total[5m]), \"stage\", \"written\", \"\", \"\") or label_replace(increase(mongo_event_duplicates_total[5m]), \"stage\", \"duplicate\", \"\", \"\") or label_replace(increase(mongo_event_write_failures_total[5m]), \"stage\", \"failed\", \"\", \"\"))"
         }
       ]
     },
@@ -215,7 +215,7 @@
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
-        "uid": "spacecube-prometheus"
+        "uid": "prometheus"
       },
       "gridPos": {
         "y": 24,
@@ -229,9 +229,9 @@
       },
       "targets": [
         {
-          "legendFormat": "{{vm}} {{stage}} {{reason}} {{dependency}}",
+          "legendFormat": "{{server}} {{stage}} {{reason}} {{dependency}}",
           "refId": "A",
-          "expr": "sum by (vm) (event_writer_queue_size)"
+          "expr": "sum by (server) (event_writer_queue_size)"
         }
       ]
     },
@@ -241,7 +241,7 @@
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
-        "uid": "spacecube-prometheus"
+        "uid": "prometheus"
       },
       "gridPos": {
         "y": 32,
@@ -255,9 +255,9 @@
       },
       "targets": [
         {
-          "legendFormat": "{{vm}} {{stage}} {{reason}} {{dependency}}",
+          "legendFormat": "{{server}} {{stage}} {{reason}} {{dependency}}",
           "refId": "A",
-          "expr": "min by (vm, dependency) (health_dependency_up)"
+          "expr": "min by (server, dependency) (health_dependency_up)"
         }
       ]
     },
@@ -267,7 +267,7 @@
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
-        "uid": "spacecube-prometheus"
+        "uid": "prometheus"
       },
       "gridPos": {
         "y": 32,
@@ -281,9 +281,9 @@
       },
       "targets": [
         {
-          "legendFormat": "{{vm}} {{stage}} {{reason}} {{dependency}}",
+          "legendFormat": "{{server}} {{stage}} {{reason}} {{dependency}}",
           "refId": "A",
-          "expr": "sum by (vm) (rate(http_requests_total{status=~\"5..\"}[5m])) / clamp_min(sum by (vm) (rate(http_requests_total[5m])), 0.001)"
+          "expr": "sum by (server) (rate(http_requests_total{status=~\"5..\"}[5m])) / clamp_min(sum by (server) (rate(http_requests_total[5m])), 0.001)"
         }
       ]
     },
@@ -293,7 +293,7 @@
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
-        "uid": "spacecube-prometheus"
+        "uid": "prometheus"
       },
       "gridPos": {
         "y": 40,
@@ -307,9 +307,9 @@
       },
       "targets": [
         {
-          "legendFormat": "{{vm}} {{stage}} {{reason}} {{dependency}}",
+          "legendFormat": "{{server}} {{stage}} {{reason}} {{dependency}}",
           "refId": "A",
-          "expr": "histogram_quantile(0.95, sum by (vm, le) (rate(http_request_duration_seconds_bucket[5m])))"
+          "expr": "histogram_quantile(0.95, sum by (server, le) (rate(http_request_duration_seconds_bucket[5m])))"
         }
       ]
     }

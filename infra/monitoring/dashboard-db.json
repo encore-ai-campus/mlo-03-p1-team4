@@ -21,7 +21,7 @@
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
-        "uid": "spacecube-prometheus"
+        "uid": "prometheus"
       },
       "gridPos": {
         "h": 8,
@@ -42,8 +42,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "up{job=~\"mysql|mongodb\"}",
-          "legendFormat": "{{vm}}"
+          "expr": "up{job=~\"mariadb|mongodb\"}",
+          "legendFormat": "{{server}}"
         }
       ]
     },

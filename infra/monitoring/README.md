@@ -9,20 +9,20 @@ node / FastAPI / HAProxy / Nginx / MariaDB / MongoDB / Alloy 지표 ─▶ mon P
 각 VM의 journal·app.log·events.log·Nginx 접근 로그 ─▶ Alloy ─▶ mon Loki ─▶ Grafana
 ```
 
-`prometheus.yml`은 IP 대신 `gw`, `api1`, `api2`, `mon`, `db1`, `db2`, `mongo` 이름을 사용한다. IP 주소는 `/etc/hosts`의 환경별 이름 매핑에서 한 번만 관리하고 VM에 배포한다. 109 시험망(`192.168.219.x`)과 최종 노트북망(`192.168.0.211`~`.217`)의 주소가 달라도 Prometheus·Alloy 설정 파일은 바꾸지 않는다. 현재 배포 스크립트의 기본 매핑은 [`infra/vm/lab/install-role.sh`](../vm/lab/install-role.sh)에서 관리하고, 109 배포 묶음은 [`infra/vm/remote109/build_config.py`](../vm/remote109/build_config.py)가 시험망 주소로 렌더링한다.
+`prometheus.yml`은 주소 대신 `gw`, `api1`, `api2`, `mon`, `db1`, `db2`, `mongo` 이름을 사용한다. 실제 주소는 환경별 이름 매핑에서 관리한다. 109 시험망과 최종 노트북망의 주소가 달라도 Prometheus·Alloy 설정 파일을 바꾸지 않도록 [`infra/vm/lab/install-role.sh`](../vm/lab/install-role.sh)와 [`infra/vm/remote109/build_config.py`](../vm/remote109/build_config.py)의 렌더링 결과를 확인한다.
 
 | Scrape job | 대상 이름·포트 | 내용 |
 | --- | --- | --- |
-| `node` | 7대 VM `:9100` | 호스트 자원. Mongo VM node exporter 설치 상태 확인 필요 |
+| `nodes` | 7대 VM `:9100` | 호스트 자원. Mongo VM node exporter 설치 상태 확인 필요 |
 | `api` | `api1`, `api2`: `:8000/metrics` | FastAPI 요청·예약·이벤트 지표 |
 | `haproxy` | `gw:8404/metrics` | HAProxy 백엔드 상태·분산 요청 |
 | `nginx` | `api1`, `api2`: `:9113/metrics` | Nginx exporter |
-| `mysql` | `db1`, `db2`: `:9104/metrics` | MariaDB exporter |
+| `mariadb` | `db1`, `db2`: `:9104/metrics` | MariaDB exporter |
 | `mongodb` | `mongo:9216/metrics` | MongoDB exporter. 109에는 아직 설치되지 않아 DB 담당 확인 필요 |
 | `alloy` | 7대 VM `:12345/metrics` | Alloy 에이전트 상태 |
 | `prometheus`, `loki` | mon loopback `:9090`, `:3100` | 모니터링 서버 자체 상태 |
 
-Prometheus의 모든 원격 대상에는 `vm` 라벨을 붙인다. HAProxy 자체 시계열의 `server` 라벨은 API 백엔드 이름(`api1`, `api2`)을 보존하므로 scrape 대상에도 `server` 라벨을 덮어 씌우지 않는다.
+109의 기존 Prometheus job 이름(`nodes`, `api`, `mariadb` 등)과 서버 식별 라벨 `server`를 사용한다. HAProxy 자체 시계열의 `server`는 API 백엔드 이름(`api1`, `api2`)이므로 HAProxy scrape 대상에는 정적 `server` 라벨을 추가하지 않는다. Grafana 데이터소스 UID도 기존 `prometheus`·`loki`를 사용한다.
 
 ## Alloy 로그
 
@@ -36,7 +36,7 @@ Prometheus의 모든 원격 대상에는 `vm` 라벨을 붙인다. HAProxy 자�
 
 경로는 현재 109 배포의 [`install-role.sh`](../vm/lab/install-role.sh)·[`nginx.conf`](../vm/lab/nginx.conf)와 맞췄다. Loki 라벨은 낮은 고정값인 `server`, `vm`, `job`, `source`만 쓴다. IP·개인정보·토큰·사용자 ID·세션 ID는 라벨에 넣지 않는다.
 
-Grafana Explore에서 예를 들어 `{server="api1",source="events"}` 또는 `{server="mongo",source="journal"}`로 검색한다. 실제 적용 확인은 각 VM에서 `logger "monitor-probe-<VM>"`를 발생시키고 같은 라벨로 검색한다. 시험 데이터가 Loki에 보이는지와 7대 각각을 구분할 수 있는지를 기록한다.
+Grafana Explore에서 예를 들어 `{server="api1",source="events"}` 또는 `{server="mongo",source="journal"}`로 검색한다. 읽기 전용 점검에서는 기존 로그의 최근 유입 시각만 확인하고 시험 로그를 새로 발생시키지 않는다.
 
 ## 보관·경보·대시보드
 
@@ -53,16 +53,29 @@ Grafana Explore에서 예를 들어 `{server="api1",source="events"}` 또는 `{s
 
 `alerts.yml`의 5xx는 `http_requests_total`에서 5xx를 세고 전체 요청에서 `reservation_total{result="conflict"}`를 뺀 비율이다. VM에서 HTTP 409 수와 conflict counter가 실제로 맞는지 확인해야 한다. 경보 시험은 승인된 시험 환경에서 정상 충돌만 발생할 때 경보가 울리지 않고, 5xx 비율이 기준을 넘을 때 울리는지 본다.
 
+## 읽기 전용 조회 기준
+
+작업판·잠금 상태와 실제 배포 커밋을 먼저 확인한다. PR의 이벤트 지표가 배포되지 않았다면 기존 수집 상태만 기록하고 새 지표는 배포 후 대기로 둔다. 조회 결과에는 이벤트 원문·사용자·세션 식별자를 넣지 않는다.
+
+| 확인 대상 | 조회식 또는 API | 판정 시 주의 |
+| --- | --- | --- |
+| Prometheus target | `/api/v1/targets`의 `health`, `lastError`, `lastScrape` | `api`·`nodes`·`mariadb`·`mongodb`를 구분하고 설치 전 Mongo exporter를 앱 장애로 분류하지 않는다 |
+| 앱과 저장소 | `up{job="api"}`, `health_dependency_up{job="api"}` | `/health`가 호출되지 않았거나 지표 미배포면 후자는 No data일 수 있다 |
+| 이벤트 단계 | `event_accepted_total{job="api"}`, `event_file_written_total{job="api"}`, `mongo_event_written_total{job="api"}` | 2-worker 지표는 전체 건수의 정확한 합계가 아니다 |
+| 파일·Mongo 실패 | `event_file_write_failures_total{job="api"}`, `mongo_event_write_failures_total{job="api"}` | 0과 지표 부재를 구분한다 |
+| Loki 기존 로그 | `sum by (server) (count_over_time({server=~"api1|api2",source="app"}[5m]))`, `sum by (server) (count_over_time({server=~"api1|api2",source="events"}[5m]))` | 최근 이벤트가 없으면 events 로그 0건도 가능하며 로그 본문은 출력하지 않는다 |
+
+Grafana에서는 기존 데이터소스 `prometheus`·`loki`의 연결 상태와 서비스·이벤트 패널의 실제 데이터/No data를 분리해 기록한다. 설정 파일의 보관값과 실행 중인 서비스 설정도 구분한다.
+
 ## 설치 확인 순서
 
 VM 소유자와 작업 시간을 맞춘 뒤 진행한다. 109 부하 시험 등 다른 서버 작업이 진행 중이면 설정을 바꾸지 않는다.
 
-1. 7대 모두 `mon` 이름을 해석하고 Alloy가 `mon:3100`에 연결되는지 확인한다.
-2. `mon`에서 Prometheus `/api/v1/targets`를 열어 job과 VM별 `up` 상태를 확인한다. 7개 node exporter 및 Mongo exporter가 아직 설치되지 않은 대상은 설치 후 다시 검사한다.
-3. Grafana Explore에서 7대 probe 로그를 각각 검색한다. `api1`·`api2`는 app, events, Nginx 접근 로그도 확인한다.
-4. Prometheus 실행 인자에서 15일 보관, Loki `/config`와 상태에서 14일 보관·Compactor 활성화를 확인한다.
-5. DB 담당과 테스트 replica에서만 5초 초과 지연을 안전하게 재현해 복제 상태·exporter 지표·경보를 대조한다. 실제 운영 복제를 임의로 멈추지 않는다.
-6. 최종 노트북 7대 배치 후 같은 확인을 반복하고 결과·시각·누락 대상을 기록한다.
+1. 공용 작업판과 잠금 상태를 확인하고, api1·api2 배포 커밋이 PR 변경을 포함하는지 대조한다. 미배포면 새 지표는 배포 후 대기로 둔다.
+2. `mon`의 Prometheus `/api/v1/targets`에서 job·서버별 `up`과 마지막 scrape 오류를 확인한다. MongoDB exporter가 없으면 DB 담당 확인 항목으로 남긴다.
+3. Grafana의 기존 `prometheus`·`loki` 데이터소스와 이벤트·서비스 대시보드의 No data 여부를 확인한다. Loki에서는 api1·api2의 기존 app·events 로그 최근 유입 시각만 조회한다.
+4. Prometheus 실행 인자·Loki 실행 설정·logrotate 설정과 디스크 여유를 읽어 저장소별 실제 보관 상태를 기록한다. 예시 설정 기간을 운영 적용값으로 간주하지 않는다.
+5. 최종 노트북 7대 배치 후 같은 읽기 전용 확인을 반복하고 시각·누락 대상을 기록한다. 복제 지연 재현·경보 발화 시험은 별도 승인된 작업에서만 한다.
 
 ## 이 브랜치에서 로컬로 검사
 

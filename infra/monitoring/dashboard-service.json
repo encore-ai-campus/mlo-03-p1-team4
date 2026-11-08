@@ -21,7 +21,7 @@
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
-        "uid": "spacecube-prometheus"
+        "uid": "prometheus"
       },
       "gridPos": {
         "h": 8,
@@ -42,8 +42,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "up{job=\"node\"}",
-          "legendFormat": "{{vm}}"
+          "expr": "up{job=\"nodes\"}",
+          "legendFormat": "{{server}}"
         }
       ]
     },
@@ -53,7 +53,7 @@
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
-        "uid": "spacecube-prometheus"
+        "uid": "prometheus"
       },
       "gridPos": {
         "h": 8,
@@ -74,8 +74,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (vm) (rate(http_requests_total[5m]))",
-          "legendFormat": "{{vm}}"
+          "expr": "sum by (server) (rate(http_requests_total[5m]))",
+          "legendFormat": "{{server}}"
         }
       ]
     },
@@ -85,7 +85,7 @@
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
-        "uid": "spacecube-prometheus"
+        "uid": "prometheus"
       },
       "gridPos": {
         "h": 8,
@@ -106,8 +106,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "histogram_quantile(0.95, sum by (le,vm) (rate(http_request_duration_highr_seconds_bucket[5m])))",
-          "legendFormat": "{{vm}}"
+          "expr": "histogram_quantile(0.95, sum by (le,server) (rate(http_request_duration_highr_seconds_bucket[5m])))",
+          "legendFormat": "{{server}}"
         }
       ]
     },
@@ -117,7 +117,7 @@
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
-        "uid": "spacecube-prometheus"
+        "uid": "prometheus"
       },
       "gridPos": {
         "h": 8,
@@ -138,8 +138,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (vm) (rate(http_requests_total{status=~\"5..\"}[5m])) / clamp_min(sum by (vm) (rate(http_requests_total[5m])) - (sum by (vm) (rate(reservation_total{result=\"conflict\"}[5m])) or on(vm) (0 * sum by (vm) (rate(http_requests_total[5m])))), 0.001)",
-          "legendFormat": "{{vm}}"
+          "expr": "sum by (server) (rate(http_requests_total{status=~\"5..\"}[5m])) / clamp_min(sum by (server) (rate(http_requests_total[5m])) - (sum by (server) (rate(reservation_total{result=\"conflict\"}[5m])) or on(server) (0 * sum by (server) (rate(http_requests_total[5m])))), 0.001)",
+          "legendFormat": "{{server}}"
         }
       ]
     },
@@ -149,7 +149,7 @@
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
-        "uid": "spacecube-prometheus"
+        "uid": "prometheus"
       },
       "gridPos": {
         "h": 8,
@@ -215,7 +215,7 @@
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
-        "uid": "spacecube-prometheus"
+        "uid": "prometheus"
       },
       "gridPos": {
         "h": 8,

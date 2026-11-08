@@ -3,6 +3,21 @@ rule_files:
   - alerts.yml
 evaluation_interval: 1m
 tests:
+  - name: nodes_job의_수집_장애_경보
+    interval: 1m
+    input_series:
+      - series: 'up{job="nodes",server="api1"}'
+        values: '0 0 0 0 0'
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: NodeExporterScrapeFailed
+        exp_alerts:
+          - exp_labels:
+              job: nodes
+              server: api1
+              severity: warning
+            exp_annotations:
+              summary: 'api1 호스트 exporter 수집 실패'
   - name: 이벤트_파일_실패_경보
     interval: 1m
     input_series:
@@ -19,14 +34,14 @@ tests:
   - name: mongo_degraded가_2분_지속되면_경보
     interval: 1m
     input_series:
-      - series: 'health_dependency_up{vm="api1",dependency="mongo"}'
+      - series: 'health_dependency_up{server="api1",dependency="mongo"}'
         values: '0 0 0 0 0'
     alert_rule_test:
       - eval_time: 3m
         alertname: HealthDependencyDown
         exp_alerts:
           - exp_labels:
-              vm: api1
+              server: api1
               dependency: mongo
               severity: warning
             exp_annotations:
@@ -34,11 +49,11 @@ tests:
   - name: 정상_슬롯_충돌만_있으면_경보_없음
     interval: 1m
     input_series:
-      - series: 'http_requests_total{status="201",vm="api1"}'
+      - series: 'http_requests_total{status="201",server="api1"}'
         values: '0+10x12'
-      - series: 'http_requests_total{status="409",vm="api1"}'
+      - series: 'http_requests_total{status="409",server="api1"}'
         values: '0+90x12'
-      - series: 'reservation_total{result="conflict",vm="api1"}'
+      - series: 'reservation_total{result="conflict",server="api1"}'
         values: '0+90x12'
     alert_rule_test:
       - eval_time: 10m
@@ -47,9 +62,9 @@ tests:
   - name: 서버_오류_10퍼센트면_경보
     interval: 1m
     input_series:
-      - series: 'http_requests_total{status="201",vm="api1"}'
+      - series: 'http_requests_total{status="201",server="api1"}'
         values: '0+90x12'
-      - series: 'http_requests_total{status="503",vm="api1"}'
+      - series: 'http_requests_total{status="503",server="api1"}'
         values: '0+10x12'
     alert_rule_test:
       - eval_time: 10m
@@ -62,13 +77,13 @@ tests:
   - name: 충돌이_90퍼센트여도_서버_오류가_남으면_경보
     interval: 1m
     input_series:
-      - series: 'http_requests_total{status="201",vm="api1"}'
+      - series: 'http_requests_total{status="201",server="api1"}'
         values: '0+10x12'
-      - series: 'http_requests_total{status="409",vm="api1"}'
+      - series: 'http_requests_total{status="409",server="api1"}'
         values: '0+90x12'
-      - series: 'reservation_total{result="conflict",vm="api1"}'
+      - series: 'reservation_total{result="conflict",server="api1"}'
         values: '0+90x12'
-      - series: 'http_requests_total{status="503",vm="api1"}'
+      - series: 'http_requests_total{status="503",server="api1"}'
         values: '0+1x12'
     alert_rule_test:
       - eval_time: 10m
