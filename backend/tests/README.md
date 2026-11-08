@@ -50,6 +50,7 @@ python -m pytest backend/tests/test_reservations.py backend/tests/test_concurren
 | `test_reviews.py` | A | 후기 자격 404·403·403·409, 작성 직후 내 후기에 보임 |
 | `test_review_repo_ids.py` | A | #45 내 예약용 후기 ID 일괄 조회: 빈 입력 SQL 없음, 활성·삭제 후기 포함, 중복 ID에도 SELECT 한 번, 호출자 트랜잭션 보존 (로컬 MariaDB) |
 | `test_events.py` | A | 51건 400, MongoDB가 꺼져도 202이고 `events.log`에는 남음, replay해도 중복 없음 |
+| `test_logging.py` | A | 짧은 파일 잠금 경합 뒤에도 JSON 한 줄 기록 성공 |
 | `test_events.py` 현재 추가 검증 | A | #60 전환: FE 12종·서버 3종 문서 구조와 상품 조건, 자유 문자열·잘못된 자료형 제거, 미허용 이벤트만 제외, 파일 기록 실패 503과 MongoDB 대기열 미전달. 비활성 공간 이벤트가 섞인 묶음은 현재 계약대로 전체 400·로그 미기록. 공식 validator를 적용한 전용 테스트 MongoDB의 검색·서버 이벤트 실저장은 별도 수동 통합 검증 완료; B 예약 호출 통합은 남음 |
 | `test_models_match_db.py` | A | `app/models`의 표·컬럼 이름·NULL 여부가 `spacecube_test`의 실제 표와 같은지 (SQLAlchemy `inspect`) |
 | `test_health.py`, `test_db_routing.py`, `test_metrics.py` | A | primary 끊김 503 / replica·MongoDB 끊김 200 degraded, replica 주소가 틀려도 공개 조회 성공 |

@@ -24,7 +24,7 @@ from app.core.event_document import (
     build_document,
 )
 from app.core.logging import request_id_context, write_event
-from app.core.metrics import mongo_event_write_failures_counter
+from app.core.metrics import event_file_write_failures_counter, mongo_event_write_failures_counter
 from app.core.mongo import get_event_collection
 
 FRONTEND_EVENTS = FE_EVENTS
@@ -274,6 +274,7 @@ def _log_event(
     try:
         write_event(document)
     except Exception:
+        event_file_write_failures_counter.inc()
         if buffer is not None:
             buffer.file_failures += 1
         logging.getLogger("spacecube.app").error(

@@ -18,6 +18,7 @@ from app.core.config import get_settings
 
 request_id_context: ContextVar[str | None] = ContextVar("request_id", default=None)
 _file_lock = RLock()
+FILE_LOCK_WAIT_SECONDS = 0.5
 _fields = (
     "request_id",
     "path",
@@ -35,7 +36,7 @@ _fields = (
 @contextmanager
 def _process_lock(path: Path):
     # workers=2가 같은 파일을 쓸 때 JSON 줄이 서로 섞이지 않게 한다.
-    if not _file_lock.acquire(timeout=0.1):
+    if not _file_lock.acquire(timeout=FILE_LOCK_WAIT_SECONDS):
         raise OSError("로그 파일 잠금 대기 초과")
     locked = False
     try:
@@ -43,8 +44,7 @@ def _process_lock(path: Path):
             if os.name == "nt":
                 import msvcrt
 
-                stream.seek(0)
-                if not stream.read(1):
+                if os.fstat(stream.fileno()).st_size == 0:
                     stream.write(b"0")
                     stream.flush()
 
@@ -64,7 +64,7 @@ def _process_lock(path: Path):
                 def release():
                     fcntl.flock(stream.fileno(), fcntl.LOCK_UN)
 
-            deadline = monotonic() + 0.1
+            deadline = monotonic() + FILE_LOCK_WAIT_SECONDS
             while True:
                 try:
                     acquire()

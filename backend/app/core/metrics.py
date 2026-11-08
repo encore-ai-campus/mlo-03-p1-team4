@@ -7,6 +7,10 @@ from prometheus_client import Counter
 from prometheus_fastapi_instrumentator import Instrumentator
 
 reservation_counter = Counter("reservation_total", "예약 처리 결과", ["result"])
+event_file_write_failures_counter = Counter(
+    "event_file_write_failures_total",
+    "events.log에 기록하지 못한 이벤트 수",
+)
 mongo_event_write_failures_counter = Counter(
     "mongo_event_write_failures_total",
     "MongoDB에 쓰지 못한 이벤트 수",
