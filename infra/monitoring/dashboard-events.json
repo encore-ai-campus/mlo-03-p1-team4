@@ -1,0 +1,317 @@
+{
+  "id": null,
+  "uid": "spacecube-events",
+  "title": "이벤트 · 수집 단계와 장애",
+  "tags": [
+    "spacecube",
+    "F-65"
+  ],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "이벤트 접수·파일 성공·Mongo 저장 (5분)",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "targets": [
+        {
+          "legendFormat": "{{server}} {{stage}}",
+          "refId": "A",
+          "expr": "sum by (server, stage) (label_replace(increase(event_accepted_total[5m]), \"stage\", \"accepted\", \"\", \"\") or label_replace(increase(event_file_written_total[5m]), \"stage\", \"file\", \"\", \"\") or label_replace(increase(mongo_event_written_total[5m]), \"stage\", \"mongo\", \"\", \"\"))"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "MongoDB 쓰기 실패",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (server) (increase(mongo_event_write_failures_total[5m]))",
+          "legendFormat": "{{server}}"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "replica 읽기 대체",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 8
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (server) (increase(db_read_fallback_total[5m]))",
+          "legendFormat": "{{server}}"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Loki events.log 유입 (5분)",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 8
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "targets": [
+        {
+          "legendFormat": "{{server}}",
+          "refId": "A",
+          "expr": "sum by (server) (count_over_time({source=\"events\"}[5m]))"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "파일 기록 실패 단계·원인 (5분)",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "y": 16,
+        "x": 0,
+        "h": 8,
+        "w": 12
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "targets": [
+        {
+          "legendFormat": "{{server}} {{stage}} {{reason}} {{dependency}}",
+          "refId": "A",
+          "expr": "sum by (server, stage, reason) (increase(event_file_write_failures_total[5m]))"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "파일 잠금 대기 p95·기록 p95 (5분)",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "y": 16,
+        "x": 12,
+        "h": 8,
+        "w": 12
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "targets": [
+        {
+          "legendFormat": "{{server}} {{stage}} {{reason}} {{dependency}}",
+          "refId": "A",
+          "expr": "label_replace(histogram_quantile(0.95, sum by (server, le) (rate(event_file_lock_wait_seconds_bucket[5m]))), \"stage\", \"lock_wait\", \"\", \"\") or label_replace(histogram_quantile(0.95, sum by (server, le) (rate(event_file_write_duration_seconds_bucket[5m]))), \"stage\", \"write_total\", \"\", \"\")"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "title": "Mongo 새 저장·중복·실패 (5분)",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "y": 24,
+        "x": 0,
+        "h": 8,
+        "w": 12
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "targets": [
+        {
+          "legendFormat": "{{server}} {{stage}} {{reason}} {{dependency}}",
+          "refId": "A",
+          "expr": "sum by (server, stage) (label_replace(increase(mongo_event_written_total[5m]), \"stage\", \"written\", \"\", \"\") or label_replace(increase(mongo_event_duplicates_total[5m]), \"stage\", \"duplicate\", \"\", \"\") or label_replace(increase(mongo_event_write_failures_total[5m]), \"stage\", \"failed\", \"\", \"\"))"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "title": "writer 대기열",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "y": 24,
+        "x": 12,
+        "h": 8,
+        "w": 12
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "targets": [
+        {
+          "legendFormat": "{{server}} {{stage}} {{reason}} {{dependency}}",
+          "refId": "A",
+          "expr": "sum by (server) (event_writer_queue_size)"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "title": "/health 저장소 상태 (1 정상)",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "y": 32,
+        "x": 0,
+        "h": 8,
+        "w": 12
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "targets": [
+        {
+          "legendFormat": "{{server}} {{stage}} {{reason}} {{dependency}}",
+          "refId": "A",
+          "expr": "min by (server, dependency) (health_dependency_up)"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "title": "HTTP 5xx 비율",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "y": 32,
+        "x": 12,
+        "h": 8,
+        "w": 12
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "targets": [
+        {
+          "legendFormat": "{{server}} {{stage}} {{reason}} {{dependency}}",
+          "refId": "A",
+          "expr": "sum by (server) (rate(http_requests_total{status=~\"5..\"}[5m])) / clamp_min(sum by (server) (rate(http_requests_total[5m])), 0.001)"
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "title": "HTTP p95 (초)",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "y": 40,
+        "x": 0,
+        "h": 8,
+        "w": 12
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "targets": [
+        {
+          "legendFormat": "{{server}} {{stage}} {{reason}} {{dependency}}",
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by (server, le) (rate(http_request_duration_seconds_bucket[5m])))"
+        }
+      ]
+    }
+  ]
+}

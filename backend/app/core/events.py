@@ -29,7 +29,15 @@ from app.core.logging import (
     request_id_context,
     write_event,
 )
-from app.core.metrics import event_file_write_failures_counter, mongo_event_write_failures_counter
+from app.core.metrics import (
+    event_accepted_counter,
+    event_file_write_failures_counter,
+    event_file_written_counter,
+    event_writer_queue_size,
+    mongo_event_duplicates_counter,
+    mongo_event_write_failures_counter,
+    mongo_event_written_counter,
+)
 from app.core.mongo import get_event_collection
 
 FRONTEND_EVENTS = FE_EVENTS
@@ -147,12 +155,17 @@ class _EventWriter:
                 except Empty:
                     break
             try:
-                insert_event_documents(batch)
+                inserted, duplicates = insert_event_documents(batch)
+                mongo_event_written_counter.inc(inserted)
+                mongo_event_duplicates_counter.inc(duplicates)
             except BulkWriteError as error:
                 details = error.details
                 duplicates = sum(
                     item.get("code") == 11000 for item in details.get("writeErrors", [])
                 )
+                if not details.get("writeConcernErrors"):
+                    mongo_event_written_counter.inc(details.get("nInserted", 0))
+                    mongo_event_duplicates_counter.inc(duplicates)
                 failed = max(0, len(batch) - details.get("nInserted", 0) - duplicates)
                 if details.get("writeConcernErrors"):
                     failed = len(batch)
@@ -162,6 +175,7 @@ class _EventWriter:
             finally:
                 for _ in batch:
                     self.queue.task_done()
+                event_writer_queue_size.set(self.queue.qsize())
 
     @staticmethod
     def _record_failure(count: int) -> None:
@@ -187,6 +201,7 @@ def start_event_writer() -> None:
     with _writer_lock:
         if _writer is None:
             _writer = _EventWriter()
+            event_writer_queue_size.set(0)
         _writer_closed = False
 
 
@@ -206,6 +221,7 @@ def submit_events(documents: list[dict]) -> None:
                     _writer.queue.put_nowait(document)
                 except Full:
                     dropped += 1
+            event_writer_queue_size.set(_writer.queue.qsize())
     if dropped:
         mongo_event_write_failures_counter.inc(dropped)
         logging.getLogger("spacecube.app").warning(
@@ -221,6 +237,7 @@ def stop_event_writer() -> None:
         writer, _writer = _writer, None
     if writer is not None:
         writer.stop()
+    event_writer_queue_size.set(0)
 
 
 def require_event_file() -> None:
@@ -276,6 +293,7 @@ def _log_event(
         logging.getLogger("spacecube.app").warning("이벤트 필수값 오류로 제외")
         return
     buffer = event_buffer.get()
+    event_accepted_counter.inc()
     try:
         write_event(document)
     except Exception as error:
@@ -298,6 +316,7 @@ def _log_event(
                 # 예약은 이미 커밋됐으므로 관측 로그 파일이 실패해도 MongoDB 전달은 시도한다.
                 buffer.documents.append(document)
         return
+    event_file_written_counter.inc()
     # 관측 실패가 이미 커밋한 예약을 사용자에게 실패로 보이게 해서는 안 된다.
     if buffer is None:
         submit_events([document])

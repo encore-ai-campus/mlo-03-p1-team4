@@ -1,0 +1,9 @@
+logging { level = "info" }
+loki.write "local" {
+  endpoint { url = "http://mon:3100/loki/api/v1/push" }
+}
+loki.source.journal "system" {
+  max_age = "1h"
+  labels = { job = "journal", server = "db2", vm = "db2", source = "journal" }
+  forward_to = [loki.write.local.receiver]
+}

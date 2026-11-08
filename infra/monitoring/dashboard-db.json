@@ -1,0 +1,96 @@
+{
+  "id": null,
+  "uid": "spacecube-db",
+  "title": "DB · 연결/복제 지연",
+  "tags": [
+    "spacecube",
+    "F-65"
+  ],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "DB exporter 수집 상태",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "up{job=~\"mariadb|mongodb\"}",
+          "legendFormat": "{{server}}"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "MariaDB 연결 수",
+      "type": "text",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "### MariaDB 연결 수\ndb1/db2 exporter의 실제 연결 지표 확인 대기\n실제 /metrics 샘플 확인 후 쿼리를 연결합니다."
+      }
+    },
+    {
+      "id": 3,
+      "title": "replica 복제 지연",
+      "type": "text",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 8
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "### replica 복제 지연\ndb2 exporter의 Seconds_Behind_Master 대응 지표 확인 대기\n실제 /metrics 샘플 확인 후 쿼리를 연결합니다."
+      }
+    },
+    {
+      "id": 4,
+      "title": "MongoDB 연결 수",
+      "type": "text",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 8
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "### MongoDB 연결 수\nmongo exporter의 실제 연결 지표 확인 대기\n실제 /metrics 샘플 확인 후 쿼리를 연결합니다."
+      }
+    }
+  ]
+}

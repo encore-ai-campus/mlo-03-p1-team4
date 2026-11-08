@@ -1,0 +1,4 @@
+# systemctl cat loki 로 실제 패키지 경로를 확인한 뒤 override
+[Service]
+ExecStart=
+ExecStart=/usr/bin/loki -config.file=/etc/loki/loki.yml

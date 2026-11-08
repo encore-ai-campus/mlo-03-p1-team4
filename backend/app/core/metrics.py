@@ -3,7 +3,7 @@
 사용: 앱이 HTTP 지표를 노출하고 B 예약 서비스가 예약 결과 카운터를 올린다.
 """
 
-from prometheus_client import Counter, Histogram
+from prometheus_client import Counter, Gauge, Histogram
 from prometheus_fastapi_instrumentator import Instrumentator
 
 reservation_counter = Counter("reservation_total", "예약 처리 결과", ["result"])
@@ -28,6 +28,20 @@ event_file_write_duration_seconds = Histogram(
     buckets=(0.001, 0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 1.0),
 )
 db_read_fallback_counter = Counter("db_read_fallback_total", "replica 대신 primary를 사용한 횟수")
+event_accepted_counter = Counter("event_accepted_total", "검증을 통과해 기록을 시도한 이벤트 수")
+event_file_written_counter = Counter(
+    "event_file_written_total", "events.log 기록에 성공한 이벤트 수"
+)
+mongo_event_written_counter = Counter(
+    "mongo_event_written_total", "MongoDB에 새로 저장된 이벤트 수"
+)
+mongo_event_duplicates_counter = Counter(
+    "mongo_event_duplicates_total", "MongoDB에서 event_id 중복으로 건너뛴 이벤트 수"
+)
+event_writer_queue_size = Gauge("event_writer_queue_size", "MongoDB writer 대기열의 현재 문서 수")
+health_dependency_up = Gauge(
+    "health_dependency_up", "마지막 /health 확인의 저장소 연결 상태(1 정상, 0 장애)", ["dependency"]
+)
 
 
 def setup_metrics(app) -> None:

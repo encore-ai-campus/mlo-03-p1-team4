@@ -1,0 +1,10 @@
+apiVersion: 1
+providers:
+  - name: spacecube
+    orgId: 1
+    folder: SpaceCube
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    options:
+      path: /var/lib/grafana/dashboards

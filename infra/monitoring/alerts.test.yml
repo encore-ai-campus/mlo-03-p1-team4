@@ -1,0 +1,95 @@
+# F-65: 정상 SLOT_TAKEN이 대량 발생해도 5xx 경보를 희석하지 않는지 검사.
+rule_files:
+  - alerts.yml
+evaluation_interval: 1m
+tests:
+  - name: nodes_job의_수집_장애_경보
+    interval: 1m
+    input_series:
+      - series: 'up{job="nodes",server="api1"}'
+        values: '0 0 0 0 0'
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: NodeExporterScrapeFailed
+        exp_alerts:
+          - exp_labels:
+              job: nodes
+              server: api1
+              severity: warning
+            exp_annotations:
+              summary: 'api1 호스트 exporter 수집 실패'
+  - name: 이벤트_파일_실패_경보
+    interval: 1m
+    input_series:
+      - series: 'event_file_write_failures_total{stage="write_event",reason="disk_full"}'
+        values: '0 1 1 1 1 1'
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: EventFileWriteFailure
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: 'events.log 기록 실패'
+  - name: mongo_degraded가_2분_지속되면_경보
+    interval: 1m
+    input_series:
+      - series: 'health_dependency_up{server="api1",dependency="mongo"}'
+        values: '0 0 0 0 0'
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: HealthDependencyDown
+        exp_alerts:
+          - exp_labels:
+              server: api1
+              dependency: mongo
+              severity: warning
+            exp_annotations:
+              summary: 'api1 mongo 저장소 확인 실패'
+  - name: 정상_슬롯_충돌만_있으면_경보_없음
+    interval: 1m
+    input_series:
+      - series: 'http_requests_total{status="201",server="api1"}'
+        values: '0+10x12'
+      - series: 'http_requests_total{status="409",server="api1"}'
+        values: '0+90x12'
+      - series: 'reservation_total{result="conflict",server="api1"}'
+        values: '0+90x12'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: HttpServerErrorRateHigh
+        exp_alerts: []
+  - name: 서버_오류_10퍼센트면_경보
+    interval: 1m
+    input_series:
+      - series: 'http_requests_total{status="201",server="api1"}'
+        values: '0+90x12'
+      - series: 'http_requests_total{status="503",server="api1"}'
+        values: '0+10x12'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: HttpServerErrorRateHigh
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: 'FastAPI 5xx 오류율 5% 초과 (SLOT_TAKEN 분모 제외)'
+  - name: 충돌이_90퍼센트여도_서버_오류가_남으면_경보
+    interval: 1m
+    input_series:
+      - series: 'http_requests_total{status="201",server="api1"}'
+        values: '0+10x12'
+      - series: 'http_requests_total{status="409",server="api1"}'
+        values: '0+90x12'
+      - series: 'reservation_total{result="conflict",server="api1"}'
+        values: '0+90x12'
+      - series: 'http_requests_total{status="503",server="api1"}'
+        values: '0+1x12'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: HttpServerErrorRateHigh
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: 'FastAPI 5xx 오류율 5% 초과 (SLOT_TAKEN 분모 제외)'

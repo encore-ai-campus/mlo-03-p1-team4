@@ -8,6 +8,7 @@ dependencies:
       - fonttools==4.68.0   # 글꼴 서브셋·woff2 변환 (design/fonts)
       - brotli              # woff2 압축
       - httpx               # crawler, FastAPI TestClient
+      - requests==2.34.2    # 원격 부하 시험 실행기 HTTP 요청
       - beautifulsoup4      # crawler
       - ruff==0.17.3        # 파이썬 린트·포맷 (ruff.toml)
       # 백엔드 (11-03 결정: SQLAlchemy 2 동기 + PyMySQL, MongoDB는 pymongo). 버전은 팀이 같게 고정
