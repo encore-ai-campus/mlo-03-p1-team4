@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import csv
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from crawler.spacecloud_crawler import SpaceInfo
@@ -50,11 +50,17 @@ class SeedMaps:
     categories: dict[tuple[str, str], str]
     sido_alias: dict[str, str]
     sigungu_alias: dict[tuple[str, str], str]
+    legal_dong: dict[tuple[str, str, str], tuple[str, str] | None]
+    legal_dong_city_aliases: set[str]
     regions: set[tuple[str, str]]
     facilities: set[str]
+    # (시·도, 법정동) → 시·군·구들, (시 이름, 법정동) → (시·도, 시·군·구)들. db/seed/dong_sigungu.csv(#10)
+    dong_index: dict[tuple[str, str], set[str]] = field(default_factory=dict)
+    city_index: dict[tuple[str, str], set[tuple[str, str]]] = field(default_factory=dict)
 
     @classmethod
     def load(cls, seed_dir: Path = SEED_DIR) -> SeedMaps:
+        legal_dong_rows = _csv_rows(seed_dir / "legal_dong.csv")
         return cls(
             categories={
                 (row["source_site"], row["source_type"]): row["category_code"]
@@ -67,9 +73,54 @@ class SeedMaps:
                 (row["sido"], row["alias"]): row["sigungu"]
                 for row in _csv_rows(seed_dir / "sigungu_alias.csv")
             },
+            legal_dong={
+                (row["scope"], row["alias"], row["locality"]): (
+                    (row["sido"], row["sigungu"]) if row["status"] == "unique" else None
+                )
+                for row in legal_dong_rows
+            },
+            legal_dong_city_aliases={
+                row["alias"] for row in legal_dong_rows if row["scope"] == "city"
+            },
             regions={(row["sido"], row["sigungu"]) for row in _csv_rows(seed_dir / "regions.csv")},
             facilities={row["name"] for row in _csv_rows(seed_dir / "facilities.csv")},
+            **_dong_indexes(seed_dir / "dong_sigungu.csv"),
         )
+
+
+def _dong_indexes(path: Path) -> dict:
+    dong_index: dict[tuple[str, str], set[str]] = {}
+    city_index: dict[tuple[str, str], set[tuple[str, str]]] = {}
+    if not path.exists():
+        return {"dong_index": dong_index, "city_index": city_index}
+    for row in _csv_rows(path):
+        sido, sigungu, dong = row["sido"], row["sigungu"], row["dong"]
+        dong_index.setdefault((sido, dong), set()).add(sigungu)
+        city = re.sub(r"(시|군)$", "", sigungu)
+        if city != sigungu:
+            city_index.setdefault((city, dong), set()).add((sido, sigungu))
+    return {"dong_index": dong_index, "city_index": city_index}
+
+
+def resolve_region(address: str, maps: SeedMaps) -> tuple[tuple[str, str] | None, str]:
+    """'서울특별시 마포구'는 기존 resolve()로, '서울 봉천동'·'천안 두정동'(시·도 또는 시 + 법정동)은
+    법정동 대응표로 푼다. 같은 동 이름이 여러 시·군·구에 있으면 고르지 않고 제외한다."""
+    region, reason = resolve(address, maps.sido_alias, maps.sigungu_alias, maps.regions)
+    if region is not None or reason.startswith("나뉜 옛 구"):
+        return region, reason
+    parts = address.split()
+    if len(parts) != 2 or not re.search(r"(동|가|읍|면|로|리)$", parts[1]):
+        return region, reason
+    head, dong = parts
+    sido = maps.sido_alias.get(head)
+    if sido is not None:
+        found = {(sido, sigungu) for sigungu in maps.dong_index.get((sido, dong), ())}
+    else:
+        found = set(maps.city_index.get((head, dong), ()))
+    found = {item for item in found if item in maps.regions}
+    if len(found) == 1:
+        return found.pop(), ""
+    return None, "동 이름 겹침" if found else "동 대응 없음"
 
 
 def _business_hours(value: str | None) -> tuple[int, int] | None:
@@ -148,9 +199,22 @@ def map_space(site: str, space: SpaceInfo, maps: SeedMaps) -> tuple[dict | None,
         return None, "수용인원 이상"
     min_hours = chosen_price.get("min_hours") or space.min_hours or 1
     address = space.address_region or ""
-    region, reason = resolve(address, maps.sido_alias, maps.sigungu_alias, maps.regions)
+    region, reason = resolve(
+        address,
+        maps.sido_alias,
+        maps.sigungu_alias,
+        maps.regions,
+        maps.legal_dong,
+        maps.legal_dong_city_aliases,
+    )
     if region is None:
+        if reason in {"동 이름 겹침", "동 대응 없음"}:
+            return None, reason
         # resolve()의 상세 이유에는 입력 주소 일부가 들어가므로 고정 문구만 저장한다.
+        if reason == "동 이름 겹침":
+            return None, "동 이름 겹침"
+        if reason == "동 대응 없음":
+            return None, "동 대응 없음"
         if reason.startswith("나뉜 옛 구"):
             return None, "나뉜 옛 구"
         if reason.startswith("모르는 시·도"):

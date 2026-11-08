@@ -1,0 +1,12 @@
+Nov 06 16:53:04 spacecube-api1 uvicorn[17452]: WARNING:  Exceeded concurrency limit.
+Nov 06 16:53:04 spacecube-api1 uvicorn[17452]: WARNING:  Exceeded concurrency limit.
+Nov 06 16:53:04 spacecube-api1 uvicorn[17452]: WARNING:  Exceeded concurrency limit.
+Nov 06 16:53:04 spacecube-api1 uvicorn[17452]: WARNING:  Exceeded concurrency limit.
+Nov 06 16:53:06 spacecube-api1 uvicorn[17452]: WARNING:  Exceeded concurrency limit.
+Nov 06 16:53:12 spacecube-api1 uvicorn[17452]: WARNING:  Exceeded concurrency limit.
+Nov 06 16:53:14 spacecube-api1 uvicorn[17452]: WARNING:  Exceeded concurrency limit.
+Nov 06 16:53:20 spacecube-api1 uvicorn[17452]: WARNING:  Exceeded concurrency limit.
+Nov 06 16:53:04 spacecube-gw haproxy[12131]: [WARNING]  (12131) : Server apps/api1 is DOWN, reason: Layer7 wrong status, code: 503, info: "Service Unavailable", check duration: 1ms. 1 active and 0 backup servers left. 339 sessions active, 0 requeued, 0 remaining in queue.
+Nov 06 16:53:04 spacecube-gw haproxy[12131]: Server apps/api1 is DOWN, reason: Layer7 wrong status, code: 503, info: "Service Unavailable", check duration: 1ms. 1 active and 0 backup servers left. 339 sessions active, 0 requeued, 0 remaining in queue.
+Nov 06 16:53:25 spacecube-gw haproxy[12131]: [WARNING]  (12131) : Server apps/api1 is UP, reason: Layer7 check passed, code: 200, check duration: 101ms. 2 active and 0 backup servers online. 0 sessions requeued, 0 total in queue.
+Nov 06 16:53:25 spacecube-gw haproxy[12131]: Server apps/api1 is UP, reason: Layer7 check passed, code: 200, check duration: 101ms. 2 active and 0 backup servers online. 0 sessions requeued, 0 total in queue.

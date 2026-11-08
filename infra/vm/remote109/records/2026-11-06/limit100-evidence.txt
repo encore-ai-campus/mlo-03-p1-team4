@@ -1,0 +1,34 @@
+Nov 06 16:32:17 spacecube-api1 uvicorn[5497]: WARNING:  Exceeded concurrency limit.
+Nov 06 16:32:17 spacecube-api1 uvicorn[5497]: WARNING:  Exceeded concurrency limit.
+Nov 06 16:32:17 spacecube-api1 uvicorn[5497]: WARNING:  Exceeded concurrency limit.
+Nov 06 16:32:17 spacecube-api1 uvicorn[5497]: WARNING:  Exceeded concurrency limit.
+Nov 06 16:32:18 spacecube-api1 uvicorn[5497]: WARNING:  Exceeded concurrency limit.
+Nov 06 16:32:18 spacecube-api1 uvicorn[5497]: WARNING:  Exceeded concurrency limit.
+Nov 06 16:32:18 spacecube-api1 uvicorn[5497]: WARNING:  Exceeded concurrency limit.
+Nov 06 16:32:18 spacecube-api1 uvicorn[5497]: WARNING:  Exceeded concurrency limit.
+Nov 06 16:32:18 spacecube-api1 uvicorn[5497]: WARNING:  Exceeded concurrency limit.
+Nov 06 16:32:18 spacecube-api1 uvicorn[5497]: WARNING:  Exceeded concurrency limit.
+Nov 06 16:32:18 spacecube-api1 uvicorn[5497]: WARNING:  Exceeded concurrency limit.
+Nov 06 16:32:18 spacecube-api1 uvicorn[5497]: WARNING:  Exceeded concurrency limit.
+Nov 06 16:32:18 spacecube-api1 uvicorn[5497]: WARNING:  Exceeded concurrency limit.
+Nov 06 16:32:18 spacecube-api1 uvicorn[5497]: WARNING:  Exceeded concurrency limit.
+Nov 06 16:32:18 spacecube-api1 uvicorn[5497]: WARNING:  Exceeded concurrency limit.
+Nov 06 16:32:18 spacecube-api1 uvicorn[5497]: WARNING:  Exceeded concurrency limit.
+Nov 06 16:32:18 spacecube-api1 uvicorn[5497]: WARNING:  Exceeded concurrency limit.
+Nov 06 16:32:18 spacecube-api1 uvicorn[5497]: WARNING:  Exceeded concurrency limit.
+Nov 06 16:32:18 spacecube-api1 uvicorn[5497]: WARNING:  Exceeded concurrency limit.
+Nov 06 16:32:18 spacecube-api1 uvicorn[5497]: WARNING:  Exceeded concurrency limit.
+Nov 06 16:31:47 spacecube-gw haproxy[12131]: [WARNING]  (12131) : Server apps/api1 is DOWN, reason: Layer7 wrong status, code: 503, info: "Service Unavailable", check duration: 1ms. 1 active and 0 backup servers left. 96 sessions active, 0 requeued, 0 remaining in queue.
+Nov 06 16:31:47 spacecube-gw haproxy[12131]: Server apps/api1 is DOWN, reason: Layer7 wrong status, code: 503, info: "Service Unavailable", check duration: 1ms. 1 active and 0 backup servers left. 96 sessions active, 0 requeued, 0 remaining in queue.
+Nov 06 16:31:52 spacecube-gw haproxy[12131]: [WARNING]  (12131) : Server apps/api1 is UP, reason: Layer7 check passed, code: 200, check duration: 137ms. 2 active and 0 backup servers online. 0 sessions requeued, 0 total in queue.
+Nov 06 16:31:52 spacecube-gw haproxy[12131]: Server apps/api1 is UP, reason: Layer7 check passed, code: 200, check duration: 137ms. 2 active and 0 backup servers online. 0 sessions requeued, 0 total in queue.
+Nov 06 16:32:17 spacecube-gw haproxy[12131]: [WARNING]  (12131) : Server apps/api2 is DOWN, reason: Layer7 wrong status, code: 503, info: "Service Unavailable", check duration: 4ms. 1 active and 0 backup servers left. 189 sessions active, 0 requeued, 0 remaining in queue.
+Nov 06 16:32:17 spacecube-gw haproxy[12131]: Server apps/api2 is DOWN, reason: Layer7 wrong status, code: 503, info: "Service Unavailable", check duration: 4ms. 1 active and 0 backup servers left. 189 sessions active, 0 requeued, 0 remaining in queue.
+Nov 06 16:32:18 spacecube-gw haproxy[12131]: [WARNING]  (12131) : Server apps/api1 is DOWN, reason: Layer7 wrong status, code: 503, info: "Service Unavailable", check duration: 1ms. 0 active and 0 backup servers left. 96 sessions active, 0 requeued, 0 remaining in queue.
+Nov 06 16:32:18 spacecube-gw haproxy[12131]: [ALERT]    (12131) : backend 'apps' has no server available!
+Nov 06 16:32:18 spacecube-gw haproxy[12131]: Server apps/api1 is DOWN, reason: Layer7 wrong status, code: 503, info: "Service Unavailable", check duration: 1ms. 0 active and 0 backup servers left. 96 sessions active, 0 requeued, 0 remaining in queue.
+Nov 06 16:32:18 spacecube-gw haproxy[12131]: backend apps has no server available!
+Nov 06 16:32:22 spacecube-gw haproxy[12131]: [WARNING]  (12131) : Server apps/api1 is UP, reason: Layer7 check passed, code: 200, check duration: 113ms. 1 active and 0 backup servers online. 0 sessions requeued, 0 total in queue.
+Nov 06 16:32:22 spacecube-gw haproxy[12131]: Server apps/api1 is UP, reason: Layer7 check passed, code: 200, check duration: 113ms. 1 active and 0 backup servers online. 0 sessions requeued, 0 total in queue.
+Nov 06 16:32:25 spacecube-gw haproxy[12131]: [WARNING]  (12131) : Server apps/api2 is UP, reason: Layer7 check passed, code: 200, check duration: 86ms. 2 active and 0 backup servers online. 0 sessions requeued, 0 total in queue.
+Nov 06 16:32:25 spacecube-gw haproxy[12131]: Server apps/api2 is UP, reason: Layer7 check passed, code: 200, check duration: 86ms. 2 active and 0 backup servers online. 0 sessions requeued, 0 total in queue.
