@@ -7,11 +7,13 @@
 | 구분 | 발표용 분산 환경 | 109 시험·예비 환경 |
 | --- | --- | --- |
 | 배치 | 노트북 주인이 새로 설치한 VM 7대, DB·시드부터 새로 적재 | 한 호스트의 VM 7대, 기존 시험 데이터 보유 |
-| 주소 | 당일 IP를 `/etc/hosts`의 `gw/db1/db2/mongo/api1/api2/mon`에 반영 | 기존 주소·설정은 시험 기록으로 관리 |
-| 정기 작업 위치 | 노트북 2의 `api1` 한 대 | 예비 환경의 `api1` 한 대 |
+| 주소 | `api1 = 192.168.0.214` (사용자 확인). 나머지 VM의 현장 IP도 `/etc/hosts`에 반영 | 기존 주소·설정은 시험 기록으로 관리 |
+| 정기 작업 위치 | 노트북 2의 Ubuntu `api1` 한 대 (`192.168.0.214`) | 예비 환경의 `api1` 한 대 |
 | 스케줄러 | 운영 담당이 cron 또는 systemd timer 중 하나 선택 | 기존 systemd timer 구성 확인 후 선택 |
 
 109의 IP·데이터·활성 타이머가 새 배포에도 그대로 있다고 가정하지 않는다. 109는 용량 시험 작업판의 잠금 해제·인계 확인 뒤에만 운영 담당이 변경한다. 새 환경과 109는 DB·MongoDB 연결 대상을 각각 확인한다. 같은 DB를 향한 정기 실행은 한 api1만 담당한다.
+
+11-08 사용자 확인: 월요일 공간 보충기와 이후 #100 통합 실행기의 배포 대상은 Ubuntu `api1`(`192.168.0.214`)이다. 수동 30건 등록을 검증한 `192.168.0.232`는 별도 테스트 VM이다. 보충기·프로필·실행 기록은 #99의 지정 경로를 따르며, Python·계정·설정 주입은 실제 대상 서버에서 확인한다.
 
 두 스케줄러 모두 아래 공통 실행 파일을 호출한다. cron과 timer를 동시에 등록하지 않는다. 이 문서의 명령은 **배포 대상 Ubuntu VM에서 노트북 주인/운영 담당이 실행하는 예시**다. 문서를 추가한 것만으로 서버에 등록되지는 않는다.
 
@@ -28,17 +30,22 @@
 
 ## 3. 공통 실행 파일과 설정
 
-아래 경로는 기존 설치 예시다. 실제 설치 경로가 다르면 공통 파일과 선택한 스케줄러 설정의 경로를 함께 수정한다.
+보충기·프로필·실행 기록 경로는 [#99 7절](https://github.com/encore-ai-campus/mlo-03-p1-team4/issues/99)의 배포 기준이다. Python·실행 계정·공통 진입점·설정 파일은 아래 설치 예시를 실제 api1 환경과 대조하고 #100에서 연결한다.
 
-| 항목 | 예시·확인 사항 |
+| 항목 | 배포 기준·확인 사항 |
 | --- | --- |
-| 저장소 | `/opt/spacecube` (backend·crawler·simulator 모두 포함) |
-| Python | `/opt/spacecube/venv/bin/python` — Python 3.12·프로젝트 고정 의존성 |
+| 저장소 | `/opt/spacecube` — #99 배포 기준 루트 (backend·crawler·simulator 포함) |
+| 공간 보충기 | `/opt/spacecube/simulator/generator/venue_supplement.py` — #99 지정 |
+| 기본 프로필 | `/opt/spacecube/simulator/generator/venue_profiles.json` — #99 지정 |
+| 실행 기록 | `/opt/spacecube/logs/venue-supplement-<run_id>/` — #99 지정, 재개용 기록 보존 |
+| Python | `/opt/spacecube/venv/bin/python` — 설치 예시. 실제 Python 3.12·프로젝트 고정 의존성 확인 |
 | 실행 계정 | `spacecube`, 그룹 `adm` — 실제 설치 계정과 일치시킴 |
 | 공통 진입점 | `/opt/spacecube/ops/run-venue-job.sh` — 운영 담당이 아래 내용으로 설치 |
 | 설정 | 공통 `get_settings()`가 읽는 `/opt/spacecube/backend/.env` |
 | 필수 값 | `DB_WRITE_URL`, `MONGO_URL`, `INTERNAL_API_KEY`; host는 `db1`, `mongo` |
 | 쓰기 경로 | `logs/`, `crawler/data/`와 기존 사이트맵 상태 파일 — 실행 계정 쓰기 권한 확인 |
+
+#100은 통합 실행기의 소스 위치를 `simulator/generator/run_pipeline.py`로 지정한다. 통합 기록은 저장소 루트의 `logs/venue-pipeline-<통합 실행 ID>/`, 보충 기록은 #99의 `logs/venue-supplement-<보충 실행 ID>/`에 보존하며 두 실행 ID를 연결한다. 통합 실행기는 후속 구현 대상이다. #100 본문·댓글에는 실제 Python·실행 계정·작업 폴더·설정 경로가 아직 고정돼 있지 않고 이 문서에서 관리하도록 돼 있다. Ubuntu api1 `192.168.0.214`는 11-08 사용자가 추가 확인한 배포 대상이다. 스케줄러는 이슈 기준 cron/systemd timer 중 하나를 선택하며, #99 PM 댓글의 :10/:40 주기는 운영 검토안이다.
 
 109 설치기는 `/etc/spacecube/.env`를 서비스 환경으로 주입한다. cron에서도 같은 설정을 쓰려면 운영 담당이 `backend/.env`를 그 보호 파일에 연결하거나 동일한 설정 로딩 경로를 마련한다. 기존 `backend/.env`를 확인 없이 덮어쓰지 않는다. 링크를 쓸 경우 대상 파일·상위 디렉터리를 `spacecube:adm` 실행 문맥에서 읽을 수 있어야 한다. 비밀값을 셸 스크립트·스케줄러·Git에 복사하지 않는다.
 

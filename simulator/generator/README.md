@@ -139,7 +139,7 @@ python -m simulator.generator.venue_supplement --apply --resume <run_id>
 conda run -n pro_1 --no-capture-output python -m simulator.generator.topup --snapshot vetted_venues.json --output logs/topup-requests.json --seed 9903 --target 6 --newly-registered-by-category '{"studyroom":0,"studio":0,"cafe":0,"lectureroom":0,"partyroom":0}'
 ```
 
-테스트 VM api1(`192.168.0.232`)과 primary `spacecube_test`에서 수동 30건 등록·source ID 재조회를 확인했습니다. 재개·응답 유실·부분 성공은 전용 회귀 테스트로 검증합니다. 월요일 실제 배포 대상은 [배포 안내](../../infra/vm/venue-jobs-deploy.md)의 api1이며, 문서의 `/opt/spacecube` 경로는 설치 예시이므로 현장 IP·계정·Python·설정 경로를 확인해야 합니다. 실제 발표 환경 배포와 cron 연결은 #100의 후속 작업입니다.
+테스트 VM api1(`192.168.0.232`)과 primary `spacecube_test`에서 수동 30건 등록·source ID 재조회를 확인했습니다. 재개·응답 유실·부분 성공은 전용 회귀 테스트로 검증합니다. 월요일 실제 배포 대상은 Ubuntu `api1`(`192.168.0.214`, 사용자 확인)입니다. [#99 7절](https://github.com/encore-ai-campus/mlo-03-p1-team4/issues/99)에 따라 보충기는 `/opt/spacecube/simulator/generator/venue_supplement.py`, 기본 프로필은 같은 폴더의 `venue_profiles.json`, 실행 기록은 `/opt/spacecube/logs/venue-supplement-<run_id>/`에 배포·보존합니다. [배포 안내](../../infra/vm/venue-jobs-deploy.md)의 Python·실행 계정·설정 주입 예시는 대상 서버에서 확인해야 합니다. 실제 발표 환경 배포와 cron 연결은 #100의 후속 작업입니다.
 
 ## 검증
 

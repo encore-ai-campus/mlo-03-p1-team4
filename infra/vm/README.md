@@ -29,6 +29,8 @@
 
 ## 2. 노트북 2 (A 이자연)
 
+공간 보충기·#100 통합 실행기의 월요일 배포 대상은 Ubuntu `api1`(`192.168.0.214`)로 사용자 확인을 받았다. 보충기·프로필·실행 기록은 #99의 `/opt/spacecube` 지정 경로를 따른다. 실제 Python·실행 계정·설정 주입은 [공간 정기 작업 배포 안내](venue-jobs-deploy.md)를 참고해 대상 VM에서 확인한다.
+
 - [ ] `api1`: Python 3.12 venv + `environment.yml`의 pip 버전, `backend/.env`(`DB_WRITE_URL=…@db1`, `DB_READ_URL=…@db2`, `MONGO_URL=…@mongo`, `SERVER_NAME=api-1`, `SYNTHETIC_API_KEY` 등), uvicorn systemd(`--workers 2`, 8000)
 - [ ] `api1`: Nginx(apt), Vue 빌드(`frontend`에서 `npm run build` → `dist/`) 복사, `infra/nginx/README.md` 서버용 설정(정적 파일 + `/api` → `127.0.0.1:8000`), `stub_status` + nginx exporter (11-06 B안)
 - [ ] `api1`: 정기 작업 — 크롤러는 [cron 또는 systemd timer 중 하나](venue-jobs-deploy.md)를 선택. 이용 완료·`replay_events.py`·집계 일정은 담당 설정을 확인(109 실제 이용 완료 :05·집계 :20과 구분)
