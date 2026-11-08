@@ -13,6 +13,8 @@ from runner import HERE, ROOT, Suite, remote, save
 
 
 class WriteSuite(Suite):
+    max_users = 400
+
     def prepare(self):
         self.phase_name = "fixture_prepare"
         self.key = remote(
@@ -43,9 +45,9 @@ class WriteSuite(Suite):
                 range(body["start_hour"], body["start_hour"] + body["hours"])
             ):
                 available.append(body)
-            if len(available) >= 400:
+            if len(available) >= self.max_users:
                 break
-        if len(available) < 400:
+        if len(available) < self.max_users:
             raise RuntimeError("insufficient_unique_slots")
         self.available = available
         self.fixture = {
@@ -64,7 +66,7 @@ class WriteSuite(Suite):
             {
                 "accounts": 0,
                 "venue_count": len(details),
-                "slot_count": 400,
+                "slot_count": self.max_users,
                 "credentials": "process_memory_only",
                 "prepared_completed_reservations": 0,
             },
@@ -108,7 +110,7 @@ class WriteSuite(Suite):
             {
                 "accounts": total,
                 "venue_count": len(self.fixture["venues"]),
-                "slot_count": 400,
+                "slot_count": self.max_users,
                 "credentials": "process_memory_only",
                 "prepared_completed_reservations": 0,
             },

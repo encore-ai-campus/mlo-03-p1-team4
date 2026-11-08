@@ -16,7 +16,10 @@ parents = [
     p
     for p in psutil.process_iter(["cmdline", "name"])
     if (p.info["name"] or "").lower().startswith("python")
-    and any(Path(str(v)).name in {"read_high.py", "write_high.py"} for v in p.info["cmdline"] or [])
+    and any(
+        Path(str(v)).name in {"read_high.py", "write_high.py", "capacity.py"}
+        for v in p.info["cmdline"] or []
+    )
 ]
 if len(parents) != 1:
     raise SystemExit("read_runner_not_unique")

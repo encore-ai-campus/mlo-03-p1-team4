@@ -63,6 +63,17 @@ active_environment = None
 def initialize(environment, **_kwargs):
     global active_environment
     active_environment = environment
+    gevent.spawn(safety_watch, environment)
+
+
+def safety_watch(environment):
+    while True:
+        marker = REPORT.parent / "safety-stop.json"
+        if marker.exists():
+            (REPORT / "abort.json").write_text(marker.read_text(encoding="utf-8"), encoding="utf-8")
+            environment.runner.quit()
+            return
+        gevent.sleep(1)
 
 
 @events.request.add_listener

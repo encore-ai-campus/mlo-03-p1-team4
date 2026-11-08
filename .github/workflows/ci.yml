@@ -44,6 +44,7 @@ jobs:
               - 'db/**'
               - 'docs/db/**'
               - 'infra/local/**'
+              - 'infra/vm/**'
               - 'environment.yml'
               - 'pytest.ini'
               - '.github/workflows/ci.yml'
