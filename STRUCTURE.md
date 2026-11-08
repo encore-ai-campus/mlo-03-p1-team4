@@ -114,7 +114,8 @@ Pro_1/
 │  └─ data/                   기준선·표본 (지우지 않음)
 │
 ├─ simulator/
-│  ├─ generator/              [B 본체·A 연결 확인·DB 후속] #75 서비스 호출 기반 과거 백필 CLI
+│  ├─ generator/              [B·A·DB 연계] #75 과거 백필, #103 공간 보충 및 #100 통합 CLI·기본 프로필·공통 잠금
+│  │  ├─ run_pipeline.py      [B] #108 크롤러 결과를 #103 계획·등록·재개에 연결
 │  │  └─ tests/              고정 방문량·시각·부분 실패·실제 MariaDB 서비스/재개 검증
 │  └─ locust/                 [B] 부하·동시성 (예정)
 │     ├─ daily_locustfile.py   [B] 네 페르소나 일일 조회·명시적 쓰기 시나리오
@@ -127,6 +128,7 @@ Pro_1/
 │  ├─ nginx/                  [B] 서버마다: 정적 파일 + /api → 127.0.0.1:8000 (11-06 B안, README에 초안)
 │  ├─ monitoring/             [A] docker-compose, alloy.config, grafana/dashboards (예정)
 │  ├─ vm/                     [공동] 로컬 VM 7대 설치 체크리스트 (11-05, 1차 배포)
+│  │  ├─ venue-jobs-deploy.md [공동/B] 발표·109 환경 구분, 공간 정기 작업 cron/timer 선택·설정·수동 대체
 │  │  ├─ lab/                 [공동] 109 시험 VM 공통 서비스·Grafana 공개 설정
 │  │  └─ remote109/           [공동] Terraform·Ansible·부하 실행·실험 기록(records/)
 │  │     ├─ db-monitoring/   [공동] DB exporter·최소 계정·앱 연결 집계·Grafana 영구 저장
