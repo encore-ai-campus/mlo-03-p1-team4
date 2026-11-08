@@ -1,39 +1,27 @@
-prometheus.remote_write "mon" {
-  external_labels = { vm = "api1" }
-  endpoint { url = "http://mon:9090/api/v1/write" }
-}
-loki.write "mon" {
+logging { level = "info" }
+loki.write "local" {
   endpoint { url = "http://mon:3100/loki/api/v1/push" }
 }
-prometheus.exporter.unix "host" {}
-prometheus.scrape "node" {
-  targets = prometheus.exporter.unix.host.targets
-  job_name = "node"
-  forward_to = [prometheus.remote_write.mon.receiver]
-}
 loki.source.journal "system" {
-  labels = { vm = "api1", source = "journal" }
-  forward_to = [loki.write.mon.receiver]
+  max_age = "1h"
+  labels = { job = "journal", server = "api1", vm = "api1", source = "journal" }
+  forward_to = [loki.write.local.receiver]
+}\nlocal.file_match "api_logs" {
+  path_targets = [
+    { __path__ = "/opt/spacecube/backend/logs/app.log", job = "api", server = "api1", vm = "api1", source = "app" },
+    { __path__ = "/opt/spacecube/backend/logs/events.log", job = "api", server = "api1", vm = "api1", source = "events" },
+  ]
 }
-prometheus.scrape "fastapi" {
-  targets = [{ "__address__" = "127.0.0.1:8000", "instance" = "api1", "vm" = "api1" }]
-  job_name = "fastapi"
-  forward_to = [prometheus.remote_write.mon.receiver]
+loki.source.file "api_logs" {
+  targets = local.file_match.api_logs.targets
+  forward_to = [loki.write.local.receiver]
 }
-prometheus.scrape "nginx" {
-  targets = [{ "__address__" = "127.0.0.1:9113", "instance" = "api1", "vm" = "api1" }]
-  job_name = "nginx"
-  forward_to = [prometheus.remote_write.mon.receiver]
-}
-loki.source.file "app" {
-  targets = [{ "__path__" = "/var/log/spacecube/app.log", "vm" = "api1", "source" = "app" }]
-  forward_to = [loki.write.mon.receiver]
-}
-loki.source.file "events" {
-  targets = [{ "__path__" = "/var/log/spacecube/events.log", "vm" = "api1", "source" = "events" }]
-  forward_to = [loki.write.mon.receiver]
+local.file_match "nginx_access" {
+  path_targets = [
+    { __path__ = "/var/log/nginx/spacecube-access.log", job = "nginx", server = "api1", vm = "api1", source = "nginx_access" },
+  ]
 }
 loki.source.file "nginx_access" {
-  targets = [{ "__path__" = "/var/log/nginx/access.log", "vm" = "api1", "source" = "nginx_access" }]
-  forward_to = [loki.write.mon.receiver]
+  targets = local.file_match.nginx_access.targets
+  forward_to = [loki.write.local.receiver]
 }
