@@ -40,13 +40,10 @@ def inspect(report, events_path, daily_path):
                     event_type: sum(
                         int(row["count"])
                         for row in daily
-                        if row["event_type"] == event_type
-                        and row["is_synthetic"].lower() == "true"
+                        if row["event_type"] == event_type and row["is_synthetic"].lower() == "true"
                     )
                     for event_type in {
-                        row["event_type"]
-                        for row in daily
-                        if row["is_synthetic"].lower() == "true"
+                        row["event_type"] for row in daily if row["is_synthetic"].lower() == "true"
                     }
                 }.items()
             )

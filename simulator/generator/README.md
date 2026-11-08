@@ -123,7 +123,7 @@ conda run -n pro_1 --no-capture-output python -m simulator.generator.topup --sna
 conda run -n pro_1 --no-capture-output python -m simulator.generator.audit --report logs/generator-<run_id>/report.json --events-csv logs/analytics/events-2026-10-08-2026-11-07-synthetic.csv --daily-csv logs/analytics/events-2026-10-08-2026-11-07-event-daily.csv
 ```
 
-### api1 cron 인계 (A 담당)
+### api1 일별 스케줄 인계 (A 담당)
 
 api1에서 `timedatectl`로 OS 시간이 Asia/Seoul인지 확인합니다. 서비스 계정에 저장소 읽기, `backend/.env` 읽기, 분석 출력 폴더 쓰기 권한을 부여합니다. `pro_1`을 활성화해 `command -v python`으로 절대 경로를 기록한 뒤 `crontab -e`에서 다음 한 줄의 경로를 실제 값으로 바꿉니다. `.env` 비밀값은 crontab이나 로그에 적지 않습니다.
 

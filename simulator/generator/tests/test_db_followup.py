@@ -31,7 +31,7 @@ class Events:
                 "date": "2026-11-07",
                 "event_type": "product_view",
                 "venue_id": "21",
-                "is_synthetic": True,
+                "is_synthetic": "true",
                 "count": 1,
             }
         ]
