@@ -37,6 +37,8 @@ except CrawlerRunError as error:
     result = error.result  # 실패 시에도 확인된 부분 결과와 실패 정보를 받는다.
 ```
 
+초기 등록을 반복하는 회차에서는 `mode="bootstrap", max_detail=20, max_register=20`을 전달한다. `weekly`는 baseline 이후 새 ID 비교에 쓰며 등록 상한이 5건이다. B 통합 실행기는 모드에 맞는 등록 상한을 전달하고, 어떤 모드에서도 상세 조회 20건 제한을 지킨다.
+
 `result`는 성공과 실패에 같은 키를 사용한다. 기존 `jobs`와 `registered_by_category`는 유지한다.
 
 - `ok`: 실행 성공 여부
@@ -49,6 +51,8 @@ except CrawlerRunError as error:
 - `failure`: `stage`, `kind`(`external`/`internal`), `error_type`, 고정된 안전 요약과 선택적 출처 ID. 응답 본문·URL·예외 원문은 넣지 않는다. 초기화 실패도 `runtime_init` 단계의 같은 형식이다.
 
 실패한 경우 CLI는 이 결과 JSON을 출력하고 종료 코드 1을 반환한다. B 실행기는 #99의 유형별 회차 목표 6개에서 `newly_registered_by_category`만 빼서 부족분을 계산하고, 재개 때는 이전 회차 입력을 이어 쓴다. `failure.kind == "external"`이고 `uncertain_registrations`가 비어 있을 때는 확인된 신규 건수로 보충할 수 있다. 내부 실패나 불확실 등록이 있으면 보충을 진행하지 않는다. 부족분 계산·생성·재개는 B 담당이며, 이 DB 진입점은 크롤러 결과만 전달한다. venue API 요청 필드와 반환 형식은 바꾸지 않는다.
+
+#96의 `topup.py`는 #19 백필을 위한 활성 공간 수 기준 등록 요청 JSON 준비 도구다. #99/#100의 운영 보충은 B가 #103과 통합하는 보충기를 사용한다. 두 도구의 synthetic `source_id` 체계와 부족분 계산 기준이 다르므로 같은 운영 회차에 함께 적용하지 않는다.
 
 유형은 db/seed/category_map.csv 한 곳에서 대응시킨다. 지역은 `addressRegion`+`addressLocality`를 `db/seed/legal_dong.csv` 또는 기존 별칭표와 `db/seed/regions.csv`로 매핑하고, 모호·누락 이유를 구분해 기록한다. 쉐어잇의 ruleType 1·2 단위가 확정되지 않았으므로 명시적으로 timeUnitMinute=60인 요금만 시간당 가격 후보로 쓴다. API 요청의 이름·소개·안내는 생성 문구이고, 공간당 art: 이미지 코드 3개를 보낸다.
 
