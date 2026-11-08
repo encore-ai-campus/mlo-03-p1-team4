@@ -227,7 +227,14 @@ def register_pending(
             if sum(registered.values()) >= limit:
                 break
             site, source_id = document["source_site"], document["source_id"]
-            category = document["mapped"]["category"]
+            mapped = document["mapped"]
+            category = mapped.get("category")
+            if category is None:
+                category = mapped.get("category_code")
+                if category is not None:
+                    mapped = {**mapped, "category": category}
+            if category not in CATEGORIES:
+                raise ValueError("지원하지 않는 크롤링 공간 유형입니다.")
             if per_category and registered[category]:
                 continue
             context = {"source_site": site, "source_id": source_id}
@@ -235,7 +242,7 @@ def register_pending(
                 "venue_api_payload",
                 "internal",
                 "내부 공간 등록 요청을 구성하지 못했습니다.",
-                lambda site=site, source_id=source_id, mapped=document["mapped"]: venue_payload(
+                lambda site=site, source_id=source_id, mapped=mapped: venue_payload(
                     site, source_id, mapped
                 ),
                 context,

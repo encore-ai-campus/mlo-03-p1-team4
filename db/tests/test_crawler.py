@@ -463,6 +463,21 @@ def test_failed_venue_id_write_can_retry_same_source():
     assert api.calls[0]["source_id"] == api.calls[1]["source_id"]
 
 
+def test_register_pending_accepts_legacy_mapped_category_code():
+    raw = _pending_raw()
+    row = raw.rows[("spacecloud", "53074")]
+    row["mapped"]["category_code"] = row["mapped"].pop("category")
+    api = FakeApi()
+
+    registered = register_pending(
+        raw, api, "test-key", "http://test/internal/venues", 1, True, ("spacecloud",)
+    )
+
+    assert registered["studyroom"] == 1
+    assert api.calls[0]["category_code"] == "studyroom"
+    assert "category" not in row["mapped"]
+
+
 def test_unprocessed_new_ids_remain_for_next_run(tmp_path, monkeypatch):
     raw = FakeRaw()
     site_ids = {"spacecloud": ["1", "2", "3"]}
