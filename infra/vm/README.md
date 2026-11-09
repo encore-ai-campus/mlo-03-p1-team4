@@ -24,9 +24,8 @@
 - [ ] `db1`: `0001_init.sql` → `seed.sql` 적용, `db/tests/check_ddl.py`를 `CHECK_DB_URL`로 한 번 돌려 확인(`spacecube_test`)
 - [ ] `db1`: 백업 cron(하루 1회 `mariadb-dump --single-transaction`, 7개 보관)
 - [ ] `mongo`: MongoDB 8.0.34(현재 팀 OVA 기준), 인증 켬, WiredTiger 캐시 1GB, `docs/db/mongo_init.js`, `db/tests/check_mongo_init.js`, 백업 cron(`mongodump`, 7개)
-- [ ] `gw`: HAProxy(apt), `infra/haproxy/README.md` 설정(80 → `api1:80`·`api2:80` 라운드로빈, `/health` 확인 `inter 2s fall 2 rise 2`, `/api/internal`·`/api/metrics` 차단, 통계·Prometheus 지표 8404), Alloy가 8404 수집 (11-06 B안)
 - [ ] `db2`: MariaDB 10.11.14, `server_id=2`, `read_only=ON`, GTID 복제(`CHANGE MASTER TO MASTER_HOST='db1', MASTER_USE_GTID=slave_pos`), `SHOW SLAVE STATUS`에서 지연 확인 (11-08: 노트북 3에서 노트북 1로 옮김)
-- [ ] 네 VM 모두 Alloy(로그 → `mon:3100`, 지표 → `mon:9090`, db1·db2는 mysqld exporter 포함), `ufw` 규칙
+- [ ] 세 VM 모두 Alloy(로그 → `mon:3100`, 지표 → `mon:9090`, db1·db2는 mysqld exporter 포함), `ufw` 규칙
 
 ## 2. 노트북 2 (A 이자연)
 
@@ -44,7 +43,8 @@
 
 - [ ] VM 사양·주소는 [`docs/로컬_VM_구성.md`](../../docs/로컬_VM_구성.md) 2·3절(11-08 확정: 109 검증 사양 × 1.5, 192.168.0.211~217)
 - [ ] `api2`: `api1`과 같은 Nginx·코드·설정(`SERVER_NAME=api-2`, cron 없음)
-- [ ] `ufw` 규칙
+- [ ] `gw`: HAProxy(apt), `infra/haproxy/README.md` 설정(80 → `api1:80`·`api2:80` 라운드로빈, `/health` 확인 `inter 2s fall 2 rise 2`, `/api/internal`·`/api/metrics` 차단, 통계·Prometheus 지표 8404), Alloy가 8404 수집 (11-06 B안) (11-09: 노트북 1에서 노트북 3으로 옮김)
+- [ ] 두 VM 모두 Alloy(HAProxy 8404 지표 포함), `ufw` 규칙
 
 ## 4. 노트북 4 (FE·PM 노진산)
 

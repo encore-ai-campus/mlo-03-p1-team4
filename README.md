@@ -42,7 +42,9 @@
 | 데이터 | ![MariaDB](https://img.shields.io/badge/MariaDB-11.4-003545?logo=mariadb&logoColor=white) ![MongoDB](https://img.shields.io/badge/MongoDB-7-47A248?logo=mongodb&logoColor=white) |
 | 인프라·테스트 | ![HAProxy](https://img.shields.io/badge/HAProxy-106DA9?logoColor=white) ![Nginx](https://img.shields.io/badge/Nginx-009639?logo=nginx&logoColor=white) ![Grafana](https://img.shields.io/badge/Grafana-F46800?logo=grafana&logoColor=white) ![Playwright](https://img.shields.io/badge/Playwright-2EAD33?logo=playwright&logoColor=white) ![Locust](https://img.shields.io/badge/Locust-1C7C54?logoColor=white) |
 
-기술별 쓰임과 VM 7대 구성: [위키 · 기술 스택과 시스템 구성](https://github.com/encore-ai-campus/mlo-03-p1-team4/wiki/기술-스택과-시스템-구성)
+![다락큐브 시스템 아키텍처 최종 구성](docs/figures/architecture.png)
+
+[draw.io 원본](docs/figures/src/architecture_final.drawio) · [위키 · 기술 스택과 시스템 구성](https://github.com/encore-ai-campus/mlo-03-p1-team4/wiki/기술-스택과-시스템-구성)
 
 ## 4. WBS
 
