@@ -44,7 +44,7 @@
 
 ![다락큐브 시스템 아키텍처 최종 구성](docs/figures/architecture.png)
 
-기술별 쓰임과 VM 7대 구성: [위키 · 기술 스택과 시스템 구성](https://github.com/encore-ai-campus/mlo-03-p1-team4/wiki/기술-스택과-시스템-구성)
+[draw.io 원본](docs/figures/src/architecture_final.drawio) · [위키 · 기술 스택과 시스템 구성](https://github.com/encore-ai-campus/mlo-03-p1-team4/wiki/기술-스택과-시스템-구성)
 
 ## 4. WBS
 
