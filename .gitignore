@@ -35,8 +35,9 @@ design/fonts/*/original/
 .DS_Store
 Thumbs.db
 
-# 크롤링 표본 원본(업체 이름 포함) — 공개 저장소에 올리지 않는다. 가공값은 MongoDB crawl_raw에
-crawler/data/
+# 크롤러 실행 기준선은 설명 문서만 추적하고, 현장 표본·실행 상태는 저장소에 올리지 않는다.
+crawler/data/*
+!crawler/data/README.md
 
 # 각자 PC의 Claude Code 미리보기 설정
 .claude/launch.json
