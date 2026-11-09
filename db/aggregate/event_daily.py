@@ -12,6 +12,7 @@
 - 재집계: 대상 날짜의 결과를 원천에서 다시 세어 같은 키 문서를 덮어쓴다(count는 $set, 더하지 않음).
   원천에서 사라진 조합(TTL 만료 등)은 그 날짜를 다시 집계할 때 지운다.
 - 개인정보: 날짜·행동·공간 ID·테스트 여부·건수만 남긴다.
+- CSV: date,event_type,is_synthetic,count. 공간별 집계의 count를 합치되 실제·합성은 분리한다.
 """
 
 from __future__ import annotations
@@ -25,7 +26,7 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 KST = ZoneInfo("Asia/Seoul")
-CSV_FIELDS = ["date", "event_type", "venue_id", "is_synthetic", "count"]
+CSV_FIELDS = ["date", "event_type", "is_synthetic", "count"]
 
 
 def day_range(day: date) -> tuple[datetime, datetime]:
@@ -108,10 +109,14 @@ def export_csv(db, days: list[date], path: Path) -> int:
     cursor = db.event_daily.find(
         {"date": {"$in": labels}}, {"_id": 0, **dict.fromkeys(CSV_FIELDS, 1)}
     )
-    rows = sorted(
-        cursor,
-        key=lambda r: (r["date"], r["event_type"], r.get("venue_id") or "", r["is_synthetic"]),
-    )
+    totals: dict[tuple[str, str, bool], int] = {}
+    for row in cursor:
+        key = (row["date"], row["event_type"], row["is_synthetic"])
+        totals[key] = totals.get(key, 0) + row["count"]
+    rows = [
+        {"date": day, "event_type": event_type, "is_synthetic": synthetic, "count": count}
+        for (day, event_type, synthetic), count in sorted(totals.items())
+    ]
     write_csv(rows, path)
     return len(rows)
 
@@ -125,7 +130,6 @@ def write_csv(rows: list[dict], path: Path) -> None:
             writer.writerow(
                 {
                     **{k: row.get(k) for k in CSV_FIELDS},
-                    "venue_id": row.get("venue_id") or "",
                     "is_synthetic": "true" if row.get("is_synthetic") else "false",
                 }
             )

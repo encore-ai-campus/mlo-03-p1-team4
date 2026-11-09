@@ -72,14 +72,13 @@ def test_to_rows_normalizes_types_and_sorts():
     assert rows[1]["venue_id"] == "7" and rows[1]["count"] == 3
 
 
-def test_write_csv_has_header_and_text_booleans(tmp_path):
+def test_write_csv_has_four_columns_and_text_booleans(tmp_path):
     out = tmp_path / "out" / "daily.csv"
     event_daily.write_csv(
         [
             {
                 "date": "2026-11-07",
                 "event_type": "login",
-                "venue_id": None,
                 "is_synthetic": False,
                 "count": 2,
             }
@@ -92,11 +91,58 @@ def test_write_csv_has_header_and_text_booleans(tmp_path):
         {
             "date": "2026-11-07",
             "event_type": "login",
-            "venue_id": "",
             "is_synthetic": "false",
             "count": "2",
         }
     ]
+
+
+def test_export_csv_sums_venues_but_keeps_synthetic_separate(tmp_path):
+    class Collection:
+        def find(self, query, projection):
+            assert query == {"date": {"$in": ["2026-11-07"]}}
+            assert projection == {"_id": 0, **dict.fromkeys(event_daily.CSV_FIELDS, 1)}
+            return [
+                {
+                    "date": "2026-11-07",
+                    "event_type": "product_view",
+                    "is_synthetic": True,
+                    "count": 3,
+                },
+                {
+                    "date": "2026-11-07",
+                    "event_type": "product_view",
+                    "is_synthetic": False,
+                    "count": 2,
+                },
+                {
+                    "date": "2026-11-07",
+                    "event_type": "product_view",
+                    "is_synthetic": True,
+                    "count": 4,
+                },
+            ]
+
+    class DB:
+        event_daily = Collection()
+
+    out = tmp_path / "event_daily.csv"
+    assert event_daily.export_csv(DB, [date(2026, 11, 7)], out) == 2
+    with out.open(encoding="utf-8-sig", newline="") as f:
+        assert list(csv.DictReader(f)) == [
+            {
+                "date": "2026-11-07",
+                "event_type": "product_view",
+                "is_synthetic": "false",
+                "count": "2",
+            },
+            {
+                "date": "2026-11-07",
+                "event_type": "product_view",
+                "is_synthetic": "true",
+                "count": "7",
+            },
+        ]
 
 
 def test_aggregation_runs_against_fake_collection():

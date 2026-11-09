@@ -14,6 +14,7 @@
 | `migrations/` | 표 생성·변경 이력 |
 | `seed/` | 유형 5개, 시설, 지역 기초 데이터 |
 | `views/` | 백엔드가 읽는 뷰 (`v_venue_rating`) |
+| `aggregate/` | `events`를 `event_daily`로 다시 집계하고 날짜·행동·합성 여부별 4열 요약 CSV 내보내기 |
 | `loaders/` | 기초 데이터·가상 데이터 대량 적재 |
 | `tests/` | 중복 예약 차단·외래키·CHECK 검증 |
 
