@@ -119,6 +119,7 @@ Pro_1/
 │  └─ locust/                 [B] 부하·동시성 (예정)
 │     ├─ daily_locustfile.py   [B] 네 페르소나 일일 조회·명시적 쓰기 시나리오
 │     ├─ run_daily.ps1         [B] pro_1·모드·날짜·실행 로그를 묶는 Windows 실행기
+│     ├─ personas/             [B] 합성 사용자 500명의 유형별 문서·목록
 │     └─ tests/                [B] 부하 시나리오의 오프라인 회귀 테스트
 │
 ├─ infra/
