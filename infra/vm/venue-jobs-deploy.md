@@ -24,7 +24,7 @@
 3. 회원 100명·30일 생성기 → 집계·CSV → 브라우저 점검으로 진행한다.
 4. PM 계획의 11:10 이후 정기 실행을 켜고 첫 로그를 확인한다. 분산 환경 준비가 늦으면 PM 판단으로 109 예비 환경을 사용한다.
 
-PM 검토안은 발표일 정기 크롤링을 **bootstrap, 실행당 상세 합계 20건 이하, KST 매시 :10·:40**으로 두는 것이다. 주기는 PM이 확정하기 전까지 활성화하지 않는다. `weekly`는 신규 사이트맵 ID·유형별 등록 상한 때문에 이 발표 계획에 대신 사용하지 않는다. 요청 간격·robots·출처별 사전 확인은 [crawler 지침](../../crawler/AGENTS.md)을 따른다. 30분 주기를 시연 이후 상시 운영 주기로 확정한 것은 아니다.
+발표일 정기 크롤링은 **bootstrap, 실행당 상세 합계 20건 이하, KST 매시 :10·:40, api1 한 대의 cron**으로 확정했다(11-09 PM, [데이터 수집 명세](../../docs/데이터_수집_명세.md)와 같음). `weekly`는 신규 사이트맵 ID·유형별 등록 상한 때문에 이 발표 계획에 대신 사용하지 않는다. 요청 간격·robots·출처별 사전 확인은 [crawler 지침](../../crawler/AGENTS.md)을 따른다. 30분 주기를 시연 이후 상시 운영 주기로 확정한 것은 아니다.
 
 **초기 시연 준비의 「DB 활성 공간 유형별 6곳 이상」과 변경된 #99의 「이번 실행 신규 등록을 유형별 6곳까지 보충」은 서로 다른 수치다.** 변경된 #99의 계획량은 `max(0, 6 - 이번 크롤러의 유형별 유효 신규 등록 수)`이며 HTTP 201만 센다. HTTP 200 갱신은 제외한다. 매회 크롤러 신규 등록이 모두 0이면 보충 공간이 30곳씩 추가될 수 있으므로, PM은 정기 실행을 켜기 전에 변경된 #99 정책과 발표일 주기를 함께 확인한다. DB 보유량 기준으로 정책을 임의 전환하지 않는다.
 
@@ -93,7 +93,7 @@ sudo chmod 0755 /opt/spacecube/ops/run-venue-job.sh
 
 ## 4. 방식 A — systemd timer
 
-아래 `OnCalendar`의 `:10/:40`은 PM 검토안이다. 주기 승인 전에는 timer를 활성화하지 않는다.
+운영은 방식 B(cron)를 쓴다. 방식 A는 cron을 쓸 수 없는 VM을 위한 대안이며, 쓰더라도 주기는 같은 `:10/:40`이다.
 
 `/etc/systemd/system/spacecube-venue-job.service`를 아래 내용으로 저장한다.
 
@@ -123,8 +123,8 @@ StandardError=journal
 Description=Spacecube 공간 작업 매시 10분과 40분
 
 [Timer]
-# PM 검토안. 주기가 확정된 뒤에만 이 줄을 활성화한다.
-# OnCalendar=*-*-* *:10,40:00 Asia/Seoul
+# 확정 주기(11-09). 방식 B(cron)와 동시에 켜지 않는다.
+OnCalendar=*-*-* *:10,40:00 Asia/Seoul
 AccuracySec=1s
 RandomizedDelaySec=0
 Persistent=false
@@ -158,8 +158,8 @@ VM의 시스템 시간대를 `Asia/Seoul`로 맞춘다. cron 종류에 따라 �
 SHELL=/bin/bash
 PATH=/usr/sbin:/usr/bin:/sbin:/bin
 MAILTO=""
-# 매시 :10/:40은 PM 검토안이다. 확정되기 전에는 활성화하지 않는다.
-# 10,40 * * * * root /usr/sbin/runuser -u spacecube -g adm -- /opt/spacecube/ops/run-venue-job.sh >> /opt/spacecube/logs/venue-schedule.log 2>&1
+# 확정 주기(11-09): 매시 :10/:40
+10,40 * * * * root /usr/sbin/runuser -u spacecube -g adm -- /opt/spacecube/ops/run-venue-job.sh >> /opt/spacecube/logs/venue-schedule.log 2>&1
 ```
 
 기존 크롤러 예약을 비활성화하고 방식 A timer를 꺼 둔 뒤 활성화한다. `cron` 패키지가 없는 VM은 역할 설치 단계에서 운영 담당이 준비한다.

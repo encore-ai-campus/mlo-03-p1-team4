@@ -14,7 +14,7 @@
 | `deploy-apps.sh` | api1·api2 동시 배포 + Nginx 설정·타이머 반영(초기 버전) | 로컬 |
 | `deploy-fe.sh` | 프론트 빌드만 `/var/www/spacecube`에 교체(서비스 재시작 없음) | 로컬 |
 | `nginx.conf` | #67 keepalive 16/4초·request_id·상류 지연 로그가 들어간 api용 Nginx 설정 | 배포 스크립트가 사용 |
-| `timers.snippet.sh` | api1 정기 실행: 이용 완료 배치 매시 :05, `event_daily` 집계 매시 :20, 크롤러 월 04:00 | install-role에 삽입 |
+| `timers.snippet.sh` | 109 시험 서버 api1 정기 실행: 이용 완료 배치 매시 :05, `event_daily` 집계 매시 :20, 크롤러 월 04:00(109 시험용 초기값). 발표 배포의 크롤러는 [venue-jobs-deploy](../../venue-jobs-deploy.md)의 cron 매시 :10·:40을 쓴다 | install-role에 삽입 |
 | `e2e_api.py` | 정문 경유 API 종단 점검 33항목(가입→검색→예약·결제→중복·동시 예약→취소→후기→이벤트→탈퇴) | 로컬 |
 | `health_app.py` | PR #91의 독립 헬스 앱(8001) | `verify-step2-health.sh`가 사용 |
 | `verify-step2-health.sh apply\|rollback` | PR #91 2단계: api1·api2에 독립 헬스 서비스 + Nginx `/health`·`/api/health` 분리 | playdata |
