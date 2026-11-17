@@ -138,3 +138,40 @@ def test_aggregation_runs_against_fake_collection():
     assert (
         DB.event_daily.deleted["date"] == "2026-11-07" and len(DB.event_daily.deleted["$nor"]) == 1
     )
+
+
+def test_main_keeps_aggregating_other_days_when_one_day_fails(monkeypatch, capsys):
+    """하루가 실패해도 나머지 날짜는 집계하고, 실패한 날을 알리며 1을 돌려준다."""
+    import sys
+    import types
+
+    class FakeClient:
+        def __init__(self, *_args, **_kwargs):
+            pass
+
+        def __getitem__(self, _name):
+            return object()
+
+        def close(self):
+            pass
+
+    monkeypatch.setitem(sys.modules, "pymongo", types.SimpleNamespace(MongoClient=FakeClient))
+    monkeypatch.setenv("MONGO_URL", "mongodb://test")
+    bad = date(2026, 11, 7)
+    done = []
+
+    def fake_aggregate(_db, day):
+        if day == bad:
+            raise RuntimeError("boom")
+        done.append(day)
+        return {"date": day.isoformat(), "groups": 1, "new": 1, "removed": 0}
+
+    monkeypatch.setattr(event_daily, "aggregate_day", fake_aggregate)
+    monkeypatch.setattr(
+        event_daily, "target_days", lambda **_: [date(2026, 11, 6), bad, date(2026, 11, 8)]
+    )
+    assert event_daily.main([]) == 1
+    assert done == [date(2026, 11, 6), date(2026, 11, 8)]
+    err = capsys.readouterr().err
+    assert "2026-11-07: 집계 실패 (RuntimeError)" in err
+    assert "boom" not in err  # 예외 원문은 남기지 않는다

@@ -12,6 +12,7 @@ from pathlib import Path
 
 import httpx
 
+from crawler.log import get_logger
 from crawler.spacecloud_crawler import (
     MAX_DETAIL_PER_RUN,
     SPACE_BASE_URL,
@@ -47,7 +48,7 @@ def main() -> None:
                 except httpx.HTTPStatusError as error:
                     row = {"source_id": source_id, "status": f"http_{error.response.status_code}"}
                 output.write(json.dumps(row, ensure_ascii=False) + "\n")
-    print(f"저장: {path}")
+    get_logger().info("crawler_sample_saved", extra={"path": str(path), "count": args.n})
 
 
 if __name__ == "__main__":

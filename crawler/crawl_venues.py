@@ -16,6 +16,7 @@ from sqlalchemy import create_engine, text
 
 from app.core.clock import get_event_time, get_now
 from app.core.config import get_settings
+from crawler.log import get_logger
 from crawler.preprocess import SeedMaps, map_space, venue_payload
 from crawler.shareit_crawler import parse_shareit
 from crawler.spacecloud_crawler import (
@@ -35,6 +36,7 @@ SITEMAP_STATE = DATA_DIR / "sitemap_ids.json"
 SITES = ("spacecloud", "shareit")
 CATEGORIES = ("studyroom", "studio", "cafe", "lectureroom", "partyroom")
 API_URL = "http://127.0.0.1:8000/internal/venues"
+log = get_logger()
 
 
 class CrawlerStageError(RuntimeError):
@@ -78,6 +80,8 @@ def _empty_run_result(sites: tuple[str, ...]) -> dict:
         "job_ids": {},
         "jobs": {site: {"new_ids": 0, "fetched": 0, "registered": 0} for site in sites},
         **_empty_registration_result(),
+        # 건너뛴 상세 조회·해석 실패(실행은 계속됨). 각 항목: stage·kind·error_type·summary·source_site·source_id
+        "detail_failures": [],
         "failure": None,
     }
 
@@ -425,7 +429,9 @@ def crawl_details(
     fetched: dict[str, int] | None = None,
     *,
     structured: bool = False,
+    failures: list[dict] | None = None,
 ) -> dict[str, int]:
+    """failures 목록을 주면(structured 실행) 상세 조회·해석 실패를 모아 두고 다음 후보로 넘어간다."""
     if fetched is None:
         fetched = dict.fromkeys(candidates, 0)
 
@@ -467,27 +473,38 @@ def crawl_details(
                         return None
                     raise
 
-            html = stage_call(
-                "detail_fetch",
-                "external",
-                "외부 상세 페이지를 가져오지 못했습니다.",
-                fetch_detail,
-                context,
-            )
-            if html is None:
-                fetched[site] += 1
-                space = SpaceInfo(source_id, [], None, None, [], [], None, None)
-            else:
-                fetched[site] += 1
-                space = stage_call(
-                    "detail_parse",
+            try:
+                html = stage_call(
+                    "detail_fetch",
                     "external",
-                    "외부 상세 페이지를 해석하지 못했습니다.",
-                    lambda site=site, source_id=source_id, html=html: parse_detail(
-                        site, source_id, html
-                    ),
+                    "외부 상세 페이지를 가져오지 못했습니다.",
+                    fetch_detail,
                     context,
                 )
+                if html is None:
+                    fetched[site] += 1
+                    space = SpaceInfo(source_id, [], None, None, [], [], None, None)
+                else:
+                    fetched[site] += 1
+                    space = stage_call(
+                        "detail_parse",
+                        "external",
+                        "외부 상세 페이지를 해석하지 못했습니다.",
+                        lambda site=site, source_id=source_id, html=html: parse_detail(
+                            site, source_id, html
+                        ),
+                        context,
+                    )
+            except CrawlerStageError as error:
+                # 실행기(structured) 모드: 상세 하나가 재시도 뒤에도 실패하면 기록하고 다음 후보로 간다.
+                # 처리 상태에 넣지 않으므로 다음 실행에서 다시 시도한다. 요청은 보냈으니 상세 건수에 센다.
+                if failures is None:
+                    raise
+                if error.failure["stage"] == "detail_fetch":
+                    fetched[site] += 1
+                failures.append(dict(error.failure))
+                log.warning("crawler_detail_skipped", extra=dict(error.failure))
+                continue
             mapped, reason = stage_call(
                 "detail_preprocess",
                 "external",
@@ -595,6 +612,7 @@ def run(
             state_path,
             fetched,
             structured=True,
+            failures=result["detail_failures"],
         )
         for site in sites:
             result["jobs"][site]["fetched"] = fetched[site]
@@ -832,9 +850,9 @@ def main() -> None:
                 max_register=max_register,
             )
         except CrawlerRunError as error:
-            print(json.dumps(error.result, ensure_ascii=False))
+            log.error("crawler_run_failed", extra={"result": error.result})
             raise SystemExit(1) from error
-        print(json.dumps(result, ensure_ascii=False))
+        log.info("crawler_run_finished", extra={"result": result})
         return
     with PoliteClient() as client:
         if args.command == "baseline":
@@ -842,14 +860,21 @@ def main() -> None:
             for site in sites:
                 ids = fetch_sitemap_ids(client, site)
                 state[site] = set(ids)
-                print(f"{site}: 기준선 {len(ids)}개")
+                log.info("crawler_baseline", extra={"source_site": site, "count": len(ids)})
             write_state(state)
         else:
             if len(sites) != 1:
                 parser.error("fetch에는 --site를 지정하세요.")
             site = sites[0]
             space = parse_detail(site, args.source_id, client.get(detail_url(site, args.source_id)))
-            print(json.dumps(sanitized_dict(space), ensure_ascii=False, indent=2))
+            log.info(
+                "crawler_fetch",
+                extra={
+                    "source_site": site,
+                    "source_id": args.source_id,
+                    "result": sanitized_dict(space),
+                },
+            )
 
 
 if __name__ == "__main__":

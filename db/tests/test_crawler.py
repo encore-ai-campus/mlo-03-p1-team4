@@ -773,3 +773,115 @@ def test_legal_ri_resolves_with_city_name():
     mapped, reason = map_space("spacecloud", _space_at("김포 석모리"), SeedMaps.load())
     assert reason is None
     assert (mapped["sido"], mapped["sigungu"]) == ("경기", "김포시")
+
+
+# ---- 평가 의견 4·6 (11-17): 재시도, 상세 실패 건너뛰기, JSON 로그 ----
+
+
+def _robots_ok(request):
+    return httpx.Response(200, text="User-agent: *\nAllow: /\n")
+
+
+def test_polite_client_retries_transient_status_then_succeeds(monkeypatch):
+    waited = []
+    monkeypatch.setattr("crawler.spacecloud_crawler.time.sleep", waited.append)
+    calls = {"n": 0}
+
+    def respond(request):
+        if request.url.path == "/robots.txt":
+            return _robots_ok(request)
+        calls["n"] += 1
+        if calls["n"] == 1:
+            return httpx.Response(503)
+        if calls["n"] == 2:
+            return httpx.Response(429, headers={"retry-after": "30"})
+        return httpx.Response(200, text="ok")
+
+    http = httpx.Client(transport=httpx.MockTransport(respond))
+    with PoliteClient(http=http, delay=0) as client:
+        assert client.get("https://www.spacecloud.kr/space/1") == "ok"
+    assert calls["n"] == 3
+    assert waited == [5.0, 30.0]  # 첫 재시도 5초, 두 번째는 Retry-After(최대 60초)
+
+
+def test_polite_client_retries_network_error_and_gives_up(monkeypatch):
+    waited = []
+    monkeypatch.setattr("crawler.spacecloud_crawler.time.sleep", waited.append)
+    calls = {"n": 0}
+
+    def respond(request):
+        if request.url.path == "/robots.txt":
+            return _robots_ok(request)
+        calls["n"] += 1
+        raise httpx.ConnectError("down", request=request)
+
+    http = httpx.Client(transport=httpx.MockTransport(respond))
+    with PoliteClient(http=http, delay=0) as client, pytest.raises(httpx.ConnectError):
+        client.get("https://www.spacecloud.kr/space/1")
+    assert calls["n"] == 3  # 처음 1번 + 재시도 2번
+    assert waited == [5.0, 15.0]
+
+
+def test_polite_client_does_not_retry_client_errors(monkeypatch):
+    waited = []
+    monkeypatch.setattr("crawler.spacecloud_crawler.time.sleep", waited.append)
+    calls = {"n": 0}
+
+    def respond(request):
+        if request.url.path == "/robots.txt":
+            return _robots_ok(request)
+        calls["n"] += 1
+        return httpx.Response(404)
+
+    http = httpx.Client(transport=httpx.MockTransport(respond))
+    with PoliteClient(http=http, delay=0) as client, pytest.raises(httpx.HTTPStatusError):
+        client.get("https://www.spacecloud.kr/space/1")
+    assert calls["n"] == 1
+    assert waited == []
+
+
+def test_structured_crawl_records_failed_detail_and_continues(tmp_path, monkeypatch):
+    html = '<ul class="list_detail"><li><span class="tit">공간유형</span> 연습실</li></ul>'
+
+    class Client:
+        def get(self, url):
+            if url.endswith("/2"):
+                raise httpx.ConnectError("down")
+            return html
+
+    monkeypatch.setattr("crawler.crawl_venues.get_event_time", lambda: "utc")
+    raw, failures = FakeRaw(), []
+    path = tmp_path / "state.json"
+    fetched = crawl_details(
+        Client(),
+        raw,
+        SeedMaps.load(),
+        {"spacecloud": deque(["3", "2", "1"])},
+        {"spacecloud": set()},
+        {"spacecloud": 1},
+        3,
+        path,
+        structured=True,
+        failures=failures,
+    )
+    assert fetched == {"spacecloud": 3}  # 실패한 요청도 실행당 상세 상한에 센다
+    assert [(f["stage"], f["source_id"], f["error_type"]) for f in failures] == [
+        ("detail_fetch", "2", "ConnectError")
+    ]
+    assert read_state(path) == {"spacecloud": {"1", "3"}}  # 실패한 2는 다음 실행에서 다시 시도
+    assert set(raw.rows) == {("spacecloud", "1"), ("spacecloud", "3")}
+
+
+def test_crawler_log_is_one_json_line(capsys):
+    from crawler.log import CrawlerJsonFormatter, get_logger
+
+    logger = get_logger("spacecube.crawler.test")
+    logger.handlers[0].stream = sys.stderr
+    logger.warning("crawler_detail_skipped", extra={"stage": "detail_fetch", "source_id": "2"})
+    line = capsys.readouterr().err.strip().splitlines()[-1]
+    value = json.loads(line)
+    assert value["level"] == "warning"
+    assert value["message"] == "crawler_detail_skipped"
+    assert value["stage"] == "detail_fetch" and value["source_id"] == "2"
+    assert {"ts", "server", "logger"} <= set(value)
+    assert isinstance(logger.handlers[0].formatter, CrawlerJsonFormatter)
