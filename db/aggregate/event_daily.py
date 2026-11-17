@@ -152,18 +152,32 @@ def main(argv: list[str] | None = None) -> int:
 
     days = target_days(on=args.date, days=args.days, today=datetime.now(KST).date())
     client = MongoClient(url, serverSelectionTimeoutMS=5000, tz_aware=True)
+    failed: list[date] = []
     try:
         db = client[name]
         for day in days:
-            result = aggregate_day(db, day)
+            # 하루가 실패해도 나머지 날짜는 계속 집계한다. 실패한 날은 다음 실행에서 다시 집계된다.
+            try:
+                result = aggregate_day(db, day)
+            except Exception as error:
+                failed.append(day)
+                print(f"{day.isoformat()}: 집계 실패 ({type(error).__name__})", file=sys.stderr)
+                continue
             print(
                 f"{result['date']}: 조합 {result['groups']} (신규 {result['new']}, 삭제 {result['removed']})"
             )
         if args.csv:
-            count = export_csv(db, days, args.csv)
+            done = [day for day in days if day not in failed]
+            count = export_csv(db, done, args.csv)
             print(f"CSV {count}행 → {args.csv}")
     finally:
         client.close()
+    if failed:
+        print(
+            f"집계 실패 {len(failed)}일: {', '.join(d.isoformat() for d in failed)}",
+            file=sys.stderr,
+        )
+        return 1
     return 0
 
 

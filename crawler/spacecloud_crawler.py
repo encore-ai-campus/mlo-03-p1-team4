@@ -15,12 +15,20 @@ from xml.etree import ElementTree
 import httpx
 from bs4 import BeautifulSoup
 
+from crawler.log import get_logger
+
 SPACE_BASE_URL = "https://www.spacecloud.kr"
 SHAREIT_BASE_URL = "https://shareit.kr"
 USER_AGENT = "PRO1-SpaceCubeCrawler/0.2 (class project; weekly; 3s delay)"
 REQUEST_DELAY_SEC = 3.0
 MAX_DETAIL_PER_RUN = 20
 ALLOWED_HOSTS = {"www.spacecloud.kr", "spacecloud.kr", "shareit.kr", "www.shareit.kr"}
+# 일시적인 네트워크 오류·과부하 응답만 다시 시도한다. 4xx(429 제외)는 다시 시도하지 않는다.
+RETRY_WAITS_SEC = (5.0, 15.0)
+RETRY_STATUS = {429, 500, 502, 503, 504}
+MAX_RETRY_AFTER_SEC = 60.0
+
+log = get_logger()
 
 
 @dataclass
@@ -55,16 +63,56 @@ class PoliteClient:
     def __exit__(self, *_):
         self.http.close()
 
-    def _request(self, url: str) -> httpx.Response:
+    def _send(self, url: str) -> httpx.Response:
         if self._last_request is not None:
             wait = self.delay - (time.monotonic() - self._last_request)
             if wait > 0:
                 time.sleep(wait)
         self._last_request = time.monotonic()
-        response = self.http.get(url, headers={"User-Agent": USER_AGENT}, follow_redirects=False)
-        if response.status_code not in {301, 302, 303, 307, 308}:
-            response.raise_for_status()
-        return response
+        return self.http.get(url, headers={"User-Agent": USER_AGENT}, follow_redirects=False)
+
+    def _request(self, url: str) -> httpx.Response:
+        """요청 간격을 지키며 보내고, 일시 오류는 대기 후 최대 len(RETRY_WAITS_SEC)번 다시 시도한다."""
+        path = urlsplit(url).path
+        for attempt in range(len(RETRY_WAITS_SEC) + 1):
+            last = attempt == len(RETRY_WAITS_SEC)
+            try:
+                response = self._send(url)
+            except httpx.TransportError as error:
+                if last:
+                    raise
+                wait = RETRY_WAITS_SEC[attempt]
+                log.warning(
+                    "crawler_request_retry",
+                    extra={
+                        "path": path,
+                        "attempt": attempt + 1,
+                        "wait_sec": wait,
+                        "error_type": type(error).__name__,
+                    },
+                )
+                time.sleep(wait)
+                continue
+            if response.status_code in RETRY_STATUS and not last:
+                wait = RETRY_WAITS_SEC[attempt]
+                retry_after = response.headers.get("retry-after", "")
+                if retry_after.isdecimal():
+                    wait = min(max(wait, float(retry_after)), MAX_RETRY_AFTER_SEC)
+                log.warning(
+                    "crawler_request_retry",
+                    extra={
+                        "path": path,
+                        "attempt": attempt + 1,
+                        "wait_sec": wait,
+                        "status_code": response.status_code,
+                    },
+                )
+                time.sleep(wait)
+                continue
+            if response.status_code not in {301, 302, 303, 307, 308}:
+                response.raise_for_status()
+            return response
+        raise AssertionError("unreachable")  # pragma: no cover
 
     def get(self, url: str) -> str:
         source_host = urlsplit(url).hostname

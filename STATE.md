@@ -221,6 +221,8 @@ A1~A4는 11-03에 확정했고, **A5~A8은 추후 확정**으로 미뤘다(11-03
 
 ## 최근 변경
 
+- 2026-11-17 · 공동(PM) · 평가 의견 4·6 반영. 크롤러 외부 요청 재시도(네트워크 오류·429·5xx만, 5·15초, 최대 2번, Retry-After 60초까지), 실행기에서 상세 조회·해석 실패는 `detail_failures`에 남기고 다음 후보로 진행, `db/aggregate/event_daily.py` 날짜별 예외 처리(실패한 날만 건너뛰고 종료 코드 1), 크롤러 `print` → `crawler/log.py` JSON 로그. 시험 7건 추가, 관련 pytest 83건·Ruff 통과. 의견 2·5는 미착수.
+
 - 2026-11-17 · 공동(PM) · 평가 의견 대조 후 설정·문서 정리. 설치 설정을 최종 배치로 맞춤(`infra/vm/lab/install-role.sh` hosts·ufw: gw .218, mongo .211 / `prometheus.yml`: gw .218, db1·db2 node·mysqld 지표 추가). Codex 작업 폴더에만 있던 Playwright 페르소나 시험(대표 6명 동시·녹화, 500명 읽기)과 실행 안내를 저장소에 추가. README 8절에 이벤트 유실 해결 과정(평가 의견 1). 깨진 링크 2개·`main.py (예정)` 표시 수정. 크롤러 코드 의견(2·4·5·6)은 미착수.
 
 - 2026-11-17 · 공동(PM) · 프로젝트 종료 최신화. 발표 평가서(87점)를 `docs/프로젝트_평가결과_2026-11-09.md`로 옮기고 후속 작업 6개 정리. README 회고(노진산)·WBS 완료·평가 링크, STATE 상단 종료 요약, 문서 지도 갱신. 크롤러 주기 문서 통일(`infra/vm/venue-jobs-deploy.md`, `simulator/generator/README.md`, `infra/vm/remote109/ops/README.md`).
