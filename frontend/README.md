@@ -6,6 +6,9 @@ Vue 3 + Vite 화면 7개, 기존 Noto Sans KR·CSS 토큰·reka UI 래퍼를 유
 
 ## 실행
 
+대표 6명 실서버 Playwright 준비: [실행 안내](../docs/Playwright_대표6명_실행준비.md).
+저장소 루트에서 `powershell -NoProfile -ExecutionPolicy Bypass -File frontend/run-personas.ps1`은 목록만 확인하며 서버에 접속하지 않습니다.
+
 ```bash
 npm install
 ```

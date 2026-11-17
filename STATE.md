@@ -221,6 +221,8 @@ A1~A4는 11-03에 확정했고, **A5~A8은 추후 확정**으로 미뤘다(11-03
 
 ## 최근 변경
 
+- 2026-11-17 · 공동(PM) · 평가 의견 대조 후 설정·문서 정리. 설치 설정을 최종 배치로 맞춤(`infra/vm/lab/install-role.sh` hosts·ufw: gw .218, mongo .211 / `prometheus.yml`: gw .218, db1·db2 node·mysqld 지표 추가). Codex 작업 폴더에만 있던 Playwright 페르소나 시험(대표 6명 동시·녹화, 500명 읽기)과 실행 안내를 저장소에 추가. README 8절에 이벤트 유실 해결 과정(평가 의견 1). 깨진 링크 2개·`main.py (예정)` 표시 수정. 크롤러 코드 의견(2·4·5·6)은 미착수.
+
 - 2026-11-17 · 공동(PM) · 프로젝트 종료 최신화. 발표 평가서(87점)를 `docs/프로젝트_평가결과_2026-11-09.md`로 옮기고 후속 작업 6개 정리. README 회고(노진산)·WBS 완료·평가 링크, STATE 상단 종료 요약, 문서 지도 갱신. 크롤러 주기 문서 통일(`infra/vm/venue-jobs-deploy.md`, `simulator/generator/README.md`, `infra/vm/remote109/ops/README.md`).
 
 - 2026-11-09 · B·DB · 통합 브랜치 9180dc6을 테스트 VM .232의 /opt/spacecube 최상위 구조에 배치하고 `crawler/data/README.md`를 추가. systemd 템플릿과 `/etc/cron.d/spacecube-venue-job`을 설치해 실제 이전 크롤러 결과를 넣은 dry-run smoke를 cron으로 1회 실행: Result=success, plan_valid=true. 새 크롤링·공간 등록은 하지 않았으며 테스트 예약은 주석 처리하고 파일을 보존. :10/:40은 PM 검토안, 실제 api1 .214 배포·apply cron 검증은 대기.

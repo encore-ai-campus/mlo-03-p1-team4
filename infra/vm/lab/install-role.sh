@@ -15,12 +15,12 @@ install -d /etc/systemd/journald.conf.d
 printf '[Journal]\nSystemMaxUse=128M\nRuntimeMaxUse=64M\n' > /etc/systemd/journald.conf.d/spacecube-lab.conf
 hostnamectl set-hostname "spacecube-$ROLE"
 cat >> /etc/hosts <<'EOF'
-192.168.0.211 gw
+192.168.0.218 gw
 192.168.0.212 db1
 192.168.0.213 db2
 192.168.0.214 api1
 192.168.0.215 api2
-192.168.0.216 mongo
+192.168.0.211 mongo
 192.168.0.217 mon
 EOF
 cat > /etc/alloy/config.alloy <<EOF
@@ -189,7 +189,7 @@ gw)
   ufw allow from 192.168.0.19 to any port 8404 proto tcp
   ;;
 api1|api2)
-  ufw allow from 192.168.0.211 to any port 80 proto tcp
+  ufw allow from 192.168.0.218 to any port 80 proto tcp
   ufw allow from 192.168.0.19 to any port 80 proto tcp
   ufw allow from 192.168.0.217 to any port 8000 proto tcp
   ufw allow from 192.168.0.217 to any port 9113 proto tcp
@@ -197,7 +197,7 @@ api1|api2)
 mon)
   ufw allow from 192.168.0.0/24 to any port 3000 proto tcp
   ufw allow from 192.168.0.19 to any port 9090 proto tcp
-  for ip in 192.168.0.211 192.168.0.214 192.168.0.215 192.168.0.217; do
+  for ip in 192.168.0.218 192.168.0.214 192.168.0.215 192.168.0.217; do
     ufw allow from "$ip" to any port 3100 proto tcp
   done
   ;;
