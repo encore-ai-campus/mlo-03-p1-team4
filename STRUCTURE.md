@@ -104,6 +104,7 @@ Pro_1/
 │  ├─ seed/                   categories·facilities·regions(230)·sido/sigungu 별칭·category_map.csv → seed.sql (11-04)
 │  ├─ views/                  v_venue_rating (0001에 포함)
 │  ├─ loaders/                load_seed.py(CSV → seed.sql), load_synthetic (예정)
+│  ├─ queries/                [DB] 판매·이용·취소 SQL과 이벤트 행동 집계 읽기 전용 쿼리 (#119)
 │  └─ tests/                  제약 검증 SQL·동시 INSERT (예정)
 │
 ├─ crawler/                   [DB] F-61 스페이스클라우드·쉐어잇 속성 수집
