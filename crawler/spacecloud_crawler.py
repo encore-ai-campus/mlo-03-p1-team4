@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 import sys
 import time
@@ -20,6 +21,8 @@ SHAREIT_BASE_URL = "https://shareit.kr"
 USER_AGENT = "PRO1-SpaceCubeCrawler/0.2 (class project; weekly; 3s delay)"
 REQUEST_DELAY_SEC = 3.0
 MAX_DETAIL_PER_RUN = 20
+REQUEST_RETRIES = 2
+logger = logging.getLogger(__name__)
 ALLOWED_HOSTS = {"www.spacecloud.kr", "spacecloud.kr", "shareit.kr", "www.shareit.kr"}
 
 
@@ -56,15 +59,32 @@ class PoliteClient:
         self.http.close()
 
     def _request(self, url: str) -> httpx.Response:
-        if self._last_request is not None:
-            wait = self.delay - (time.monotonic() - self._last_request)
-            if wait > 0:
-                time.sleep(wait)
-        self._last_request = time.monotonic()
-        response = self.http.get(url, headers={"User-Agent": USER_AGENT}, follow_redirects=False)
-        if response.status_code not in {301, 302, 303, 307, 308}:
-            response.raise_for_status()
-        return response
+        for attempt in range(REQUEST_RETRIES + 1):
+            if self._last_request is not None:
+                wait = self.delay - (time.monotonic() - self._last_request)
+                if wait > 0:
+                    time.sleep(wait)
+            self._last_request = time.monotonic()
+            try:
+                response = self.http.get(
+                    url, headers={"User-Agent": USER_AGENT}, follow_redirects=False
+                )
+                if response.status_code not in {301, 302, 303, 307, 308}:
+                    response.raise_for_status()
+                return response
+            except httpx.HTTPStatusError as error:
+                if (
+                    error.response.status_code not in {429, 500, 502, 503, 504}
+                    or attempt == REQUEST_RETRIES
+                ):
+                    raise
+            except httpx.TransportError:
+                if attempt == REQUEST_RETRIES:
+                    raise
+            logger.warning(
+                "crawler_request_retry site=%s attempt=%d", urlsplit(url).hostname, attempt + 1
+            )
+        raise AssertionError("재시도 횟수 초과")
 
     def get(self, url: str) -> str:
         source_host = urlsplit(url).hostname

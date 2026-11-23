@@ -351,6 +351,42 @@ def test_crawler_rejects_other_ports_before_request():
     ) == ([], [])
 
 
+def test_transient_detail_error_retries_without_skipping_robots(monkeypatch):
+    requested = []
+
+    def respond(request):
+        requested.append(request.url.path)
+        if request.url.path == "/robots.txt":
+            return httpx.Response(200, text="User-agent: *\nAllow: /\n")
+        return httpx.Response(503 if requested.count("/space/1") == 1 else 200, text="ok")
+
+    with PoliteClient(http=httpx.Client(transport=httpx.MockTransport(respond)), delay=0) as client:
+        assert client.get("https://www.spacecloud.kr/space/1") == "ok"
+    assert requested == ["/robots.txt", "/space/1", "/space/1"]
+
+
+def test_detail_network_error_leaves_id_for_next_run(tmp_path):
+    class Client:
+        def get(self, url):
+            if url.endswith("/3"):
+                raise httpx.ConnectError("offline")
+            return '<ul class="list_detail"><li><span class="tit">공간유형</span> 연습실</li></ul>'
+
+    state = {"spacecloud": set()}
+    fetched = crawl_details(
+        Client(),
+        FakeRaw(),
+        SeedMaps.load(),
+        {"spacecloud": deque(["3", "2"])},
+        state,
+        {"spacecloud": 1},
+        2,
+        tmp_path / "state.json",
+    )
+    assert fetched == {"spacecloud": 2}
+    assert state == {"spacecloud": {"2"}}
+
+
 def test_robots_request_and_first_detail_obey_delay(monkeypatch):
     waited = []
     monkeypatch.setattr("crawler.spacecloud_crawler.time.monotonic", lambda: 10.0)

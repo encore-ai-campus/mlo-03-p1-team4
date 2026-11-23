@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 from collections import deque
 from contextlib import suppress
 from pathlib import Path
@@ -36,6 +37,21 @@ SITEMAP_STATE = DATA_DIR / "sitemap_ids.json"
 SITES = ("spacecloud", "shareit")
 CATEGORIES = ("studyroom", "studio", "cafe", "lectureroom", "partyroom")
 API_URL = "http://127.0.0.1:8000/internal/venues"
+logger = logging.getLogger(__name__)
+
+
+class JsonLogFormatter(logging.Formatter):
+    def format(self, record: logging.LogRecord) -> str:
+        return json.dumps(
+            {"level": record.levelname, "event": record.getMessage()}, ensure_ascii=False
+        )
+
+
+def configure_logging() -> None:
+    handler = logging.StreamHandler()
+    handler.setFormatter(JsonLogFormatter())
+    logging.getLogger("crawler").addHandler(handler)
+    logging.getLogger("crawler").setLevel(logging.INFO)
 
 
 def read_state(path: Path = SITEMAP_STATE) -> dict[str, set[str]]:
@@ -203,16 +219,31 @@ def crawl_details(
                 state.setdefault(site, set()).add(source_id)
                 write_state(state, state_path)
                 continue
+            fetched[site] += 1
             try:
                 html = client.get(detail_url(site, source_id))
-            except httpx.HTTPStatusError as error:
-                if error.response.status_code != 404:
-                    raise
-                fetched[site] += 1
-                space = SpaceInfo(source_id, [], None, None, [], [], None, None)
-            else:
-                fetched[site] += 1
                 space = parse_detail(site, source_id, html)
+            except httpx.HTTPStatusError as error:
+                if error.response.status_code == 404:
+                    space = SpaceInfo(source_id, [], None, None, [], [], None, None)
+                elif error.response.status_code in {429, 500, 502, 503, 504}:
+                    logger.warning(
+                        "crawler_detail_failed site=%s source_id=%s status=%d",
+                        site,
+                        source_id,
+                        error.response.status_code,
+                    )
+                    continue
+                else:
+                    raise
+            except httpx.TransportError as error:
+                logger.warning(
+                    "crawler_detail_failed site=%s source_id=%s error=%s",
+                    site,
+                    source_id,
+                    type(error).__name__,
+                )
+                continue
             mapped, reason = map_space(site, space, maps) if space.space_types else (None, None)
             document = raw_document(site, space, job_ids[site], mapped, reason)
             raw.update_one(
@@ -318,6 +349,7 @@ def _runtime():
 
 
 def main() -> None:
+    configure_logging()
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
     for name in ("baseline", "run", "fetch"):
