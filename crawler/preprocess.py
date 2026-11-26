@@ -181,6 +181,17 @@ def map_space(site: str, space: SpaceInfo, maps: SeedMaps) -> tuple[dict | None,
     ]
     if not prices:
         return None, "최소 예약시간 범위 밖"
+    hours = _business_hours(space.open_hours)
+    if hours is None:
+        return None, "영업시간 이상"
+    available_hours = hours[1] - hours[0]
+    prices = [
+        price
+        for price in prices
+        if (price.get("min_hours") or space.min_hours or 1) <= available_hours
+    ]
+    if not prices:
+        return None, "최소 이용시간이 영업시간보다 김"
     if site == "shareit":
         prices = [
             price
@@ -222,9 +233,6 @@ def map_space(site: str, space: SpaceInfo, maps: SeedMaps) -> tuple[dict | None,
         if reason.startswith("regions에 없음"):
             return None, "지원하지 않는 시·군·구"
         return None, "주소가 시·도 하나뿐"
-    hours = _business_hours(space.open_hours)
-    if hours is None:
-        return None, "영업시간 이상"
     sido, sigungu = region
     return {
         "category": category,

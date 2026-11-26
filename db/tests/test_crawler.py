@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 from collections import deque
@@ -14,6 +15,9 @@ import pytest
 
 from app.schemas.internal import InternalVenueUpsert
 from crawler.crawl_venues import (
+    CrawlerRunError,
+    CrawlerStageError,
+    _empty_registration_result,
     candidate_ids,
     crawl_details,
     raw_document,
@@ -39,6 +43,8 @@ def test_crawler_cli_imports_from_repository_root():
         cwd=root,
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        env={**os.environ, "PYTHONIOENCODING": "utf-8"},
         check=False,
     )
     assert result.returncode == 0, result.stderr
@@ -457,6 +463,21 @@ def test_failed_venue_id_write_can_retry_same_source():
     assert api.calls[0]["source_id"] == api.calls[1]["source_id"]
 
 
+def test_register_pending_accepts_legacy_mapped_category_code():
+    raw = _pending_raw()
+    row = raw.rows[("spacecloud", "53074")]
+    row["mapped"]["category_code"] = row["mapped"].pop("category")
+    api = FakeApi()
+
+    registered = register_pending(
+        raw, api, "test-key", "http://test/internal/venues", 1, True, ("spacecloud",)
+    )
+
+    assert registered["studyroom"] == 1
+    assert api.calls[0]["category_code"] == "studyroom"
+    assert "category" not in row["mapped"]
+
+
 def test_unprocessed_new_ids_remain_for_next_run(tmp_path, monkeypatch):
     raw = FakeRaw()
     site_ids = {"spacecloud": ["1", "2", "3"]}
@@ -546,6 +567,140 @@ def test_weekly_run_allows_zero_new_registrations(tmp_path, monkeypatch):
     assert finished == [(1, result["jobs"]["spacecloud"], "done")]
 
 
+def _pending_raw():
+    raw = FakeRaw()
+    space = SpaceInfo(
+        "53074",
+        ["스터디룸"],
+        8,
+        1,
+        [],
+        [{"amount": 10000, "unit": "시간", "per_person": False}],
+        None,
+        "서울 마포구",
+    )
+    mapped, _ = map_space("spacecloud", space, SeedMaps.load())
+    raw.update_one(
+        {"source_site": "spacecloud", "source_id": "53074"},
+        {"$set": raw_document("spacecloud", space, 1, mapped, None)},
+        upsert=True,
+    )
+    return raw
+
+
+@pytest.mark.parametrize("status,expected", [(200, 0), (201, 1)])
+def test_pipeline_counts_only_http_201(monkeypatch, status, expected):
+    api = FakeApi()
+    monkeypatch.setattr(
+        api,
+        "post",
+        lambda url, **kwargs: httpx.Response(
+            status,
+            json={"venue_id": 123, "ignored_facilities": []},
+            request=httpx.Request("POST", url),
+        ),
+    )
+    outcome = _empty_registration_result()
+    register_pending(
+        _pending_raw(),
+        api,
+        "test-key",
+        "http://test/internal/venues",
+        1,
+        True,
+        ("spacecloud",),
+        outcome=outcome,
+    )
+    assert outcome["newly_registered_by_category"]["studyroom"] == expected
+    assert outcome["registered_by_category"]["studyroom"] == 1
+    assert len(outcome["newly_registered_by_category"]) == 5
+
+
+def test_pipeline_keeps_confirmed_201_when_mongo_write_fails():
+    raw = _pending_raw()
+    raw.fail_venue_write = True
+    outcome = _empty_registration_result()
+    with pytest.raises(CrawlerStageError) as failure:
+        register_pending(
+            raw,
+            FakeApi(),
+            "test-key",
+            "http://test/internal/venues",
+            1,
+            True,
+            ("spacecloud",),
+            outcome=outcome,
+        )
+    assert outcome["newly_registered_by_category"]["studyroom"] == 1
+    assert outcome["confirmed_registrations"][0]["venue_id"] == 123
+    assert outcome["registered_by_category"]["studyroom"] == 0
+    assert failure.value.failure["kind"] == "internal"
+
+
+def test_pipeline_marks_lost_registration_response_uncertain(monkeypatch):
+    api = FakeApi()
+
+    def no_response(url, **kwargs):
+        raise httpx.ReadTimeout("test", request=httpx.Request("POST", url))
+
+    monkeypatch.setattr(api, "post", no_response)
+    outcome = _empty_registration_result()
+    with pytest.raises(CrawlerStageError):
+        register_pending(
+            _pending_raw(),
+            api,
+            "test-key",
+            "http://test/internal/venues",
+            1,
+            True,
+            ("spacecloud",),
+            outcome=outcome,
+        )
+    assert len(outcome["uncertain_registrations"]) == 1
+    assert sum(outcome["newly_registered_by_category"].values()) == 0
+
+
+def test_pipeline_run_error_preserves_partial_201_and_job_id(tmp_path, monkeypatch):
+    raw = _pending_raw()
+    raw.fail_venue_write = True
+    monkeypatch.setattr("crawler.crawl_venues.start_job", lambda *args: 42)
+    monkeypatch.setattr("crawler.crawl_venues.finish_job", lambda *args: None)
+    monkeypatch.setattr("crawler.crawl_venues.fetch_sitemap_ids", lambda *args: [])
+    with pytest.raises(CrawlerRunError) as failure:
+        run(
+            sites=("spacecloud",),
+            mode="bootstrap",
+            max_detail=0,
+            max_register=20,
+            client=object(),
+            raw=raw,
+            engine=None,
+            api=FakeApi(),
+            key="test-key",
+            state_path=tmp_path / "sitemap.json",
+        )
+    result = failure.value.result
+    assert result["newly_registered_by_category"]["studyroom"] == 1
+    assert result["job_ids"] == {"spacecloud": 42}
+    assert result["ok"] is False
+
+
+def test_minimum_booking_time_cannot_exceed_business_hours():
+    space = SpaceInfo(
+        "53074",
+        ["스터디룸"],
+        8,
+        4,
+        [],
+        [{"amount": 10000, "unit": "시간", "per_person": False}],
+        "09:00~11:00",
+        "서울 마포구",
+    )
+    mapped, reason = map_space("spacecloud", space, SeedMaps.load())
+    assert mapped is None
+    assert reason == "최소 이용시간이 영업시간보다 김"
+
+
 @pytest.mark.parametrize(
     ("address", "expected"),
     [
@@ -618,3 +773,115 @@ def test_legal_ri_resolves_with_city_name():
     mapped, reason = map_space("spacecloud", _space_at("김포 석모리"), SeedMaps.load())
     assert reason is None
     assert (mapped["sido"], mapped["sigungu"]) == ("경기", "김포시")
+
+
+# ---- 평가 의견 4·6 (11-17): 재시도, 상세 실패 건너뛰기, JSON 로그 ----
+
+
+def _robots_ok(request):
+    return httpx.Response(200, text="User-agent: *\nAllow: /\n")
+
+
+def test_polite_client_retries_transient_status_then_succeeds(monkeypatch):
+    waited = []
+    monkeypatch.setattr("crawler.spacecloud_crawler.time.sleep", waited.append)
+    calls = {"n": 0}
+
+    def respond(request):
+        if request.url.path == "/robots.txt":
+            return _robots_ok(request)
+        calls["n"] += 1
+        if calls["n"] == 1:
+            return httpx.Response(503)
+        if calls["n"] == 2:
+            return httpx.Response(429, headers={"retry-after": "30"})
+        return httpx.Response(200, text="ok")
+
+    http = httpx.Client(transport=httpx.MockTransport(respond))
+    with PoliteClient(http=http, delay=0) as client:
+        assert client.get("https://www.spacecloud.kr/space/1") == "ok"
+    assert calls["n"] == 3
+    assert waited == [5.0, 30.0]  # 첫 재시도 5초, 두 번째는 Retry-After(최대 60초)
+
+
+def test_polite_client_retries_network_error_and_gives_up(monkeypatch):
+    waited = []
+    monkeypatch.setattr("crawler.spacecloud_crawler.time.sleep", waited.append)
+    calls = {"n": 0}
+
+    def respond(request):
+        if request.url.path == "/robots.txt":
+            return _robots_ok(request)
+        calls["n"] += 1
+        raise httpx.ConnectError("down", request=request)
+
+    http = httpx.Client(transport=httpx.MockTransport(respond))
+    with PoliteClient(http=http, delay=0) as client, pytest.raises(httpx.ConnectError):
+        client.get("https://www.spacecloud.kr/space/1")
+    assert calls["n"] == 3  # 처음 1번 + 재시도 2번
+    assert waited == [5.0, 15.0]
+
+
+def test_polite_client_does_not_retry_client_errors(monkeypatch):
+    waited = []
+    monkeypatch.setattr("crawler.spacecloud_crawler.time.sleep", waited.append)
+    calls = {"n": 0}
+
+    def respond(request):
+        if request.url.path == "/robots.txt":
+            return _robots_ok(request)
+        calls["n"] += 1
+        return httpx.Response(404)
+
+    http = httpx.Client(transport=httpx.MockTransport(respond))
+    with PoliteClient(http=http, delay=0) as client, pytest.raises(httpx.HTTPStatusError):
+        client.get("https://www.spacecloud.kr/space/1")
+    assert calls["n"] == 1
+    assert waited == []
+
+
+def test_structured_crawl_records_failed_detail_and_continues(tmp_path, monkeypatch):
+    html = '<ul class="list_detail"><li><span class="tit">공간유형</span> 연습실</li></ul>'
+
+    class Client:
+        def get(self, url):
+            if url.endswith("/2"):
+                raise httpx.ConnectError("down")
+            return html
+
+    monkeypatch.setattr("crawler.crawl_venues.get_event_time", lambda: "utc")
+    raw, failures = FakeRaw(), []
+    path = tmp_path / "state.json"
+    fetched = crawl_details(
+        Client(),
+        raw,
+        SeedMaps.load(),
+        {"spacecloud": deque(["3", "2", "1"])},
+        {"spacecloud": set()},
+        {"spacecloud": 1},
+        3,
+        path,
+        structured=True,
+        failures=failures,
+    )
+    assert fetched == {"spacecloud": 3}  # 실패한 요청도 실행당 상세 상한에 센다
+    assert [(f["stage"], f["source_id"], f["error_type"]) for f in failures] == [
+        ("detail_fetch", "2", "ConnectError")
+    ]
+    assert read_state(path) == {"spacecloud": {"1", "3"}}  # 실패한 2는 다음 실행에서 다시 시도
+    assert set(raw.rows) == {("spacecloud", "1"), ("spacecloud", "3")}
+
+
+def test_crawler_log_is_one_json_line(capsys):
+    from crawler.log import CrawlerJsonFormatter, get_logger
+
+    logger = get_logger("spacecube.crawler.test")
+    logger.handlers[0].stream = sys.stderr
+    logger.warning("crawler_detail_skipped", extra={"stage": "detail_fetch", "source_id": "2"})
+    line = capsys.readouterr().err.strip().splitlines()[-1]
+    value = json.loads(line)
+    assert value["level"] == "warning"
+    assert value["message"] == "crawler_detail_skipped"
+    assert value["stage"] == "detail_fetch" and value["source_id"] == "2"
+    assert {"ts", "server", "logger"} <= set(value)
+    assert isinstance(logger.handlers[0].formatter, CrawlerJsonFormatter)

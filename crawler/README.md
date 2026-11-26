@@ -24,7 +24,40 @@
 - run: MongoDB crawl.crawl_raw에 이름·사진·후기·연락처·상세 주소·HTML을 뺀 추출값과 제외 이유를 남긴다. 전처리한 공간은 B의 POST /internal/venues로만 등록하고 응답 venue_id를 기록한다. MariaDB crawl_jobs에는 출처별 조회·등록 건수와 실행 상태를 남긴다. API 등록 뒤 Mongo 기록이 실패해도 같은 출처로 재전송하면 기존 공간을 갱신한다.
 - 실행 결과의 `jobs.<site>.fetched`와 `registered`는 각각 상세 조회·공간 등록 건수다. 전체 시연 공간 수는 등록 뒤 공개 `GET /venues?page=1&size=1`의 `total`을 따로 확인한다. 읽기 복제 지연이 있으면 값이 반영될 때 다시 조회한다.
 
+## 통합 실행기 연동 (#100)
+
+B 실행기는 CLI 프로세스를 파싱하지 않고 아래 Python 진입점을 직접 호출할 수 있다. 설정·MariaDB·MongoDB 연결과 HTTP 클라이언트 수명은 크롤러가 관리한다.
+
+```python
+from crawler.crawl_venues import CrawlerRunError, run_configured
+
+try:
+    result = run_configured(mode="weekly", max_detail=20, max_register=5)
+except CrawlerRunError as error:
+    result = error.result  # 실패 시에도 확인된 부분 결과와 실패 정보를 받는다.
+```
+
+`result`는 성공과 실패에 같은 키를 사용한다. 기존 `jobs`와 `registered_by_category`는 유지한다.
+
+- `ok`: 실행 성공 여부
+- `job_ids`: 출처별 MariaDB `crawl_jobs.job_id`
+- `jobs.<site>`: `new_ids`, `fetched`, `registered` 실행 건수
+- `registered_by_category`: HTTP 200/201 후 MongoDB 상태 기록까지 끝난 유형별 건수
+- `newly_registered_by_category`: **HTTP 201만** 세는 유형별 신규 등록 수. 다섯 유형을 모두 포함하고 0도 반환한다. HTTP 200 갱신은 포함하지 않는다.
+- `confirmed_registrations`: API가 확인 응답한 출처 ID·유형·상태 코드·공간 ID. HTTP 201 응답은 본문 해석이나 MongoDB 기록이 뒤이어 실패해도 남으며, 이 경우 `venue_id`는 `null`일 수 있다.
+- `uncertain_registrations`: 요청 무응답 또는 API 5xx로 등록 여부를 단정할 수 없는 출처. 이런 건을 신규 0건으로 간주해 보충하지 않도록 표시한다.
+- `detail_failures`: 재시도 뒤에도 실패해 **건너뛴** 상세 조회·해석 목록(`stage`이 `detail_fetch`/`detail_parse`, `error_type`, 출처 ID). 실행은 멈추지 않고 다음 후보로 간다. 건너뛴 ID는 처리 상태에 넣지 않으므로 다음 실행에서 다시 시도한다. 보낸 요청은 실행당 상세 20건 상한에 센다.
+- `failure`: `stage`, `kind`(`external`/`internal`), `error_type`, 고정된 안전 요약과 선택적 출처 ID. 응답 본문·URL·예외 원문은 넣지 않는다. 초기화 실패도 `runtime_init` 단계의 같은 형식이다.
+
+실패한 경우 CLI는 이 결과를 JSON 로그(`crawler_run_failed`)로 남기고 종료 코드 1을 반환한다. B 실행기는 #99의 유형별 회차 목표 6개에서 `newly_registered_by_category`만 빼서 부족분을 계산하고, 재개 때는 이전 회차 입력을 이어 쓴다. `failure.kind == "external"`이고 `uncertain_registrations`가 비어 있을 때는 확인된 신규 건수로 보충할 수 있다. 내부 실패나 불확실 등록이 있으면 보충을 진행하지 않는다. 부족분 계산·생성·재개는 B 담당이며, 이 DB 진입점은 크롤러 결과만 전달한다. venue API 요청 필드와 반환 형식은 바꾸지 않는다.
+
 유형은 db/seed/category_map.csv 한 곳에서 대응시킨다. 지역은 `addressRegion`+`addressLocality`를 `db/seed/legal_dong.csv` 또는 기존 별칭표와 `db/seed/regions.csv`로 매핑하고, 모호·누락 이유를 구분해 기록한다. 쉐어잇의 ruleType 1·2 단위가 확정되지 않았으므로 명시적으로 timeUnitMinute=60인 요금만 시간당 가격 후보로 쓴다. API 요청의 이름·소개·안내는 생성 문구이고, 공간당 art: 이미지 코드 3개를 보낸다.
+
+## 재시도와 로그 (11-17, 발표 평가 의견 4·6)
+
+- **재시도**: `PoliteClient`는 네트워크 오류(`httpx.TransportError`)와 429·500·502·503·504 응답만 5초, 15초 기다린 뒤 최대 2번 다시 보낸다. 429의 `Retry-After`는 60초까지 따른다. 그 밖의 4xx(404 등)는 다시 보내지 않는다. 다시 보낼 때도 요청 간격 3초 이상·robots 확인은 그대로다.
+- **상세 하나 실패**: 실행기(`run`/`run_configured`)에서는 상세 조회·해석이 재시도 뒤에도 실패하면 `detail_failures`에 남기고 다음 후보로 간다. 사이트맵·DB·등록 단계 실패는 예전처럼 실행을 멈추고 `failure`에 남긴다.
+- **JSON 로그**: `crawler/log.py`가 백엔드와 같은 한 줄 JSON(`ts`, `server`, `level`, `logger`, `message`와 `stage`·`source_id` 같은 안전한 필드)을 stderr로 남긴다. 실행 결과는 `crawler_run_finished`/`crawler_run_failed`의 `result` 필드에 담긴다. `print`는 쓰지 않는다(표본 분포를 사람이 읽는 표로 보여 주는 `analyze_sample.py` 제외).
 
 sample_categories.py는 새 표본을 꼭 확인해야 할 때만 사용하며 상세 20건 상한을 강제한다. analyze_sample.py는 기존 표본의 분포를 읽는 도구다. data/의 기존 결과 파일은 삭제하지 않는다.
 

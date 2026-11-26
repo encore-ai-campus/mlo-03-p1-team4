@@ -6,6 +6,8 @@
 
 11-07 실제 상태는 219망 VM **7대 실행**, Terraform 6대+Mongo OVA 1대다. MariaDB 10.11.14 primary/replica, MongoDB 8.0.34, Prometheus 19 targets·Grafana 11개를 확인했다. 현재 주소·사양·한도는 [운영 현황](../../docs/DB_운영_모니터링_현황_2026-11-07.md)에 있다. 아래 노트북별 목록은 11-09 분산 배치 체크리스트이며 전체 항목 완료를 뜻하지 않는다.
 
+11-08 14시 PM 팀 공유 계획: 발표용 VM은 노트북 주인이 새로 설치하고 현장 IP를 이름으로 연결한다. 109는 용량 시험 종료 뒤 예비 환경으로 보존한다. 이후 사용자 확인으로 발표 배포의 공간 정기 작업은 cron을 사용한다. 설정·전환 절차는 [공간 정기 작업 배포 안내](venue-jobs-deploy.md)를 따른다. 11-08 사용자 확정 기준은 bootstrap·상세 20건·매시 :10/:40이며, 아래의 과거 주간 크롤링 일정에 우선한다. 실제 활성화는 배포 대상 api1 운영 담당이 한다.
+
 ## 0. 모두 한 번
 
 - [ ] 팀 전용 공유기, AP 격리 끔, 가능하면 유선
@@ -22,16 +24,18 @@
 - [ ] `db1`: `0001_init.sql` → `seed.sql` 적용, `db/tests/check_ddl.py`를 `CHECK_DB_URL`로 한 번 돌려 확인(`spacecube_test`)
 - [ ] `db1`: 백업 cron(하루 1회 `mariadb-dump --single-transaction`, 7개 보관)
 - [ ] `mongo`: MongoDB 8.0.34(현재 팀 OVA 기준), 인증 켬, WiredTiger 캐시 1GB, `docs/db/mongo_init.js`, `db/tests/check_mongo_init.js`, 백업 cron(`mongodump`, 7개)
-- [ ] `gw`: HAProxy(apt), `infra/haproxy/README.md` 설정(80 → `api1:80`·`api2:80` 라운드로빈, `/health` 확인 `inter 2s fall 2 rise 2`, `/api/internal`·`/api/metrics` 차단, 통계·Prometheus 지표 8404), Alloy가 8404 수집 (11-06 B안)
 - [ ] `db2`: MariaDB 10.11.14, `server_id=2`, `read_only=ON`, GTID 복제(`CHANGE MASTER TO MASTER_HOST='db1', MASTER_USE_GTID=slave_pos`), `SHOW SLAVE STATUS`에서 지연 확인 (11-08: 노트북 3에서 노트북 1로 옮김)
-- [ ] 네 VM 모두 Alloy(로그 → `mon:3100`, 지표 → `mon:9090`, db1·db2는 mysqld exporter 포함), `ufw` 규칙
+- [ ] 세 VM 모두 Alloy(로그 → `mon:3100`, 지표 → `mon:9090`, db1·db2는 mysqld exporter 포함), `ufw` 규칙
 
 ## 2. 노트북 2 (A 이자연)
 
+공간 보충기·#100 통합 실행기의 월요일 배포 대상은 Ubuntu `api1`(`192.168.0.214`)로 사용자 확인을 받았다. 보충기·프로필·실행 기록은 #99의 `/opt/spacecube` 지정 경로를 따른다. 실제 Python·실행 계정·설정 주입은 [공간 정기 작업 배포 안내](venue-jobs-deploy.md)를 참고해 대상 VM에서 확인한다.
+
 - [ ] `api1`: Python 3.12 venv + `environment.yml`의 pip 버전, `backend/.env`(`DB_WRITE_URL=…@db1`, `DB_READ_URL=…@db2`, `MONGO_URL=…@mongo`, `SERVER_NAME=api-1`, `SYNTHETIC_API_KEY` 등), uvicorn systemd(`--workers 2`, 8000)
 - [ ] `api1`: Nginx(apt), Vue 빌드(`frontend`에서 `npm run build` → `dist/`) 복사, `infra/nginx/README.md` 서버용 설정(정적 파일 + `/api` → `127.0.0.1:8000`), `stub_status` + nginx exporter (11-06 B안)
-- [ ] `api1`: cron — 이용 완료 배치(1시간), 크롤러(주 1회, `crawler/AGENTS.md` 규칙), `replay_events.py`, `event_daily` 집계(매일 새벽)
+- [ ] `api1`: 정기 작업 — 크롤러·보충 통합 실행기는 [cron](venue-jobs-deploy.md) 사용(사용자 확정). 이용 완료·`replay_events.py`·집계 일정은 담당 설정을 확인(109 실제 이용 완료 :05·집계 :20과 구분)
 - [ ] `api1`: 크롤러·생성기 실행 환경과 키(`INTERNAL_API_KEY`, DB·MongoDB 접속 정보)는 A가 설치(11-05 #38). 생성기 과거 30일 백필은 수동으로 한 번, 먼저 회원 100명으로 검증
+- [ ] `api1`: #10 bootstrap → #99 공간 보충 → 생성기 → 집계·CSV 순서로 준비. #99 브랜치 코드는 실행별 신규 등록 수 입력을 사용한다. 실제 대상 환경의 입력·등록·재개를 검증한 뒤, #100 통합 실행기가 준비되면 정기 작업의 공통 진입점을 실제 apply 명령으로 전환한다. 통합 실행기 전에는 [수동 대체 절차](venue-jobs-deploy.md)를 따른다.
 - [ ] `mon`: Prometheus(15일, 원격 쓰기 받기 켬), Loki(14일), Grafana(3000) + 현재 11개 대시보드(서비스·프록시·서버·DB·이벤트·수집 로그) + 경보(복제 지연 5초, 오류율)
 - [ ] 두 VM 모두 Alloy, `ufw` 규칙
 
@@ -39,7 +43,8 @@
 
 - [ ] VM 사양·주소는 [`docs/로컬_VM_구성.md`](../../docs/로컬_VM_구성.md) 2·3절(11-08 확정: 109 검증 사양 × 1.5, 192.168.0.211~217)
 - [ ] `api2`: `api1`과 같은 Nginx·코드·설정(`SERVER_NAME=api-2`, cron 없음)
-- [ ] `ufw` 규칙
+- [ ] `gw`: HAProxy(apt), `infra/haproxy/README.md` 설정(80 → `api1:80`·`api2:80` 라운드로빈, `/health` 확인 `inter 2s fall 2 rise 2`, `/api/internal`·`/api/metrics` 차단, 통계·Prometheus 지표 8404), Alloy가 8404 수집 (11-06 B안) (11-09: 노트북 1에서 노트북 3으로 옮김)
+- [ ] 두 VM 모두 Alloy(HAProxy 8404 지표 포함), `ufw` 규칙
 
 ## 4. 노트북 4 (FE·PM 노진산)
 
